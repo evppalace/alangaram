@@ -829,6 +829,90 @@ var sectionMeta = {
   s9:{prefix:'RC', name:'Reception'},
   s10:{prefix:'MH', name:'Muhurtham'}
 };
+
+// ── GOOGLE DRIVE AUTO-SYNC ──────────────────────────────────────────────────
+// Drop a new photo into the matching Drive folder and it appears here automatically —
+// no code edits needed. Never uses the actual Drive filename (may contain client names);
+// captions are always auto-generated as "<Section> Reference #N".
+var GOOGLE_DRIVE_API_KEY = 'AIzaSyDzOKhUNnV1WwZFyZ6mN8uD6Q8tqFY7K3A';
+var DRIVE_SECTION_FOLDERS = {
+  s1:  '1O5fcxSgDv7XJ6Wg6zXJmlr_cTu0Xj9Hx', // Main Gate — Main entrance
+  s2:  '1oREoxnUiQesDY9zyaU7Ju_FKn6KFDzQR', // Portico — Portico entrance
+  s3:  '1hQD7xivtpZmGGYXzplNeS3yCDTCG40ez', // Entrance Arch — Arches (shared with Dining Arch + Event Entrance)
+  s4:  '1hQD7xivtpZmGGYXzplNeS3yCDTCG40ez', // Dining Arch — Arches (same folder as Entrance Arch)
+  s5:  '1Ks3NSkW9Oe9RBcqLKkS9Za1GTOgP3cxB', // Ganesh Corner — Ganesh cornor & Staircase
+  s6:  '1hQD7xivtpZmGGYXzplNeS3yCDTCG40ez', // Event Entrance — Arches (same folder as Entrance Arch / Dining Arch)
+  s7:  '1c4tTPIpNhYfq0fTD1NGCo9PgR5vp-oen', // Photo Booth — Name boards & Photobooth
+  s8:  '148un-YiKB6GP6MhhAkKjedNVHh37a7Zk', // Pathway
+  s9:  '1CL5FR51uBp6Cw-978j39kUWapDj48NbA', // Reception
+  s10: '1j2E7bEJwYGg0HxxJ_pDDDbBbvOZR5jQ1'  // Muhurtham
+};
+
+function driveFetchFolder(folderId){
+  var url = 'https://www.googleapis.com/drive/v3/files'
+    + '?q=' + encodeURIComponent("'" + folderId + "' in parents and mimeType contains 'image/' and trashed = false")
+    + '&fields=' + encodeURIComponent('files(id,name,createdTime)')
+    + '&pageSize=200'
+    + '&key=' + GOOGLE_DRIVE_API_KEY;
+  return fetch(url).then(function(r){
+    if(!r.ok) throw new Error('Drive API error ' + r.status);
+    return r.json();
+  }).then(function(data){
+    var files = (data.files || []).slice();
+    files.sort(function(a, b){
+      var na = (a.name.match(/(\d+)/) || [])[1];
+      var nb = (b.name.match(/(\d+)/) || [])[1];
+      if(na && nb) return parseInt(na, 10) - parseInt(nb, 10);
+      return new Date(a.createdTime) - new Date(b.createdTime);
+    });
+    return files;
+  }).catch(function(err){
+    console.error('Drive folder load failed for ' + folderId, err);
+    return [];
+  });
+}
+
+function renderDriveImages(sid, files){
+  var sec = document.getElementById(sid);
+  if(!sec) return;
+  var grid = sec.querySelector('.gg');
+  if(!grid) return;
+  var meta = sectionMeta[sid];
+  if(files.length > 0){
+    // Drive loaded successfully — remove the old hardcoded reference photos so
+    // Drive becomes the single live source. "Actual Space" photos are untouched.
+    Array.prototype.slice.call(grid.querySelectorAll('.gc')).forEach(function(card){
+      if(!card.querySelector('.own-tag')) card.remove();
+    });
+  }
+  // If files.length is 0 (API failed, key issue, empty folder), the existing
+  // hardcoded photos stay exactly as they are — safe fallback, gallery never goes blank.
+  files.forEach(function(f, i){
+    var caption = meta.name + ' Reference #' + (i + 1);
+    var div = document.createElement('div');
+    div.className = 'gc';
+    div.setAttribute('onclick', 'openLB(this)');
+    div.innerHTML =
+      '<img src="https://drive.google.com/thumbnail?id=' + f.id + '&sz=w1000" alt="' + caption + '" loading="lazy">' +
+      '<div class="gc-ov"></div>' +
+      '<div class="gc-cap">' + caption + '</div>' +
+      '<div class="ref-tag">Reference</div>';
+    grid.appendChild(div);
+  });
+}
+
+function loadAllDriveSections(){
+  var sectionIds = Object.keys(DRIVE_SECTION_FOLDERS);
+  var fetches = sectionIds.map(function(sid){
+    return driveFetchFolder(DRIVE_SECTION_FOLDERS[sid]).then(function(files){
+      return { sid: sid, files: files };
+    });
+  });
+  return Promise.all(fetches).then(function(results){
+    results.forEach(function(r){ renderDriveImages(r.sid, r.files); });
+  });
+}
+
 var selectedImages = {};
 function pad2(n){ return n<10 ? '0'+n : ''+n; }
 function initCodesAndSelection(){
@@ -1999,7 +2083,11 @@ function initMoodboard(){
   buildMoodQuestions();
   document.getElementById('moodGenerateBtn').addEventListener('click', generateMoodboard);
 }
-window.addEventListener('DOMContentLoaded', function(){ initShowMore(); initTastePanel(); initCodesAndSelection(); initSelectionBar(); initPinCollector(); initTutorial(); initWaWidget(); initOutfitMatcher(); initScrollReveal(); initMoodboard(); initSelectionMoodboard(); });
+window.addEventListener('DOMContentLoaded', function(){
+  loadAllDriveSections().then(function(){
+    initShowMore(); initTastePanel(); initCodesAndSelection(); initSelectionBar(); initPinCollector(); initTutorial(); initWaWidget(); initOutfitMatcher(); initScrollReveal(); initMoodboard(); initSelectionMoodboard();
+  });
+});
 function flt(cat,btn,gid){
   var g=document.getElementById(gid);if(!g)return;
   g.dataset.filter = cat;
