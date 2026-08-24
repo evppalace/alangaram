@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Booking Confirmation — Alangaram Events</title>
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Alangaram Events — Your Booking Confirmation">
+<meta property="og:description" content="Your SVV decor booking details, payment status, quote and moodboard — all in one place.">
+<meta property="og:image" content="https://evppalace.github.io/alangaram/svv-cover.jpg">
+<meta name="twitter:card" content="summary_large_image">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:-apple-system,"Segoe UI",system-ui,sans-serif;
+  background:#0F0804;
+  color:#F0E6CC;
+  min-height:100vh;
+  padding:0 0 40px;
+}
+.header{
+  background:linear-gradient(135deg,#1B0C0D,#241012);
+  border-bottom:1px solid rgba(196,150,42,.25);
+  padding:28px 20px 22px;
+  text-align:center;
+}
+.header .brand{
+  font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#C9A961;font-weight:700;margin-bottom:6px;
+}
+.header h1{font-size:20px;font-weight:800;color:#F0E6CC;}
+.header .sub{font-size:12px;color:#95796B;margin-top:4px;}
+
+.wrap{max-width:480px;margin:0 auto;padding:20px 16px;}
+
+.status-banner{
+  border-radius:14px;padding:16px 18px;margin-bottom:18px;text-align:center;
+}
+.status-banner.confirmed{background:rgba(90,158,111,.14);border:1px solid rgba(90,158,111,.4);}
+.status-banner.pending{background:rgba(200,146,42,.14);border:1px solid rgba(200,146,42,.4);}
+.status-banner .icon{font-size:28px;margin-bottom:6px;}
+.status-banner .title{font-size:15px;font-weight:800;}
+.status-banner.confirmed .title{color:#5A9E6F;}
+.status-banner.pending .title{color:#C9A961;}
+.status-banner .msg{font-size:11.5px;color:#C4B39E;margin-top:4px;}
+
+.card{
+  background:#1B0C0D;border:1px solid rgba(122,27,38,.3);border-radius:14px;
+  padding:16px 18px;margin-bottom:14px;
+}
+.card .sec-title{
+  font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#C9A961;font-weight:700;margin-bottom:12px;
+}
+.row{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;gap:10px;}
+.row .l{font-size:12px;color:#95796B;}
+.row .v{font-size:13px;color:#F0E6CC;font-weight:700;text-align:right;}
+
+.pay-total{display:flex;justify-content:space-between;align-items:center;padding:8px 0;}
+.pay-total .l{font-size:12.5px;color:#C4B39E;}
+.pay-total .v{font-size:17px;font-weight:800;}
+.pay-total.received .v{color:#5A9E6F;}
+.pay-total.balance .v{color:#D07030;}
+.pay-total.cleared .v{color:#5A9E6F;}
+.progress-track{height:8px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;margin:8px 0 2px;}
+.progress-fill{height:100%;background:linear-gradient(90deg,#C9A961,#5A9E6F);border-radius:5px;}
+
+.btn{
+  display:block;width:100%;text-align:center;padding:13px 16px;border-radius:10px;
+  font-size:13.5px;font-weight:800;text-decoration:none;cursor:pointer;border:none;margin-bottom:10px;
+}
+.btn-primary{background:linear-gradient(135deg,#C0166E,#8a0f4e);color:#fff;}
+.btn-wa{background:#25D366;color:#fff;}
+.btn-outline{background:transparent;border:1.5px solid rgba(196,150,42,.4);color:#C9A961;}
+
+.ref-imgs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;}
+.ref-imgs img{width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid rgba(122,27,38,.3);flex:0 0 auto;}
+
+.footer{text-align:center;padding:26px 16px 4px;color:#6B5648;font-size:11px;line-height:1.7;}
+.footer .tag{color:#C9A961;font-weight:700;font-size:12px;margin-bottom:4px;}
+
+.loading,.errbox{text-align:center;padding:80px 20px;color:#95796B;font-size:13px;}
+.errbox .icon{font-size:34px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">Alangaram Events</div>
+  <h1>Your Booking Confirmation</h1>
+  <div class="sub">SVV Marriage Hall Decor</div>
+</div>
+
+<div class="wrap" id="app">
+  <div class="loading">Loading your booking details…</div>
+</div>
+
+<div class="footer">
+  <div class="tag">Alangaram Events</div>
+  Beautiful Moments, Lasting Memories<br>
+  For any questions, reach out anytime below.
+</div>
+
+<script>
+var FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyC2c1V3cYDX5Njc78BGvbr43caM089IuiE",
+  authDomain:        "evp-crm.firebaseapp.com",
+  databaseURL:       "https://evp-crm-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "evp-crm",
+  storageBucket:     "evp-crm.firebasestorage.app",
+  messagingSenderId: "78324247402",
+  appId:             "1:78324247402:web:f4060a2bf5b04baf411313"
+};
+try { if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG); } catch(e){}
+var db = firebase.database();
+var CONTACT_NO = '918081111114';
+
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fmtMoney(v){ return '₹' + (Number(v)||0).toLocaleString('en-IN'); }
+function fmtDate(s){
+  if(!s) return '';
+  try{ return new Date(s+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'}); }
+  catch(e){ return s; }
+}
+function durLabel(start,end){
+  if(!start) return 'Date to be confirmed';
+  if(end && end!==start) return fmtDate(start)+' – '+fmtDate(end);
+  return fmtDate(start);
+}
+function isImgUrl(u){ return /\.(jpe?g|png|webp|gif)(\?|$)/i.test(u||''); }
+
+function renderError(msg){
+  document.getElementById('app').innerHTML =
+    '<div class="errbox"><div class="icon">😕</div><div>'+esc(msg)+'</div></div>';
+}
+
+var params = new URLSearchParams(window.location.search);
+var leadId = params.get('id');
+
+if(!leadId){
+  renderError('This link is missing a booking reference. Please ask Alangaram Events to resend it.');
+} else {
+  db.ref('svv_leads/' + leadId).once('value').then(function(snap){
+    var lead = snap.val();
+    if(!lead){ renderError('We could not find this booking. Please contact Alangaram Events.'); return; }
+    lead.id = leadId;
+    // Pull payments logged against this lead from the ledger
+    db.ref('ledger').orderByChild('svvLeadId').equalTo(leadId).once('value').then(function(ledSnap){
+      var paid = 0;
+      var payments = [];
+      ledSnap.forEach(function(c){
+        var e = c.val();
+        if(e && e.type === 'income'){
+          paid += Number(e.amount)||0;
+          payments.push(e);
+        }
+      });
+      payments.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+      renderBooking(lead, paid, payments);
+    }).catch(function(){
+      renderBooking(lead, 0, []);
+    });
+  }).catch(function(){
+    renderError('Could not load your booking right now. Please check your connection and try again.');
+  });
+}
+
+function renderBooking(l, paid, payments){
+  payments = payments || [];
+  var isConfirmed = l.status === 'converted';
+  var quoteTotal = Number(l.quoteTotal)||0;
+  var balance = quoteTotal > 0 ? Math.max(quoteTotal - paid, 0) : 0;
+  var pct = quoteTotal > 0 ? Math.min(Math.round((paid/quoteTotal)*100),100) : 0;
+
+  var h = '';
+
+  // Status banner
+  if(isConfirmed){
+    h += '<div class="status-banner confirmed"><div class="icon">✅</div>' +
+         '<div class="title">Booking Confirmed</div>' +
+         '<div class="msg">Your decor booking with Alangaram Events is confirmed. We can\'t wait to make your day beautiful!</div></div>';
+  }else{
+    h += '<div class="status-banner pending"><div class="icon">🌸</div>' +
+         '<div class="title">Booking In Progress</div>' +
+         '<div class="msg">We\'re finalising the details with you. Your booking will be confirmed once the advance is received.</div></div>';
+  }
+
+  // Event details
+  h += '<div class="card"><div class="sec-title">Event Details</div>';
+  h += '<div class="row"><span class="l">Client Name</span><span class="v">'+esc(l.name||'—')+'</span></div>';
+  h += '<div class="row"><span class="l">Function</span><span class="v">'+esc(l.fnType||'—')+'</span></div>';
+  h += '<div class="row"><span class="l">Event Date</span><span class="v">'+esc(durLabel(l.eventDate,l.eventEndDate))+'</span></div>';
+  if(l.guests) h += '<div class="row"><span class="l">Guests</span><span class="v">'+esc(l.guests)+'</span></div>';
+  h += '<div class="row"><span class="l">Venue</span><span class="v">SVV Marriage Hall</span></div>';
+  h += '</div>';
+
+  // Payment summary
+  if(quoteTotal>0 || paid>0){
+    h += '<div class="card"><div class="sec-title">Payment Summary</div>';
+    h += '<div class="pay-total"><span class="l">Quote Total</span><span class="v" style="color:#C9A961">'+fmtMoney(quoteTotal)+'</span></div>';
+    h += '<div class="pay-total received"><span class="l">Amount Received</span><span class="v">'+fmtMoney(paid)+'</span></div>';
+    if(quoteTotal>0){
+      h += '<div class="progress-track"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
+      if(balance>0){
+        h += '<div class="pay-total balance" style="margin-top:6px"><span class="l">Balance Due</span><span class="v">'+fmtMoney(balance)+'</span></div>';
+      }else{
+        h += '<div style="text-align:center;color:#5A9E6F;font-weight:700;font-size:12.5px;margin-top:8px">✓ Fully Paid</div>';
+      }
+    }
+    h += '</div>';
+  }
+
+  // Payment history
+  if(payments.length){
+    h += '<div class="card"><div class="sec-title">Payment History</div>';
+    payments.forEach(function(p){
+      h += '<div class="row" style="border-bottom:1px solid rgba(255,255,255,.06)">' +
+           '<span class="l">'+esc(p.stage||p.category||'Payment')+'<br><span style="font-size:10px;color:#6B5648">'+esc(fmtDate(p.date))+(p.paymentMode?' · '+esc(p.paymentMode):'')+'</span></span>' +
+           '<span class="v" style="color:#5A9E6F">'+fmtMoney(p.amount)+'</span></div>';
+    });
+    h += '</div>';
+  }
+
+  // Quote & Moodboard
+  var moodboardUrl = l.moodboardLink || (l.moodboardId ? ('svv-moodboard.html?id='+encodeURIComponent(l.moodboardId)) : '');
+  if(moodboardUrl){
+    h += '<a class="btn btn-primary" href="'+esc(moodboardUrl)+'" target="_blank" rel="noopener">🌸 View Your Quote &amp; Moodboard</a>';
+  }
+
+  // Reference images
+  if(l.refLinks && l.refLinks.length){
+    var imgs = l.refLinks.filter(isImgUrl);
+    if(imgs.length){
+      h += '<div class="card"><div class="sec-title">Your Reference Decor</div><div class="ref-imgs">';
+      imgs.forEach(function(u){
+        h += '<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="reference" onerror="this.parentNode.style.display=\'none\'"></a>';
+      });
+      h += '</div></div>';
+    }
+  }
+
+  // Contact
+  var phoneDigits = (l.phone||'').replace(/[^0-9]/g,'');
+  var waMsg = 'Hi! I had a question about my SVV decor booking'+(l.name?' ('+l.name+')':'')+'.';
+  h += '<a class="btn btn-wa" href="https://wa.me/'+CONTACT_NO+'?text='+encodeURIComponent(waMsg)+'" target="_blank" rel="noopener">💬 WhatsApp Alangaram Events</a>';
+  h += '<a class="btn btn-outline" href="tel:+'+CONTACT_NO+'">📞 Call Us</a>';
+
+  document.getElementById('app').innerHTML = h;
+  document.title = 'Booking Confirmation — ' + (l.name||'Client') + ' — Alangaram Events';
+}
+</script>
+</body>
+</html>
