@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title id="ptitle">Invoice — Alangaram Events</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:Georgia,serif;background:#faf5ee;color:#2a1a0e;}
+@media print{body{background:#fff!important;}.no-print{display:none!important;}@page{margin:12mm;size:A4;}}
+.wrap{max-width:780px;margin:0 auto;background:#fff;box-shadow:0 4px 40px rgba(0,0,0,.15);}
+/* HEADER */
+.hdr{background:linear-gradient(135deg,#120a04 0%,#221208 55%,#120a04 100%);padding:28px 32px 22px;}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.hdr-logos{display:flex;align-items:center;gap:16px;}
+.hdr-right{text-align:right;}
+.hdr-right .lbl{font-size:9px;color:#906840;letter-spacing:2px;text-transform:uppercase;}
+.hdr-right .qno{font-size:20px;color:#f0d080;font-weight:700;letter-spacing:1px;}
+.hdr-right .qdate{font-size:11px;color:#a07848;margin-top:3px;}
+.hdr-bottom{border-top:1px solid rgba(200,146,42,.3);padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;}
+.venue-name{font-size:19px;color:#f0d080;font-weight:700;letter-spacing:0.5px;}
+.venue-sub{font-size:10px;color:#a07848;letter-spacing:2px;margin-top:3px;}
+.contact-info{text-align:right;font-size:11px;color:#907050;line-height:1.9;}
+/* META STRIP */
+.meta{display:flex;justify-content:space-between;padding:12px 32px;background:#fdf8f2;border-bottom:2px solid #e8d8c0;flex-wrap:wrap;gap:8px;}
+.meta-item .ml{font-size:9px;color:#b09070;letter-spacing:1.5px;text-transform:uppercase;}
+.meta-item .mv{font-size:13px;font-weight:700;color:#2a1a0e;}
+/* BODY */
+.body{padding:22px 32px;}
+.sec{font-size:9px;font-weight:800;letter-spacing:2px;color:#c8922a;text-transform:uppercase;border-bottom:2px solid #f0e4d0;padding-bottom:5px;margin:18px 0 11px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.ibox{background:#fdf8f2;border:1px solid #f0e4d0;border-radius:7px;padding:10px 13px;}
+.il{font-size:9px;color:#b09070;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
+.iv{font-size:13px;color:#2a1a0e;font-weight:700;}
+.svc-wrap{display:flex;flex-wrap:wrap;gap:6px;}
+.svc-tag{background:#fdf5e0;border:1px solid #e8d090;border-radius:4px;padding:3px 10px;font-size:11px;color:#7a5c2a;}
+/* RATE TABLE */
+.rtbl{width:100%;border-collapse:collapse;border:1px solid #f0e4d0;border-radius:8px;overflow:hidden;}
+.rtbl tr td{padding:9px 14px;font-size:13px;border-bottom:1px solid #f5ece0;}
+.rtbl tr td:last-child{text-align:right;font-weight:700;}
+.tr-total td{background:#1a0e06;color:#f0d080;padding:14px;font-size:16px;font-weight:800;}
+.tr-total td:last-child{font-size:22px;text-align:right;}
+/* PAYMENT */
+.pay-box{background:#f5fbf5;border:1px solid #c0ddc0;border-radius:8px;padding:14px 18px;}
+.pay-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;}
+.pay-note{font-size:11px;color:#5a8a6a;margin-top:8px;border-top:1px solid #c0ddc0;padding-top:8px;}
+/* TERMS */
+.terms-box{background:#fdf8f2;border:1px solid #f0e4d0;border-radius:8px;padding:14px 18px;}
+.terms-box li{font-size:11px;color:#7a5c3a;margin-bottom:5px;margin-left:16px;line-height:1.6;}
+/* ACTION BUTTONS */
+.action-bar{display:flex;gap:10px;margin:20px 0;flex-wrap:wrap;}
+.btn-print{flex:1;background:linear-gradient(135deg,#c8922a,#a87020);color:#fff;border:none;border-radius:10px;padding:13px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:Georgia,serif;text-align:center;min-width:120px;}
+.btn-svc{flex:1;background:linear-gradient(135deg,#7050b0,#503090);color:#fff;border:none;border-radius:10px;padding:13px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:Georgia,serif;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;min-width:120px;}
+/* SIGN */
+.sign-row{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;padding-top:18px;border-top:1px solid #e8d8c0;}
+.sign-box{text-align:center;}
+.sign-line{border-bottom:1px solid #3a2510;height:44px;margin-bottom:7px;}
+.sign-lbl{font-size:10px;color:#b09070;letter-spacing:1px;text-transform:uppercase;}
+/* FOOTER */
+.ftr{background:#1a0e06;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.ftr-l{font-size:10px;color:#907050;line-height:1.9;}
+.ftr-r{font-size:12px;color:#c8922a;font-weight:700;}
+.loading{text-align:center;padding:60px 20px;font-size:14px;color:#907050;}
+</style>
+</head>
+<body>
+
+<div class="loading" id="loadingMsg">Loading your invoice…</div>
+<div class="wrap" id="wrap" style="display:none">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-top">
+    <div class="hdr-logos">
+      <div style="background:#fff;border-radius:6px;padding:8px 14px;font-weight:700;color:#7A1B26;font-size:15px;letter-spacing:0.5px;">A&nbsp;Florist&nbsp;Stories</div>
+    </div>
+    <div class="hdr-right">
+      <div class="lbl">Invoice</div>
+      <div class="qno" id="qno">ALG-2026-XXXX</div>
+      <div class="qdate" id="qdate"></div>
+    </div>
+  </div>
+  <div class="hdr-bottom">
+    <div>
+      <div class="venue-name">Alangaram Events</div>
+      <div class="venue-sub">Decor &amp; Styling for Your Celebration</div>
+    </div>
+    <div class="contact-info">Chennai<br>+91 94440 12856<br>A Florist Stories &middot; by Alangaram Events</div>
+  </div>
+</div>
+
+<!-- META -->
+<div class="meta">
+  <div class="meta-item"><div class="ml">Invoice Status</div><div class="mv" id="m-status" style="color:#3a8a4a">—</div></div>
+  <div class="meta-item"><div class="ml">Prepared By</div><div class="mv">Alangaram Events</div></div>
+</div>
+
+<!-- BODY -->
+<div class="body">
+
+<div class="action-bar no-print">
+  <button class="btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+  <a class="btn-svc" id="svcBtn" href="#" target="_blank">🌸 Our Services</a>
+</div>
+
+<!-- CLIENT -->
+<div class="sec">Client Details</div>
+<div class="grid2" style="margin-bottom:4px">
+  <div class="ibox"><div class="il">Client Name</div><div class="iv" id="c-name">—</div></div>
+  <div class="ibox"><div class="il">Phone</div><div class="iv" id="c-phone">—</div></div>
+</div>
+
+<!-- SERVICES -->
+<div id="svc-section" style="display:none">
+  <div class="sec">Decor Selections</div>
+  <div class="svc-wrap" id="svc-list"></div>
+</div>
+
+<!-- RATE BREAKDOWN -->
+<div class="sec">Rate Breakdown</div>
+<table class="rtbl">
+  <tbody id="rate-body"></tbody>
+  <tr class="tr-total"><td>GRAND TOTAL</td><td id="grand-total">₹0</td></tr>
+</table>
+
+<!-- PAYMENT STATUS -->
+<div class="sec">Payment Status</div>
+<div class="pay-box">
+  <div class="pay-row"><span style="font-weight:700;color:#2a1a0e">Grand Total</span><span style="font-size:15px;font-weight:800;color:#2a1a0e" id="pay-grand-lbl">₹0</span></div>
+  <div id="pay-paid-row" class="pay-row" style="border-top:1px solid #c0ddc0;margin-top:5px;padding-top:6px"><span style="color:#2a6a4a;font-weight:700;font-size:13px">✅ Amount Paid</span><span style="color:#2a6a4a;font-weight:800;font-size:16px" id="pay-paid-lbl">₹0</span></div>
+  <div id="pay-balance-row" class="pay-row" style="background:#fff3f0;border-radius:6px;padding:8px 10px;margin-top:6px"><span style="color:#c04030;font-size:13px;font-weight:800">⏳ Balance Due</span><span style="color:#c04030;font-size:17px;font-weight:800" id="pay-balance-lbl">₹0</span></div>
+  <div id="pay-cleared-msg" style="display:none;color:#3a8a4a;font-weight:700;font-size:13px;text-align:center;padding:6px 0">✅ Fully Paid — Thank You!</div>
+  <div id="pay-history" style="margin-top:10px;border-top:1px solid #c0ddc0;padding-top:8px"></div>
+  <div class="pay-note">Payment: Cash &middot; UPI &middot; Bank Transfer &middot; Cheque — "Alangaram Events"</div>
+</div>
+
+<!-- TERMS -->
+<div class="sec">Terms &amp; Conditions</div>
+<div class="terms-box"><ul>
+  <li>This invoice reflects the decor package agreed upon based on your selected designs and preferences.</li>
+  <li>Any changes to selections after this invoice may affect the total amount.</li>
+  <li>Balance amount, if any, is due before the event date unless otherwise agreed.</li>
+  <li>This invoice is issued by Alangaram Events for decor and styling services only.</li>
+</ul></div>
+
+<!-- SIGNATURE -->
+<div class="sign-row">
+  <div class="sign-box"><div class="sign-line"></div><div class="sign-lbl">Client Signature &amp; Date</div></div>
+  <div class="sign-box"><div class="sign-line"></div><div class="sign-lbl">Alangaram Events — Authorised Signatory</div></div>
+</div>
+
+</div><!-- /body -->
+
+<div class="ftr">
+  <div class="ftr-l">Alangaram Events &middot; Chennai &middot; +91 94440 12856<br>A Florist Stories — Beautiful Moments, Lasting Memories</div>
+  <div class="ftr-r">🙏 Thank you!</div>
+</div>
+</div><!-- /wrap -->
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+var FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyC2c1V3cYDX5Njc78BGvbr43caM089IuiE",
+  authDomain:        "evp-crm.firebaseapp.com",
+  databaseURL:       "https://evp-crm-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "evp-crm",
+  storageBucket:     "evp-crm.firebasestorage.app",
+  messagingSenderId: "78324247402",
+  appId:             "1:78324247402:web:f4060a2bf5b04baf411313"
+};
+try { if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG); } catch(e){}
+var db = firebase.database();
+
+var BASE = (function(){
+  var o = window.location.origin;
+  var p = window.location.pathname.replace(/[^\/]*$/, '');
+  return o + p;
+})();
+
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function toArray(x){
+  if(Array.isArray(x)) return x;
+  if(x && typeof x === 'object') return Object.keys(x).sort().map(function(k){ return x[k]; });
+  return [];
+}
+function fmtMoney(v){ return '₹' + (Number(v)||0).toLocaleString('en-IN'); }
+function fmtDate(d){
+  if(!d) return '';
+  try{ return new Date(d).toLocaleDateString('en-IN', {day:'numeric', month:'long', year:'numeric'}); }
+  catch(e){ return d; }
+}
+
+var params = new URLSearchParams(window.location.search);
+var id = params.get('id');
+
+if(!id){
+  document.getElementById('loadingMsg').textContent = 'No invoice ID given in the link.';
+} else {
+  db.ref('moodboards/' + id).once('value').then(function(snap){
+    var mb = snap.val();
+    if(!mb){
+      document.getElementById('loadingMsg').textContent = 'This invoice could not be found — the link may be invalid.';
+      return;
+    }
+    mb.designs = toArray(mb.designs);
+    if(mb.quote) mb.quote.items = toArray(mb.quote.items);
+    var payments = toArray(mb.payments);
+
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('wrap').style.display = 'block';
+    document.title = 'Invoice — ' + (mb.clientName || 'Alangaram Events');
+
+    document.getElementById('qno').textContent = 'ALG-' + id.slice(-6).toUpperCase();
+    document.getElementById('qdate').textContent = fmtDate(mb.updatedAt || mb.createdAt || new Date().toISOString());
+    document.getElementById('c-name').textContent = mb.clientName || '—';
+    document.getElementById('c-phone').textContent = mb.phone || '—';
+
+    // Decor selections, grouped by section
+    if(mb.designs.length){
+      var sections = {};
+      mb.designs.forEach(function(d){ sections[d.section || 'Design'] = true; });
+      document.getElementById('svc-section').style.display = 'block';
+      document.getElementById('svc-list').innerHTML = Object.keys(sections).map(function(s){
+        return '<span class="svc-tag">' + esc(s) + '</span>';
+      }).join('');
+    }
+
+    // Rate breakdown
+    var total = (mb.quote && mb.quote.total) || 0;
+    var items = (mb.quote && mb.quote.items) || [];
+    document.getElementById('rate-body').innerHTML = items.map(function(it){
+      return '<tr><td>' + esc(it.label) + '</td><td>' + fmtMoney(it.amount) + '</td></tr>';
+    }).join('');
+    document.getElementById('grand-total').textContent = fmtMoney(total);
+
+    // Payment status
+    var paid = payments.reduce(function(s,p){ return s + (Number(p.amount)||0); }, 0);
+    var balance = Math.max(0, total - paid);
+    document.getElementById('pay-grand-lbl').textContent = fmtMoney(total);
+    document.getElementById('pay-paid-lbl').textContent = fmtMoney(paid);
+    document.getElementById('pay-balance-lbl').textContent = fmtMoney(balance);
+    if(balance <= 0 && paid > 0){
+      document.getElementById('pay-balance-row').style.display = 'none';
+      document.getElementById('pay-cleared-msg').style.display = 'block';
+      document.getElementById('m-status').textContent = 'Fully Paid';
+    } else if(paid > 0){
+      document.getElementById('m-status').textContent = 'Partially Paid';
+      document.getElementById('m-status').style.color = '#c8922a';
+    } else {
+      document.getElementById('pay-paid-row').style.display = 'none';
+      document.getElementById('pay-balance-row').style.display = 'none';
+      document.getElementById('m-status').textContent = 'Unpaid';
+      document.getElementById('m-status').style.color = '#c04030';
+    }
+
+    if(payments.length){
+      document.getElementById('pay-history').innerHTML =
+        '<div style="font-size:9px;color:#b09070;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Payment History</div>' +
+        payments.map(function(p){
+          return '<div class="pay-row" style="font-size:12px;padding:3px 0"><span>' + fmtDate(p.date) + ' &middot; ' + esc(p.method||'') + '</span><span style="font-weight:700">' + fmtMoney(p.amount) + '</span></div>';
+        }).join('');
+    }
+
+    document.getElementById('svcBtn').href = BASE + 'services.html?name=' + encodeURIComponent(mb.clientName||'');
+  }).catch(function(err){
+    document.getElementById('loadingMsg').textContent = 'Could not load this invoice — please check your connection and try again.';
+    console.error('Invoice load failed:', err);
+  });
+}
+</script>
+</body>
+</html>
