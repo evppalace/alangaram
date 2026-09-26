@@ -708,9 +708,14 @@ document.getElementById('payBtn').addEventListener('click', async () => {
       // Write the order to Realtime Database so the vendor dashboard sees it immediately
       const orderRef = db.ref('onebyte_orders/' + state.orderId);
       await orderRef.set({
+        token: state.tokenNumber,
         phone: state.phone,
         counterId: COUNTER_ID,
         items: state.cart,
+        itemNames: Object.entries(state.cart).map(([id,qty]) => {
+          const m = MENU.find(x=>x.id===id);
+          return m ? `${m.name} x${qty}` : id;
+        }).join(', '),
         amount: total,
         slot: SLOTS[state.selectedSlot],
         status: 'awaiting_payment',
@@ -729,11 +734,11 @@ document.getElementById('payBtn').addEventListener('click', async () => {
         if (data.status === 'ready') setStatusStep('ready');
       });
 
-      // DEMO ONLY: simulate the webhook confirming payment after 2s,
-      // and the vendor marking it ready after 8s. Remove once Mswipe
-      // webhook -> Realtime Database write is wired up on your server.
+      // DEMO ONLY: simulate the Mswipe webhook confirming payment after 2s.
+      // Remove once the real Mswipe webhook -> Realtime Database write is
+      // wired up on your server. "Ready" is now set by the vendor dashboard,
+      // not simulated here.
       setTimeout(()=> orderRef.update({status:'processing'}), 2000);
-      setTimeout(()=> orderRef.update({status:'ready'}), 8000);
     } else {
       // Full demo mode, no Firebase configured
       setTimeout(()=> setStatusStep('processing'), 1500);
