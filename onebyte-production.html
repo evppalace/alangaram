@@ -8,6 +8,7 @@
 <title>OneByte Production</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   :root{
     --brand:#015B36; --brand-dark:#014228; --gold:#F59E0B; --ink:#0F2A1B; --paper:#FAFAF7; --card:#FFFFFF;
@@ -162,6 +163,8 @@ const store = (function(){ try{ localStorage.setItem('_t','1'); localStorage.rem
 /* ============ STATE ============ */
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
+/* device sign-in (anonymous) so Firebase rules can block outsiders; staff login is still username + password */
+const authReady = (firebase.auth ? firebase.auth().signInAnonymously() : Promise.resolve()).catch(e=>console.warn('anon auth',e&&e.message));
 let me = null;
 let users = {}, sites = {}, items = {}, basins = {}, ledger = {}, notices = {}, sessions = {}, settings = {}, recipes = {};
 let stockFilter = 'all', stockSearch = '';
@@ -183,7 +186,7 @@ function isAdmin(){ return me && me.role==='admin'; }
 /* ============ LOGIN ============ */
 function login(){
   const uname = ($('uname').value||'').trim().toLowerCase(), entered = $('pin').value.trim();
-  db.ref(P+'users').once('value').then(snap=>{
+  authReady.then(()=>db.ref(P+'users').once('value')).then(snap=>{
     const u = snap.val() || {};
     let m = null;
     Object.entries(u).forEach(([id,x])=>{
@@ -230,7 +233,8 @@ const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'n
 if (saved && ROLES[saved.role]){ me = saved; enter(); }
 
 /* ============ LIVE DATA ============ */
-function listen(){
+function listen(){ authReady.then(listenNow); }
+function listenNow(){
   const bind = (path, assign) => db.ref(P+path).on('value', s=>{ assign(s.val()||{}); renderAll(); });
   bind('users',  v=>{ users=v;
     if (me && me.id!=='setup' && users[me.id]){
