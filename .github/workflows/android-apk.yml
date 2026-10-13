@@ -21,6 +21,12 @@ jobs:
         working-directory: production-android
         run: |
           npm install
+          if [ -f google-services.json ]; then
+            echo "google-services.json found - enabling closed-app push"
+            npm install @capacitor/push-notifications@^8.0.0
+          else
+            echo "No google-services.json - building without Firebase push (in-app and local alerts only)"
+          fi
           mkdir -p www
           cp ../onebyte-production.html www/index.html
           npx cap add android
@@ -58,6 +64,7 @@ jobs:
                   r.save(f'{res}/mipmap-{d}/{n}')
           PY
           npx cap sync android
+          if [ -f google-services.json ]; then cp google-services.json android/app/google-services.json; fi
       - name: Fixed signing key + version number
         working-directory: production-android
         run: |

@@ -249,6 +249,45 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
 .tw{animation:tw 2.8s ease-in-out infinite alternate}
 @keyframes tw{from{opacity:.2}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.van,.tw{animation:none!important}.van{transform:translateX(160px)}}
+/* ===== v3: login tabs, photos, chatbot ===== */
+.lgtabs{display:flex;gap:6px;background:rgba(255,255,255,.14);padding:4px;border-radius:16px;margin:2px 0 10px;width:100%;max-width:360px}
+.lgtabs button{flex:1;border:0;background:transparent;color:#fff;font-weight:800;font-size:13px;padding:10px 6px;border-radius:12px;font-family:inherit}
+.lgtabs{position:relative;z-index:2}#lgHint{color:rgba(255,255,255,.92)!important;font-size:12.5px;padding:0 24px;text-shadow:0 1px 3px rgba(0,0,0,.35)}
+.lgtabs button.on{background:#fff;color:#04704a;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.phbox{margin:8px 0}
+.phbox .phrow{display:flex;gap:6px;flex-wrap:wrap}
+.phbox .phrow:empty{display:none}
+.phth{width:62px;height:62px;object-fit:cover;border-radius:12px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer}
+.phadd{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:8px 13px;border-radius:99px;background:var(--ok-soft);color:var(--brand);font-weight:800;font-size:12.5px;cursor:pointer}
+.phbox.ro{margin:6px 0}.phbox.ro.empty{display:none}
+.phbox .phrow+.phadd{margin-top:6px}
+.phtag{cursor:pointer}
+#phView{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:100000;display:none;flex-direction:column;align-items:center;justify-content:center;padding:12px}
+#phView.show{display:flex}
+#phView img{max-width:100%;max-height:70vh;border-radius:12px}
+.phv-top{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:14px;right:14px;display:flex;justify-content:space-between;color:#fff;font-weight:800}
+.phv-top button,.phv-act button{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:99px;padding:10px 16px;font-size:16px;font-weight:800;font-family:inherit}
+.phv-bot{color:#fff;margin-top:12px;text-align:center;font-size:13px}.phv-act{display:flex;gap:10px;justify-content:center;margin-top:10px}.phv-act .del{background:#d6453a}
+#botFab{position:fixed;right:14px;bottom:calc(76px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:50%;border:0;background:var(--g2);color:#2b1400;font-size:25px;box-shadow:0 10px 24px rgba(255,122,26,.45);z-index:60;display:none;align-items:center;justify-content:center}
+#botFab.hide{display:none!important}
+#bot{position:fixed;left:0;right:0;bottom:0;height:84vh;max-height:700px;background:var(--paper);border-radius:24px 24px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.35);z-index:200;display:none;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+#bot.show{display:flex}
+.bot-h{background:var(--g1);color:#fff;border-radius:24px 24px 0 0;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}
+.bot-h b{display:block;font-size:16px}.bot-h small{opacity:.85;font-size:12px}
+.bot-h button{background:rgba(255,255,255,.2);border:0;color:#fff;width:34px;height:34px;border-radius:50%;font-size:15px}
+.bot-m{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.bm{max-width:86%;padding:10px 13px;border-radius:18px;font-size:14px;line-height:1.4;word-wrap:break-word}
+.bm.bot{background:#fff;align-self:flex-start;border-bottom-left-radius:6px;box-shadow:var(--shadow)}
+.bm.me{background:var(--brand);color:#fff;align-self:flex-end;border-bottom-right-radius:6px}
+.bm a{color:var(--brand);font-weight:800}.bm.me a{color:#fff}
+.bm .rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+.bm .callrow{margin-top:6px}
+.bot-c{display:flex;gap:6px;overflow-x:auto;padding:6px 12px;scrollbar-width:none}
+.bot-c button{flex:none;border:1px solid var(--line);background:#fff;border-radius:99px;padding:8px 13px;font-size:12.5px;font-weight:800;color:var(--brand);font-family:inherit}
+.bot-c button.x{color:var(--red)}
+.bot-i{display:flex;gap:8px;padding:8px 12px 12px}
+.bot-i input{flex:1;margin:0;border-radius:99px}
+.bot-i button{width:46px;border:0;border-radius:50%;background:var(--g1);color:#fff;font-size:17px}
 </style>
 </head>
 <body>
@@ -259,6 +298,8 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
   <h1>Production &amp; Supply</h1>
   <div class="kslogo-bg" role="img" aria-label="Kalyana Sapadu — Corporate Dining Partner"></div>
   <div class="internal"><span>🔒</span><span><b>INTERNAL USE ONLY.</b> This app is for authorised Kalyana Sapadu production-unit staff. Every entry is recorded against your login.</span></div>
+  <div class="lgtabs"><button type="button" id="lgStaff" class="on">👨‍🍳 Staff login</button><button type="button" id="lgClient" >🤝 Client / Aggregator</button></div>
+  <div class="sub" id="lgHint" style="text-align:center;margin:-4px 0 8px"></div>
   <input id="uname" type="text" autocomplete="username" autocapitalize="none" placeholder="Username">
   <input id="pin" type="password" autocomplete="current-password" placeholder="Password">
   <button class="btn" id="unlockBtn">Unlock</button>
@@ -318,7 +359,7 @@ const ROLES = {
   store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','stock','purchase','issue','plan'] },
   kitchen:     { label:'Kitchen',            desc:'Daily issue & stock',         tabs:['home','stock','issue','plan','meals'] },
   driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals'] },
-  supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter',tabs:['home','meals'], site:true },
+  supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter, client escalations',tabs:['home','meals','client'], site:true },
   aggregator:  { label:'Aggregator / Client', desc:'Live view, ratings, feedback, escalation', tabs:['agg','aglive','agrate','agesc','agcontact'], siteOpt:true },
   counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals'], site:true }
 };
@@ -360,6 +401,8 @@ function tabsFor(){
 function isAdmin(){ return me && me.role==='admin'; }
 
 /* ============ LOGIN ============ */
+let loginMode = 'staff';
+function setLoginMode(m){ loginMode = m; $('lgStaff').classList.toggle('on', m==='staff'); $('lgClient').classList.toggle('on', m==='client'); $('lgHint').textContent = m==='client' ? 'For the client / food-service aggregator — view live status, rate, escalate' : ''; $('unlockBtn').textContent = m==='client' ? 'Open client portal' : 'Unlock'; $('pinErr').textContent=''; const ib=document.querySelector('#lock .internal'); if (ib) ib.style.display = m==='client' ? 'none' : ''; }
 function login(){
   const uname = ($('uname').value||'').trim().toLowerCase(), entered = $('pin').value.trim();
   authReady.then(()=>db.ref(P+'users').once('value')).then(snap=>{
@@ -368,15 +411,15 @@ function login(){
     Object.entries(u).forEach(([id,x])=>{
       if (!ROLES[x.role]) return;
       const pw = x.password || x.pin;
-      if (pw===entered && ((x.username||'').toLowerCase()===uname || !x.username)) m = Object.assign({id},x);
+      if (pw===entered && ((x.username||'').toLowerCase()===uname || !x.username) && ((loginMode==='client') === (x.role==='aggregator'))) m = Object.assign({id},x);
     });
-    if (!m && Object.keys(u).length===0 && entered===SETUP_PIN && (!uname || uname==='admin')) m = { id:'setup', name:'Setup Admin', role:'admin', siteId:'all' };
+    if (!m && loginMode==='staff' && Object.keys(u).length===0 && entered===SETUP_PIN && (!uname || uname==='admin')) m = { id:'setup', name:'Setup Admin', role:'admin', siteId:'all' };
     if (m){ me = m; try{ store.setItem('prod_user', JSON.stringify(m)); }catch(e){} enter(); }
-    else { $('pinErr').textContent = 'Wrong username or password'; $('pin').value=''; }
+    else { $('pinErr').textContent = loginMode==='client' ? 'Wrong client username or password' : 'Wrong username or password (client users: use the Client tab)'; $('pin').value=''; }
   }).catch(()=>{ $('pinErr').textContent = 'No internet — try again'; });
 }
 function logout(){ try{ store.removeItem('prod_user'); }catch(e){} location.reload(); }
-$('unlockBtn').onclick = login;
+$('unlockBtn').onclick = login; $('lgStaff').onclick = ()=>setLoginMode('staff'); $('lgClient').onclick = ()=>setLoginMode('client');
 $('uname').addEventListener('keydown', e=>{ if(e.key==='Enter') $('pin').focus(); });
 $('pin').addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
 $('lockBtn').onclick = logout;
@@ -456,7 +499,7 @@ function renderAll(){
   if (can('agrate'))   renderAgRate();
   if (can('agesc'))    renderAgEsc();
   if (can('agcontact')) renderAgContact();
-  try{ updateBell(); uwAttach(); }catch(e){}
+  try{ updateBell(); uwAttach(); botShow(); pushInit(); }catch(e){}
 }
 
 /* ============ HOME ============ */
@@ -491,7 +534,7 @@ function heroSvg(){
 }
 function postNotice(){
   const text = $('n_text').value.trim(); if (!text){ alert('Type the note first.'); return; }
-  db.ref(P+'notices').push({ text, level:$('n_level').value, by:me.name, ts:Date.now() }).then(()=>{ $('n_text').value=''; toast('Posted to all staff'); });
+  db.ref(P+'notices').push({ text, level:$('n_level').value, by:me.name, ts:Date.now(), photoKey:usePh('notice') }).then(()=>{ $('n_text').value=''; toast('Posted to all staff'); });
 }
 function renderHome(){
   const el = $('p-home');
@@ -520,7 +563,7 @@ function renderHome(){
       <div class="pillrow"><span class="pill">🍽️ ${Object.keys(sites).length} counters</span><span class="pill">📦 ${list.length} items</span>${low.length?`<span class="pill">⚠️ ${low.length} low stock</span>`:''}</div></div>
     <div class="qa">${qa.map(x=>`<button data-qa="${x}"><i>${NAV[x][0]}</i>${NAV[x][1]}</button>`).join('')}</div>
     <div class="hero scene">${sceneSvg({seed:5})}<div class="cap"><span>Kitchen → vehicle → counter</span><span>${new Date().toLocaleDateString([], {weekday:'short', day:'numeric', month:'short'})}</span></div></div>
-    ${nts.map(([id,n])=>`<div class="notice ${esc(n.level||'note')}"><span>${ico[n.level]||'📝'}</span><div><div>${esc(n.text)}</div><div class="sub">${esc(n.by||'')} · ${new Date(n.ts||0).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div></div>${canPost?`<button class="x" data-nd="${id}" aria-label="Remove">✕</button>`:''}</div>`).join('')}
+    ${nts.map(([id,n])=>`<div class="notice ${esc(n.level||'note')}"><span>${ico[n.level]||'📝'}</span><div><div>${esc(n.text)}</div>${n.photoKey?photoBox(n.photoKey,'',{ro:true}):''}<div class="sub">${esc(n.by||'')} · ${new Date(n.ts||0).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div></div>${canPost?`<button class="x" data-nd="${id}" aria-label="Remove">✕</button>`:''}</div>`).join('')}
     ${can('meals')?roadHtml():''}
     <div class="kpi">
       <div class="card"><div class="sub">Below minimum</div><div class="n" style="${low.length?'color:var(--amber)':''}">${low.length}</div></div>
@@ -539,7 +582,7 @@ function renderHome(){
     <div class="ksfoot"><div class="ksseal"><div class="kslogo-bg"></div></div>Internal production system for Kalyana Sapadu</div>
     ${canPost ? `<h2>Post a note or alert to all staff</h2><div class="card">
       <select id="n_level"><option value="note">📝 Note</option><option value="alert">🚨 Alert</option><option value="info">ℹ️ Info</option></select>
-      <input id="n_text" placeholder="e.g. Chicken delivery delayed — use frozen stock" style="margin-top:8px">
+      <input id="n_text" placeholder="e.g. Chicken delivery delayed — use frozen stock" style="margin-top:8px">${photoBox(draftCtx('notice'),'Attach photo',{draft:'notice'})}
       <button class="btn save" id="n_post">Post</button></div>` : ''}`;
   el.querySelectorAll('[data-qa]').forEach(b=>b.onclick=()=>go(b.dataset.qa));
   const np=$('n_post'); if (np) np.onclick=postNotice;
@@ -579,7 +622,7 @@ function recentLedger(n){
   return e.map(([,x])=>{
     const it = items[x.itemId]||{name:'(deleted item)',unit:''};
     const d = new Date(x.ts||0);
-    return `<div class="card row"><div class="grow"><b>${esc(it.name)}</b><div class="sub">${esc(x.type)}${x.supplier?' · '+esc(x.supplier):''}${x.expiry?' · exp '+esc(x.expiry):''}${x.lot?' · lot '+esc(x.lot):''} · ${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · ${esc(x.by||'')}</div></div><div class="qty" style="color:${x.qty<0?'var(--red)':'var(--green)'}">${x.qty>0?'+':''}${fmt(x.qty)} <small>${esc(it.unit)}</small></div></div>`;
+    return `<div class="card row"><div class="grow"><b>${esc(it.name)}</b><div class="sub">${esc(x.type)}${x.photoKey?' <span class="phtag" data-phv="'+esc(x.photoKey)+'">📷</span>':''}${x.supplier?' · '+esc(x.supplier):''}${x.expiry?' · exp '+esc(x.expiry):''}${x.lot?' · lot '+esc(x.lot):''} · ${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · ${esc(x.by||'')}</div></div><div class="qty" style="color:${x.qty<0?'var(--red)':'var(--green)'}">${x.qty>0?'+':''}${fmt(x.qty)} <small>${esc(it.unit)}</small></div></div>`;
   }).join('');
 }
 
@@ -599,6 +642,7 @@ function renderPurchase(){
       <label>Supplier (optional)</label><input id="pu_sup" list="supList" placeholder="e.g. Koyambedu vegetable vendor"><datalist id="supList">${[...new Set(Object.values(ledger).map(e=>e.supplier).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
       <div class="two"><div><label>Expiry / best before (optional)</label><input id="pu_exp" type="date"></div><div><label>Batch / lot (optional)</label><input id="pu_batch" placeholder="e.g. L-2310"></div></div>
       <label>Bill / note (optional)</label><input id="pu_note" placeholder="Bill no.">
+      ${photoBox(draftCtx('purchase'),'Bill / stock photo',{draft:'purchase'})}
       <button class="btn save" id="pu_save">Add to stock</button>
     </div>` : `<div class="empty">Add raw materials in Masters first.</div>`}
     <h2>Stock correction</h2>
@@ -607,6 +651,7 @@ function renderPurchase(){
       <label>Item</label><select id="ad_item">${raws.map(([id,i])=>`<option value="${id}">${esc(i.name)} — now ${fmt(stockOf(id))} ${esc(i.unit)}</option>`).join('')}</select>
       <label>Actual quantity counted</label><input id="ad_qty" type="number" inputmode="decimal" step="any">
       <label>Reason</label><input id="ad_note" placeholder="e.g. monthly count">
+      ${photoBox(draftCtx('adjust'),'Count photo',{draft:'adjust'})}
       <button class="btn sec save" id="ad_save">Set to counted quantity</button></div>` : ''}`;
   if (keep.item && el.querySelector('#pu_item')) el.querySelector('#pu_item').value = keep.item;
   const ps = $('pu_save'); if (ps) ps.onclick = savePurchase;
@@ -619,7 +664,7 @@ function addLedger(e){
 function savePurchase(){
   const itemId = $('pu_item').value, qty = num($('pu_qty').value), rate = num($('pu_rate').value);
   if (!(qty>0)) { alert('Enter a quantity greater than 0.'); return; }
-  addLedger({ itemId, type:'purchase', qty, rate: isFinite(rate)?rate:null, supplier:$('pu_sup').value.trim(), expiry:$('pu_exp').value||null, lot:$('pu_batch').value.trim()||null, note:$('pu_note').value.trim() })
+  addLedger({ itemId, type:'purchase', qty, rate: isFinite(rate)?rate:null, supplier:$('pu_sup').value.trim(), expiry:$('pu_exp').value||null, lot:$('pu_batch').value.trim()||null, note:$('pu_note').value.trim(), photoKey:usePh('purchase') })
     .then(()=>{ toast('Added to stock'); $('pu_qty').value=''; $('pu_rate').value=''; $('pu_note').value=''; });
 }
 function saveAdjust(){
@@ -627,7 +672,7 @@ function saveAdjust(){
   if (!(counted>=0)) { alert('Enter the counted quantity.'); return; }
   const diff = counted - stockOf(itemId);
   if (Math.abs(diff) < 0.0005) { toast('Already matches'); return; }
-  addLedger({ itemId, type:'adjust', qty:diff, note:$('ad_note').value.trim() || 'stock count' })
+  addLedger({ itemId, type:'adjust', qty:diff, note:$('ad_note').value.trim() || 'stock count', photoKey:usePh('adjust') })
     .then(()=>{ toast('Stock corrected'); $('ad_qty').value=''; });
 }
 
@@ -658,6 +703,7 @@ function renderIssue(){
         ${issueRows.length>1?`<button class="btn danger" data-rm="${n}" style="padding:9px 12px">✕</button>`:''}</div>`; }).join('')}</div>
       <button class="btn sec" id="is_add" style="margin-top:10px;width:100%;padding:10px">+ Add another item</button>
       <label>Note (optional)</label><input id="is_note" value="${esc(issueNote)}" placeholder="e.g. lunch for 150">
+      ${photoBox(draftCtx('issue'),'Photo of issued material',{draft:'issue'})}
       <button class="btn save" id="is_save">Issue to kitchen</button>
     </div>` : `<div class="empty">Add raw materials and vegetables in Masters first.</div>`}
     <h2>Issued today</h2>
@@ -687,9 +733,9 @@ function saveIssue(){
   const short = Object.entries(need).filter(([id,q])=>q > stockOf(id)+0.0005);
   if (short.length && !confirm('Not enough stock for: ' + short.map(([id,q])=>items[id].name+' (have '+fmt(stockOf(id))+' '+items[id].unit+', issuing '+fmt(q)+')').join(', ') + '.\n\nIssue anyway?')) return;
   const [siteId, meal] = issueFor ? issueFor.split('|') : ['',''];
-  const batch = db.ref(P+'ledger').push().key;
+  const batch = db.ref(P+'ledger').push().key, phk = usePh('issue');
   Promise.all(Object.entries(need).map(([itemId,q])=>
-    addLedger({ itemId, type:'issue', qty:-q, siteId:siteId||null, meal:meal||null, note:issueNote, batch })
+    addLedger({ itemId, type:'issue', qty:-q, siteId:siteId||null, meal:meal||null, note:issueNote, batch, photoKey:phk })
   )).then(()=>{ toast('Issued to kitchen'); issueRows=[{itemId:'',qty:''}]; issueNote=''; renderIssue(); });
 }
 function reverseIssue(id){
@@ -780,7 +826,7 @@ function lastStamp(s){
 
 function stepHead(n, title, ts, extra){
   return `<div class="row" style="margin-bottom:8px"><div style="width:26px;height:26px;border-radius:99px;background:${ts?'var(--green)':'var(--line)'};color:${ts?'#fff':'var(--muted)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">${ts?'✓':n}</div>
-    <b class="grow">${title}</b><span class="sub" style="margin:0">${ts?hm(ts)+(extra||''):''}</span></div>`;
+    <b class="grow">${title}</b><span class="sub" style="margin:0">${ts?hm(ts)+(extra||''):''}</span></div>${typeof openSid==='string'&&openSid?photoBox(openSid+'_s'+n,'Photos'):''}`;
 }
 function renderSession(el){
   const sid = openSid, parts = sid.split('_'), date = parts[0], siteId = parts[1], meal = parts[2];
@@ -834,13 +880,18 @@ function renderSession(el){
       return `<div class="sub" style="margin-bottom:6px">${sc.depart?'Planned departure '+esc(sc.depart)+lt(dep&&dep.ts,sc.depart):''}${sc.depart&&sc.arrive?' · ':''}${sc.arrive?'Planned arrival '+esc(sc.arrive)+lt(arr&&arr.ts,sc.arrive):''}</div>`; })()}
     ${dep&&dep.ts?`<div class="sub">Vehicle ${esc(s.vehicle||'—')} · Driver ${esc(s.driver||'—')}${dep.loc?` · <a href="https://maps.google.com/?q=${dep.loc.lat},${dep.loc.lng}" target="_blank">start location</a>`:''}</div>`:''}
     ${!(dep&&dep.ts)&&canStep('depart')?`<div class="two"><div><label>Vehicle no.</label><input id="veh" value="${esc(s.vehicle||'')}" placeholder="TN 09 AB 1234"></div><div><label>Driver</label><input id="drv" value="${esc(s.driver||(me.role==='driver'?me.name:''))}"></div></div>
+      <label>🛣️ Meter (odometer) reading at START — km</label><input id="odoS" type="number" inputmode="decimal" step="any" placeholder="e.g. 45210" value="${s.odo&&s.odo.start!=null?s.odo.start:''}">
+      ${photoBox(sid+'_odoS','Meter photo (start)')}
       ${loaded&&loaded.ts?`<button class="btn save" id="btnDepart">🚚 Start trip (departed)</button>`:'<div class="sub" style="margin-top:8px">Mark the food loaded first.</div>'}`:''}
     ${dep&&dep.ts&&!(arr&&arr.ts)?`
       ${s.trackLast?`<div class="sub" style="margin-top:6px">Last position ${hm(s.trackLast.ts)}${s.trackLast.bg?' (background GPS)':''} · <a href="https://maps.google.com/?q=${s.trackLast.lat},${s.trackLast.lng}" target="_blank">open map</a></div>
       <iframe title="Vehicle position" loading="lazy" style="width:100%;height:190px;border:0;border-radius:10px;margin-top:6px" src="https://www.openstreetmap.org/export/embed.html?bbox=${s.trackLast.lng-0.012},${s.trackLast.lat-0.008},${s.trackLast.lng+0.012},${s.trackLast.lat+0.008}&layer=mapnik&marker=${s.trackLast.lat},${s.trackLast.lng}"></iframe>`:''}
       ${canStep('depart')?`<button class="btn sec save" id="btnTrack">${tracker?'⏸ Stop sharing location':'📍 Share live location'}</button>
       <div class="sub" style="margin-top:4px">${window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.BackgroundGeolocation?'Background GPS is available — tracking continues with the screen off.':'Browser mode: works while this screen stays open. Screen-off tracking needs the Android app with the background-location plugin and "Allow all the time" permission.'}</div>`:''}
+      ${s.odo&&s.odo.start!=null?`<div class="sub" style="margin-top:6px">🛣️ Meter at start: <b>${fmt(s.odo.start)} km</b></div>`:''}
+      ${canStep('arrive')?`<label>🛣️ Meter (odometer) reading now, at STOP — km</label><input id="odoE" type="number" inputmode="decimal" step="any" placeholder="e.g. ${s.odo&&s.odo.start!=null?fmt(s.odo.start+12):'45222'}">${photoBox(sid+'_odoE','Meter photo (stop)')}`:''}
       ${btn('btnArrive','📍 Arrived at site','arrive')}`:''}
+    ${s.odo&&s.odo.start!=null&&dep&&dep.ts?`<div class="sub">🛣️ Meter ${fmt(s.odo.start)}${s.odo.end!=null?' → '+fmt(s.odo.end)+' km · <b>'+fmt(Math.round((s.odo.end-s.odo.start)*10)/10)+' km driven</b>':' km (start)'}</div>`:''}
     ${arr&&arr.ts?`<div class="sub">Arrived ${hm(arr.ts)} · trip ${dur(dep&&dep.ts,arr.ts)} · ${esc(arr.by||'')}${arr.loc?` · <a href="https://maps.google.com/?q=${arr.loc.lat},${arr.loc.lng}" target="_blank">arrival location</a>`:''}${lock('arrived',1)}</div>`:''}
     ${dep&&dep.ts?lock('departed',1):''}
   </div>
@@ -918,8 +969,9 @@ function renderSession(el){
 
   // 4 trip
   const withLoc = cb => { if (!navigator.geolocation) return cb(null); navigator.geolocation.getCurrentPosition(p=>cb({lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6)}), ()=>cb(null), {timeout:6000, maximumAge:30000}); };
-  const bd = $('btnDepart'); if (bd) bd.onclick = ()=>{ withLoc(loc=>{ db.ref(P+'sessions/'+sid).update({ date, siteId, meal, vehicle:$('veh').value.trim(), driver:$('drv').value.trim(), ['times/departed']: {ts:Date.now(), by:me.name, loc:loc||null} }).then(()=>{ if (loc) startTracking(sid); }); }); };
-  const ba = $('btnArrive'); if (ba) ba.onclick = ()=>{ withLoc(loc=>{ stopTracking(); db.ref(P+'sessions/'+sid).update({ ['times/arrived']: {ts:Date.now(), by:me.name, loc:loc||null} }); }); };
+  const bd = $('btnDepart'); if (bd) bd.onclick = ()=>{ const o1 = $('odoS').value.trim(); if (o1===''||!(num(o1)>=0)){ alert('Enter the meter (odometer) reading at start.'); return; } withLoc(loc=>{ db.ref(P+'sessions/'+sid).update({ ['odo/start']:num(o1), ['odo/startBy']:me.name, date, siteId, meal, vehicle:$('veh').value.trim(), driver:$('drv').value.trim(), ['times/departed']: {ts:Date.now(), by:me.name, loc:loc||null} }).then(()=>{ if (loc) startTracking(sid); }); }); };
+  const ba = $('btnArrive'); if (ba) ba.onclick = ()=>{ const oe = $('odoE'); let o2 = null; if (oe){ if (oe.value.trim()===''||!(num(oe.value)>=0)){ alert('Enter the meter (odometer) reading at stop.'); return; } o2 = num(oe.value); if (s.odo&&s.odo.start!=null&&o2<s.odo.start){ alert('Stop meter ('+fmt(o2)+') is less than start meter ('+fmt(s.odo.start)+').'); return; } }
+    withLoc(loc=>{ stopTracking(); const up = { ['times/arrived']: {ts:Date.now(), by:me.name, loc:loc||null} }; if (o2!=null){ up['odo/end']=o2; up['odo/endBy']=me.name; } db.ref(P+'sessions/'+sid).update(up); }); };
   const bt = $('btnTrack'); if (bt) bt.onclick = ()=>{ if (tracker) stopTracking(); else startTracking(sid); renderMeals(); };
 
   // 6 weigh
@@ -1136,9 +1188,9 @@ function mealSections(R){
   const hmL = (x,k,pk)=>{ const t = T(x,k)&&T(x,k).ts; if (!t) return '—'; const sc = (((sites[x.siteId]||{}).sched||{})[x.meal]||{})[pk]; const l = sc ? lateMin(x.date, sc, t) : null; return hm(t)+(l>0?' (+'+l+'m late)':''); };
   const pend = (h)=>({ h, cols:[], rows:[], note:'No meal sheets recorded for this period / filter yet.' });
   if (!list.length) return [pend('Meal timeline'), pend('Dish-wise production, sales & wastage')];
-  const timeline = { h:'Meal timeline', cols:['Date','Counter','Meal','Cooked','QC','Packed','Loaded','Departed','Arrived','Trip','Arr. QC','At counter','Closed'],
-    rows:list.map(x=>[x.date, sn(x), x.meal, hm(T(x,'prodDone')&&T(x,'prodDone').ts), qcs(x.qc1), hm(T(x,'packed')&&T(x,'packed').ts), hm(T(x,'loaded')&&T(x,'loaded').ts), hmL(x,'departed','depart'), hmL(x,'arrived','arrive'), dur(T(x,'departed')&&T(x,'departed').ts, T(x,'arrived')&&T(x,'arrived').ts), qcs(x.qc2), hm(T(x,'counterLoaded')&&T(x,'counterLoaded').ts), hm(T(x,'closed')&&T(x,'closed').ts)]),
-    line:r=>'• '+r[1]+' '+r[2]+(r[0]!==R.from||R.from!==R.to?' ('+r[0]+')':'')+': cooked '+r[3]+' · QC '+r[4]+' · packed '+r[5]+' · loaded '+r[6]+' · departed '+r[7]+' · arrived '+r[8]+(r[9]!=='—'?' ('+r[9]+')':'')+' · arrival QC '+r[10]+' · at counter '+r[11]+' · closed '+r[12] };
+  const timeline = { h:'Meal timeline', cols:['Date','Counter','Meal','Cooked','QC','Packed','Loaded','Departed','Arrived','Trip','Arr. QC','At counter','Closed','Km'],
+    rows:list.map(x=>[x.date, sn(x), x.meal, hm(T(x,'prodDone')&&T(x,'prodDone').ts), qcs(x.qc1), hm(T(x,'packed')&&T(x,'packed').ts), hm(T(x,'loaded')&&T(x,'loaded').ts), hmL(x,'departed','depart'), hmL(x,'arrived','arrive'), dur(T(x,'departed')&&T(x,'departed').ts, T(x,'arrived')&&T(x,'arrived').ts), qcs(x.qc2), hm(T(x,'counterLoaded')&&T(x,'counterLoaded').ts), hm(T(x,'closed')&&T(x,'closed').ts), (x.odo&&x.odo.start!=null&&x.odo.end!=null)?fmt(Math.round((x.odo.end-x.odo.start)*10)/10):'—']),
+    line:r=>'• '+r[1]+' '+r[2]+(r[0]!==R.from||R.from!==R.to?' ('+r[0]+')':'')+': cooked '+r[3]+' · QC '+r[4]+' · packed '+r[5]+' · loaded '+r[6]+' · departed '+r[7]+' · arrived '+r[8]+(r[9]!=='—'?' ('+r[9]+')':'')+' · arrival QC '+r[10]+' · at counter '+r[11]+' · closed '+r[12]+(r[13]&&r[13]!=='—'?' · '+r[13]+' km':'') };
   const vtxt = v => v==null ? '—' : Math.abs(v)<0.0005 ? '0' : v>0 ? fmt(v)+' short' : fmt(-v)+' excess';
   const dishRows = [], tot = {}, daily = {}, waste = {};
   list.forEach(x=>{
@@ -1558,7 +1610,7 @@ function basinForm(id){
 
 /* ============ USERS (admin) ============ */
 const STARTER_USERS = [
-  {name:'Owner (Admin)',      username:'admin',         password:'EVP@admin26',   role:'admin'},
+  {name:'Director (Admin)',      username:'admin',         password:'EVP@admin26',   role:'admin'},
   {name:'Production Manager', username:'manager',       password:'Mgr@2026',      role:'prodmanager', rep:true},
   {name:'Store Keeper',       username:'store',         password:'Store@2026',    role:'store'},
   {name:'Purchase',           username:'purchase',      password:'Buy@2026',      role:'store'},
@@ -1656,12 +1708,21 @@ const FB_TYPES = [['feedback','💬 Feedback'],['appreciation','👏 Appreciatio
 const EMERGENCY = [['112','All-in-one emergency'],['108','Ambulance'],['101','Fire'],['100','Police'],['1800112100','FSSAI food-safety helpline']];
 const OWNER_EMAIL_DEFAULT = 'sales@evpmarriagepalace.com', OWNER_PHONE_DEFAULT = '9696962666';
 const slaHrs = sev => ({ low:(settings.sla&&settings.sla.low)||24, medium:(settings.sla&&settings.sla.medium)||8, high:(settings.sla&&settings.sla.high)||4, critical:(settings.sla&&settings.sla.critical)||1 })[sev] || 8;
+const DEF_CONTACTS = [
+  {name:'Site Supervisor', label:'Site Supervisor', phone:'8081111114'},
+  {name:'Operations Head', label:'Operations Head', phone:'9445758091'},
+  {name:'Director', label:'Director', phone:'9696962666'},
+  {name:'Customer Care', label:'Customer Care', phone:'8081111114'} ];
+const DEF_ESC = [ {role:'Site Supervisor', name:'', phone:'8081111114'}, {role:'Operations Head', name:'', phone:'9445758091'}, {role:'Director', name:'', phone:'9696962666'} ];
+const noOwner = t => String(t||'').replace(/\bowner\b/ig,'Director');
+const contactsList = () => { const c = (settings.contacts||[]).filter(x=>x&&x.phone); return (c.length?c:DEF_CONTACTS).map(x=>Object.assign({}, x, {label:noOwner(x.label), name:noOwner(x.name)})); };
+const escList = () => [0,1,2].map(i=>{ const d = DEF_ESC[i], x = (settings.esc||[])[i]||{}; return { role:noOwner(x.role)||d.role, name:noOwner(x.name)||'', phone:x.phone||d.phone }; });
 const ownerEmail = () => settings.aggEmail || OWNER_EMAIL_DEFAULT;
 const ownerPhone = () => (settings.waNumber || OWNER_PHONE_DEFAULT).replace(/\D/g,'');
 const telHref = p => 'tel:' + String(p||'').replace(/[^\d+]/g,'');
 const waHref = (p,t) => 'https://wa.me/' + (String(p||'').replace(/\D/g,'').length===10 ? '91' : '') + String(p||'').replace(/\D/g,'') + (t?'?text='+encodeURIComponent(t):'');
 const isAgg = () => me && me.role==='aggregator';
-const isStaffClient = () => me && (me.role==='admin' || me.role==='prodmanager');
+const isStaffClient = () => me && (me.role==='admin' || me.role==='prodmanager' || me.role==='supervisor');
 const ago = ts => { const m = Math.round((Date.now()-ts)/60000); return m<1?'just now': m<60? m+' min ago' : m<1440? Math.floor(m/60)+' h ago' : Math.floor(m/1440)+' d ago'; };
 const dayShort = k => { const d = new Date(k+'T00:00:00'); return d.toLocaleDateString([], {weekday:'short', day:'numeric'}); };
 const ownDay = n => { const o=[]; for(let i=n-1;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); o.push(keyOf(d)); } return o; };
@@ -1749,8 +1810,8 @@ function feedEvents(){
   });
   onRoad().forEach(v=>{ if (!vs.has(v.x.siteId)) return; v.alerts.forEach(a=>ev.push({id:'gps:'+v.sid+':'+a, ts:Date.now(), k:'gps', icon:'📡', lvl:'red', title:'Tracking alert — '+v.site+' '+v.x.meal, text:a})); });
   Object.entries(escs).forEach(([id,e])=>{
-    if (isAgg()){ if (e.siteId && !vs.has(e.siteId) && e.siteId!=='all') return; if ((e.upd||0) > e.ts) ev.push({id:'es:'+id+':'+e.status+':'+e.upd, ts:e.upd, k:'esc', icon:'🚨', lvl:e.status==='resolved'?'':'amber', title:'Escalation #'+e.n+' — '+(e.status==='resolved'?'resolved':e.status==='ack'?'acknowledged':e.status==='progress'?'being handled':e.status), text:e.cat}); }
-    else if (isStaffClient()){ ev.push({id:'en:'+id+':'+(e.level||1), ts:e.ts+((e.level||1)-1), k:'esc', icon:'🚨', lvl:'red', title:'Client escalation #'+e.n+' — '+e.sev+(e.level>1?' (level '+e.level+')':''), text:e.cat+' · '+(e.text||'').slice(0,80)}); } });
+    if (isAgg()){ if (e.siteId && !vs.has(e.siteId) && e.siteId!=='all') return; if ((e.upd||0) > e.ts) ev.push({id:'es:'+id+':'+e.status+':'+e.upd, ts:e.upd, k:'esc', icon:'🚨', lvl:e.status==='resolved'?'':'amber', title:'Escalation '+escRef(e)+' — '+(e.status==='resolved'?'resolved':e.status==='ack'?'acknowledged':e.status==='progress'?'being handled':e.status), text:e.cat}); }
+    else if (isStaffClient()){ ev.push({id:'en:'+id+':'+(e.level||1), ts:e.ts+((e.level||1)-1), k:'esc', icon:'🚨', lvl:'red', title:'Client escalation '+escRef(e)+' — '+e.sev+(e.level>1?' (level '+e.level+')':''), text:e.cat+' · '+(e.text||'').slice(0,80)}); } });
   Object.entries(feedbacks).forEach(([id,f])=>{
     if (isAgg()){ if (f.reply && f.rts) ev.push({id:'fr:'+id+':'+f.rts, ts:f.rts, k:'esc', icon:'💬', title:'Reply to your '+f.type, text:f.reply.slice(0,90)}); }
     else if (isStaffClient()) ev.push({id:'fn:'+id, ts:f.ts, k:'esc', icon:f.type==='complaint'?'😞':'💬', lvl:f.type==='complaint'?'amber':'', title:'Client '+f.type+(f.siteId&&sites[f.siteId]?' — '+sites[f.siteId].name:''), text:(f.text||'').slice(0,90)}); });
@@ -1761,18 +1822,18 @@ let feedKnown = null;
 function seenTs(){ try{ return +store.getItem('prod_seen_'+me.id) || 0; }catch(e){ return 0; } }
 function updateBell(){
   const b = $('bell'); if (!b || !me) return;
-  const ok = isAgg() || isStaffClient(); b.style.display = ok ? '' : 'none'; if (!ok) return;
+  const ok = true; b.style.display = '';
   const ev = feedEvents(), seen = seenTs(), n = ev.filter(e=>e.ts>seen).length;
   b.classList.toggle('has', n>0); $('bellN').textContent = n>9?'9+':n;
   const ids = new Set(ev.map(e=>e.id));
   if (feedKnown){ const fresh = ev.filter(e=>!feedKnown.has(e.id) && e.ts>seen);
-    if (fresh.length){ toast(fresh[0].icon+' '+fresh[0].title); try{ if (window.Notification && Notification.permission==='granted') fresh.slice(0,3).forEach(f=>new Notification(f.title,{body:f.text})); }catch(e){} } }
+    if (fresh.length){ fresh.slice(0,3).forEach(f=>notify(f.icon+' '+f.title, f.text, evRef(f))); } }
   feedKnown = ids;
 }
 function bellSheet(){
   const ev = feedEvents(), seen = seenTs(), pr = alertPrefs();
   openSheet('<h3>🔔 Alerts &amp; updates</h3>'+
-    (ev.length ? ev.slice(0,40).map(e=>`<div class="feed ${e.lvl||''}"><i>${e.icon}</i><div class="grow"><b>${esc(e.title)}</b>${e.ts>seen?' <span class="badge amber">new</span>':''}<div class="sub">${esc(e.text||'')}</div><div class="sub">${ago(e.ts)}</div></div></div>`).join('') : '<div class="empty">No updates yet today. Vehicle, wastage, quality and escalation updates appear here.</div>')+
+    (ev.length ? ev.slice(0,40).map(e=>`<div class="feed ${e.lvl||''}"><i>${e.icon}</i><div class="grow"><b>${esc(e.title)}</b>${e.ts>seen?' <span class="badge amber">new</span>':''}<div class="sub">${esc(e.text||'')}</div><div class="sub">${evRef(e)?'Ref '+esc(evRef(e))+' · ':''}${ago(e.ts)}</div></div></div>`).join('') : '<div class="empty">No updates yet today. Vehicle, wastage, quality and escalation updates appear here.</div>')+
     '<h2>Choose what to be alerted about</h2>'+ALERT_PREFS.map(([k,l])=>`<label style="display:flex;gap:10px;align-items:center;font-size:14px;color:var(--ink);margin:6px 0"><input type="checkbox" data-pf="${k}" ${pr[k]!==0?'checked':''} style="width:auto"> ${l}</label>`).join('')+
     (window.Notification && Notification.permission!=='granted' ? '<button class="btn gold save" id="notifOn">🔔 Allow phone notifications</button><div class="sub">Phone pop-ups work while the app is open. Alerts always appear here.</div>' : ''));
   try{ store.setItem('prod_seen_'+me.id, String(Date.now())); }catch(e){}
@@ -1858,6 +1919,7 @@ function renderAgg(){
       ${dishes?`<div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap">${dishes}</div>`:''}
       ${x?`<div class="sub" style="margin-top:8px">${dep?'🚚 Left '+hm(dep.ts)+(x.vehicle?' · '+esc(x.vehicle):''):''}${arr?' · 📍 Arrived '+hm(arr.ts)+(lmA>0?` <b style="color:var(--red)">(+${lmA} min late)</b>`:lmA!=null?' <b style="color:var(--green)">(on time)</b>':''):''}</div>
       ${q1||q2?`<div class="sub">${q1?'Kitchen QC '+(q1.ok?'✅':'❌')+(q1.temp!=null?' '+q1.temp+'°C':''):''}${q1&&q2?' · ':''}${q2?'Arrival QC '+(q2.ok?'✅':'❌')+(q2.temp!=null?' '+q2.temp+'°C':''):''}</div>`:''}
+      ${['_s1','_s2','_s4','_s5','_s7'].map(z=>photoBox(sid+z,'',{ro:true})).join('')}
       ${T(x,'closed')?`<div class="sub" style="margin-top:4px">♻️ Wastage ${fmt(Math.round(w*10)/10)} of ${fmt(Math.round(l*10)/10)} (${l>0?r1(w/l*100):0}%)</div>`:''}`:''}</div>`; }).join('') || '<div class="empty">No counters set up yet.</div>'}
   <h2>This week</h2>
   <div class="score"><div><b>${wRate?r1(wRate):'—'}</b><small>⭐ Avg rating</small></div><div><b>${wOnN?Math.round(wOn/wOnN*100)+'%':'—'}</b><small>🚚 On-time</small></div><div><b>${wQN?Math.round(wQ/wQN*100)+'%':'—'}</b><small>✅ QC passed</small></div></div>
@@ -1881,7 +1943,7 @@ function renderAgLive(){
   const el = $('p-aglive'); if (!el) return;
   const vs = new Set(visibleSites().map(([k])=>k)), road = onRoad().filter(v=>vs.has(v.x.siteId)), t = todayKey();
   const done = Object.entries(sessions).filter(([,x])=>x.date===t && vs.has(x.siteId) && T(x,'arrived')).sort((a,b)=>T(b[1],'arrived').ts-T(a[1],'arrived').ts);
-  const ops = (settings.contacts||[])[0];
+  const ops = contactsList()[0];
   el.innerHTML = `<h2>🚚 Vehicles on the road</h2>` + (road.length ? road.map(v=>{
     const sc = (((sites[v.x.siteId]||{}).sched||{})[v.x.meal])||{}; let pct = null, eta = '';
     if (sc.depart && sc.arrive){ const a = new Date(t+'T'+sc.depart).getTime(), b = new Date(t+'T'+sc.arrive).getTime(); if (b>a) pct = Math.max(4, Math.min(100, (Date.now()-a)/(b-a)*100)); const lm = lateMin(t, sc.arrive, Date.now()); eta = lm>0 ? `<b style="color:var(--red)">Running ${lm} min past planned arrival ${esc(sc.arrive)}</b>` : 'Expected by '+esc(sc.arrive); }
@@ -1893,7 +1955,7 @@ function renderAgLive(){
       <iframe title="Vehicle position" loading="lazy" style="width:100%;height:200px;border:0;border-radius:16px;margin-top:6px" src="https://www.openstreetmap.org/export/embed.html?bbox=${tl.lng-0.012},${tl.lat-0.008},${tl.lng+0.012},${tl.lat+0.008}&layer=mapnik&marker=${tl.lat},${tl.lng}"></iframe>`:'<div class="sub" style="margin-top:6px">Waiting for the first GPS position…</div>'}
       ${ops&&ops.phone?`<div class="callrow"><a href="${telHref(ops.phone)}">📞 Call ${esc(ops.name||ops.label||'kitchen')}</a><a class="wa" href="${waHref(ops.phone,'Where is the '+v.x.meal+' vehicle for '+v.site+'?')}" target="_blank">WhatsApp</a></div>`:''}</div>`; }).join('') : `<div class="empty">No vehicle on the road right now.<div class="sub">When a vehicle leaves the kitchen it appears here live, with the map and expected arrival.</div></div>`) + `
   <h2>✅ Delivered today</h2>` + (done.length ? done.map(([sid,x])=>{ const s = sites[x.siteId]||{}, sc = ((s.sched||{})[x.meal])||{}, lm = sc.arrive ? lateMin(t,sc.arrive,T(x,'arrived').ts) : null;
-    return `<div class="card row"><div class="grow"><b>${esc(s.name||x.siteId)} — ${esc(x.meal)}</b><div class="sub">Left ${hm(T(x,'departed')&&T(x,'departed').ts)} · arrived ${hm(T(x,'arrived').ts)} · trip ${dur(T(x,'departed')&&T(x,'departed').ts,T(x,'arrived').ts)}</div></div><span class="badge ${lm>0?'red':''}">${lm>0?'+'+lm+' min':lm!=null?'On time':'Delivered'}</span></div>`; }).join('') : '<div class="empty">Nothing delivered yet today.</div>') + `
+    return `<div class="card row"><div class="grow"><b>${esc(s.name||x.siteId)} — ${esc(x.meal)}</b><div class="sub">Left ${hm(T(x,'departed')&&T(x,'departed').ts)} · arrived ${hm(T(x,'arrived').ts)} · trip ${dur(T(x,'departed')&&T(x,'departed').ts,T(x,'arrived').ts)}${x.odo&&x.odo.start!=null&&x.odo.end!=null?' · '+fmt(Math.round((x.odo.end-x.odo.start)*10)/10)+' km':''}</div></div><span class="badge ${lm>0?'red':''}">${lm>0?'+'+lm+' min':lm!=null?'On time':'Delivered'}</span></div>`; }).join('') : '<div class="empty">Nothing delivered yet today.</div>') + `
   <button class="btn sec save" id="lvBell">🔔 Choose tracking alerts</button>`;
   $('lvBell').onclick = bellSheet;
 }
@@ -1914,6 +1976,7 @@ function renderAgRate(){
   ${meals.map(([k,s,m])=>{ const key = rateDate+'_'+k+'_'+m, saved = ratings[key]; const cur = Object.assign({}, saved&&saved.r||{}, rateDraft[key]||{});
     return `<div class="card" data-key="${key}"><div class="row"><b class="grow">${MEAL_ICON[m]||'🍽️'} ${esc(s.name)} — ${esc(m)}</b>${saved?'<span class="badge">rated</span>':''}</div>
       ${DIMS.map(([d,l])=>`<div class="rrow"><span>${l}</span>${stars(key+'|'+d, cur[d]||0)}</div>`).join('')}
+      ${photoBox('rt_'+key,'Add photo of the food')}
       <label>Comment (optional)</label><input class="rc" data-key="${key}" value="${esc((rateDraft[key]&&rateDraft[key].comment!=null)?rateDraft[key].comment:(saved&&saved.comment||''))}" placeholder="What was good / what to improve">
       <button class="btn save" data-save="${key}">Submit rating</button></div>`; }).join('') || '<div class="empty">No counters yet.</div>'}
   <h2>Rating trend — overall (7 days)</h2>
@@ -1923,8 +1986,9 @@ function renderAgRate(){
   <div class="card"><label>Type</label><select id="fb_type">${FB_TYPES.map(([v,l])=>`<option value="${v}" ${fbDraft.type===v?'selected':''}>${l}</option>`).join('')}</select>
     <label>Counter (optional)</label><select id="fb_site"><option value="">All / general</option>${visibleSites().map(([k,s])=>`<option value="${k}" ${fbDraft.siteId===k?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
     <label>Your message</label><textarea id="fb_text" rows="3" placeholder="Tell us what you noticed — taste, quantity, service, anything">${esc(fbDraft.text)}</textarea>
+    ${photoBox(draftCtx('fb'),'Add photo',{draft:'fb'})}
     <button class="btn save" id="fb_send">Send to Kalyana Sapadu</button></div>
-  ${myFb.length?`<h2>Your messages</h2>${myFb.map(([id,f])=>`<div class="card"><div class="row"><b class="grow">${(FB_TYPES.find(x=>x[0]===f.type)||[0,f.type])[1]}</b><span class="badge ${f.reply?'':'amber'}">${f.reply?'replied':'sent'}</span></div><div style="font-size:13.5px;margin-top:4px">${esc(f.text)}</div><div class="sub">${ago(f.ts)}</div>${f.reply?`<div class="notice info" style="margin:8px 0 0"><div><b>${esc(f.repBy||'Kalyana Sapadu')}:</b> ${esc(f.reply)}</div></div>`:''}</div>`).join('')}`:''}`;
+  ${myFb.length?`<h2>Your messages</h2>${myFb.map(([id,f])=>`<div class="card"><div class="row"><b class="grow">${(FB_TYPES.find(x=>x[0]===f.type)||[0,f.type])[1]}</b><span class="badge ${f.reply?'':'amber'}">${f.reply?'replied':'sent'}</span></div><div style="font-size:13.5px;margin-top:4px">${esc(f.text)}</div>${f.photoKey?photoBox(f.photoKey,'',{ro:true}):''}<div class="sub">${f.n?'Ref '+fbRef(f)+' · ':''}${ago(f.ts)}</div>${f.reply?`<div class="notice info" style="margin:8px 0 0"><div><b>${esc(f.repBy||'Kalyana Sapadu')}:</b> ${esc(f.reply)}</div></div>`:''}</div>`).join('')}`:''}`;
   $('rt_date').onchange = ()=>{ rateDate = $('rt_date').value || todayKey(); rateDraft = {}; renderAgRate(); };
   el.querySelectorAll('.stars').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{ const [key,d] = g.dataset.k.split('|'); rateDraft[key] = rateDraft[key]||{}; rateDraft[key][d] = +b.dataset.v; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on', +x.dataset.v<=+b.dataset.v)); }));
   el.querySelectorAll('.rc').forEach(i=>i.oninput=()=>{ rateDraft[i.dataset.key] = rateDraft[i.dataset.key]||{}; rateDraft[i.dataset.key].comment = i.value; });
@@ -1933,7 +1997,7 @@ function renderAgRate(){
     db.ref(P+'ratings/'+key).set({ date, siteId, meal, r, comment: (rateDraft[key]&&rateDraft[key].comment!=null)?rateDraft[key].comment:(saved.comment||''), by:me.name, ts:Date.now() }).then(()=>{ delete rateDraft[key]; toast('Thank you — rating saved'); }); });
   $('fb_type').onchange = ()=>fbDraft.type = $('fb_type').value; $('fb_site').onchange = ()=>fbDraft.siteId = $('fb_site').value; $('fb_text').oninput = ()=>fbDraft.text = $('fb_text').value;
   $('fb_send').onclick = ()=>{ const text = $('fb_text').value.trim(); if (!text){ alert('Please type your message.'); return; }
-    db.ref(P+'feedback').push({ type:$('fb_type').value, siteId:$('fb_site').value||null, text, by:me.name, ts:Date.now(), status:'new' }).then(()=>{ fbDraft = {type:'feedback', siteId:'', text:''}; toast('Sent — we will reply soon'); renderAgRate(); }); };
+    db.ref(P+'feedback').push({ type:$('fb_type').value, siteId:$('fb_site').value||null, text, by:me.name, ts:Date.now(), status:'new', n:nextFb(), photoKey:usePh('fb') }).then(()=>{ fbDraft = {type:'feedback', siteId:'', text:''}; toast('Sent — we will reply soon'); renderAgRate(); }); };
 }
 
 /* ================= AGGREGATOR: ESCALATE ================= */
@@ -1943,15 +2007,16 @@ function slaBadge(e){
   const left = (e.due||0) - Date.now(), m = Math.abs(Math.round(left/60000)), txt = m>=60 ? Math.floor(m/60)+'h '+(m%60)+'m' : m+'m';
   return left>=0 ? `<span class="badge amber">Respond within ${txt}</span>` : `<span class="badge red">OVERDUE ${txt}</span>`;
 }
+const nextFb = () => Object.values(feedbacks).reduce((a,f)=>Math.max(a,f.n||0),0)+1;
 const stLabel = s => ({open:'Open', ack:'Acknowledged', progress:'In progress', resolved:'Resolved', closed:'Closed'})[s] || s;
 function escCard(id, e, staff){
-  const hist = Object.values(e.hist||{}).sort((a,b)=>a.ts-b.ts), lv = (settings.esc||[])[Math.min((e.level||1),3)-1] || {};
-  return `<div class="card" style="${(e.sev==='critical'||e.sev==='high')&&e.status!=='closed'&&e.status!=='resolved'?'border-left:5px solid var(--red)':''}"><div class="row"><div class="grow"><b>#${e.n} · ${esc(e.cat)}</b><div class="sub">${esc((sites[e.siteId]||{}).name||'All counters')}${e.meal?' · '+esc(e.meal):''} · ${esc(e.sev)} · Level ${e.level||1} · by ${esc(e.by)} · ${ago(e.ts)}</div></div>${slaBadge(e)}</div>
-    <div style="font-size:13.5px;margin-top:6px">${esc(e.text)}</div><div style="margin-top:6px"><span class="badge ${e.status==='open'?'red':e.status==='resolved'||e.status==='closed'?'':'blue'}">${stLabel(e.status)}</span></div>
+  const hist = Object.values(e.hist||{}).sort((a,b)=>a.ts-b.ts), lv = escList()[Math.min((e.level||1),3)-1] || {};
+  return `<div class="card" style="${(e.sev==='critical'||e.sev==='high')&&e.status!=='closed'&&e.status!=='resolved'?'border-left:5px solid var(--red)':''}"><div class="row"><div class="grow"><b>${escRef(e)} · ${esc(e.cat)}</b><div class="sub">${esc((sites[e.siteId]||{}).name||'All counters')}${e.meal?' · '+esc(e.meal):''} · ${esc(e.sev)} · Level ${e.level||1} · by ${esc(e.by)} · ${ago(e.ts)}</div></div>${slaBadge(e)}</div>
+    <div style="font-size:13.5px;margin-top:6px">${esc(e.text)}</div>${e.photoKey?photoBox(e.photoKey,'',{ro:true}):''}${(!staff&&e.status!=='closed')?photoBox('esc_'+id,'Add photo',{}):photoBox('esc_'+id,'',{ro:true})}<div style="margin-top:6px"><span class="badge ${e.status==='open'?'red':e.status==='resolved'||e.status==='closed'?'':'blue'}">${stLabel(e.status)}</span></div>
     ${hist.length?`<div class="tl">${hist.map(h=>`<div><b>${esc(h.by)}</b> · ${hm(h.ts)} ${new Date(h.ts).toLocaleDateString([], {day:'numeric',month:'short'})} — ${esc(h.text)}</div>`).join('')}</div>`:''}
     <div class="actions">${staff ? (e.status==='open'?`<button data-ea="ack" data-id="${id}">Acknowledge</button>`:'')+(e.status==='open'||e.status==='ack'?`<button data-ea="progress" data-id="${id}">Working on it</button>`:'')+(e.status!=='resolved'&&e.status!=='closed'?`<button data-ea="resolve" data-id="${id}">Resolve</button>`:'')
       : (e.status==='resolved'?`<button data-ea="close" data-id="${id}">✔ Confirm fixed</button><button data-ea="reopen" data-id="${id}">Not fixed</button>`:'')+((e.status!=='resolved'&&e.status!=='closed'&&(e.level||1)<3)?`<button data-ea="up" data-id="${id}">⬆ Escalate to level ${(e.level||1)+1}</button>`:'')}</div>
-    ${!staff&&lv.phone&&e.status!=='closed'&&e.status!=='resolved'?`<div class="callrow"><a href="${telHref(lv.phone)}">📞 Call ${esc(lv.name||'level '+(e.level||1))}</a><a class="wa" href="${waHref(lv.phone,'Escalation #'+e.n+': '+e.cat)}" target="_blank">WhatsApp</a></div>`:''}</div>`;
+    ${!staff&&lv.phone&&e.status!=='closed'&&e.status!=='resolved'?`<div class="callrow"><a href="${telHref(lv.phone)}">📞 Call ${esc(lv.name||lv.role||'level '+(e.level||1))}</a><a class="wa" href="${waHref(lv.phone,escRef(e)+': '+e.cat)}" target="_blank">WhatsApp</a></div>`:''}</div>`;
 }
 function escAction(id, a){
   const e = escs[id]; if (!e) return; const ref = db.ref(P+'escalations/'+id), now = Date.now(), h = (txt)=>db.ref(P+'escalations/'+id+'/hist').push({ ts:now, by:me.name, text:txt });
@@ -1960,23 +2025,24 @@ function escAction(id, a){
   else if (a==='resolve'){ const note = prompt('What was done to fix it? (shown to the client)'); if (note==null) return; ref.update({status:'resolved', upd:now, resolution:note}).then(()=>h('Resolved — '+(note||'fixed'))); }
   else if (a==='close') ref.update({status:'closed', upd:now}).then(()=>h('Client confirmed fixed'));
   else if (a==='reopen') ref.update({status:'open', upd:now, due: now+slaHrs(e.sev)*1800000}).then(()=>h('Client says not fixed — reopened'));
-  else if (a==='up'){ const lv = (e.level||1)+1; ref.update({level:lv, status:'open', upd:now, due: now+slaHrs(e.sev)*1800000}).then(()=>h('Escalated to level '+lv+((settings.esc||[])[lv-1]&&(settings.esc||[])[lv-1].name?' — '+(settings.esc||[])[lv-1].name:''))); }
+  else if (a==='up'){ const lv = (e.level||1)+1; ref.update({level:lv, status:'open', upd:now, due: now+slaHrs(e.sev)*1800000}).then(()=>h('Escalated to level '+lv+(' — '+(escList()[lv-1].name||escList()[lv-1].role)))); }
 }
 function renderAgEsc(){
   const el = $('p-agesc'); if (!el) return;
   if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
   const mine = Object.entries(escs).sort((a,b)=>b[1].ts-a[1].ts);
-  const lvls = [0,1,2].map(i=>(settings.esc||[])[i]||{});
+  const lvls = escList();
   el.innerHTML = `<div class="sos"><i>🚨</i><div><b>Something wrong with the food?</b><span>Raise an escalation — it reaches the kitchen team instantly and is tracked until fixed.</span></div></div>
   <div class="card"><label>Counter</label><select id="es_site"><option value="all">All / general</option>${visibleSites().map(([k,s])=>`<option value="${k}" ${escDraft.siteId===k?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
     <div class="two"><div><label>Meal</label><select id="es_meal"><option value="">—</option>${MEALS.map(m=>`<option ${escDraft.meal===m?'selected':''}>${m}</option>`).join('')}</select></div>
     <div><label>What happened</label><select id="es_cat">${ESC_CATS.map(c=>`<option ${escDraft.cat===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
     <label>How serious</label><select id="es_sev">${SEVS.map(([v,l])=>`<option value="${v}" ${escDraft.sev===v?'selected':''}>${l}</option>`).join('')}</select>
     <label>Details</label><textarea id="es_text" rows="3" placeholder="Describe the issue — what, where, how many people affected">${esc(escDraft.text)}</textarea>
+    ${photoBox(draftCtx('esc'),'Add photo of the issue',{draft:'esc'})}
     <div class="sub" id="es_sla"></div>
     <button class="btn save" id="es_go" style="background:linear-gradient(135deg,#ff6b6b,#d6453a)">Raise escalation</button></div>
   <h2>Escalation ladder</h2>
-  <div class="card">${lvls.map((l,i)=>`<div class="rrow"><span><b>Level ${i+1}</b> · ${esc(l.role||['Production Manager','Operations Head','Owner'][i])}<div class="sub">${esc(l.name||'')}</div></span>${l.phone?`<a class="badge" href="${telHref(l.phone)}" style="text-decoration:none">📞 ${esc(l.phone)}</a>`:'<span class="sub">number not set</span>'}</div>`).join('')}
+  <div class="card">${lvls.map((l,i)=>`<div class="rrow"><span><b>Level ${i+1}</b> · ${esc(l.role)}<div class="sub">${esc(l.name||'')}</div></span>${l.phone?`<a class="badge" href="${telHref(l.phone)}" style="text-decoration:none">📞 ${esc(l.phone)}</a>`:'<span class="sub">number not set</span>'}</div>`).join('')}
     <div class="sub" style="margin-top:6px">Response targets: Critical ${slaHrs('critical')}h · High ${slaHrs('high')}h · Medium ${slaHrs('medium')}h · Low ${slaHrs('low')}h. If there is no reply in time, move it up a level.</div></div>
   <h2>Your escalations</h2>${mine.length ? mine.map(([id,e])=>escCard(id,e,false)).join('') : '<div class="empty">No escalations raised.</div>'}`;
   const slaTxt = ()=>{ $('es_sla').textContent = 'We will respond within '+slaHrs($('es_sev').value)+' hour(s) for this severity.'; }; slaTxt();
@@ -1984,8 +2050,8 @@ function renderAgEsc(){
   $('es_text').oninput = ()=>escDraft.text = $('es_text').value;
   $('es_go').onclick = ()=>{ const text = $('es_text').value.trim(); if (!text){ alert('Please describe the issue.'); return; }
     const n = Object.values(escs).reduce((a,e)=>Math.max(a,e.n||0),0)+1, now = Date.now(), sev = $('es_sev').value;
-    db.ref(P+'escalations').push({ n, siteId:$('es_site').value, meal:$('es_meal').value||null, cat:$('es_cat').value, sev, text, by:me.name, ts:now, upd:now, status:'open', level:1, due: now+slaHrs(sev)*3600000 })
-      .then(()=>{ escDraft = {siteId:'',meal:'',cat:ESC_CATS[0],sev:'medium',text:''}; toast('Escalation #'+n+' raised'); renderAgEsc(); }); };
+    db.ref(P+'escalations').push({ n, siteId:$('es_site').value, meal:$('es_meal').value||null, cat:$('es_cat').value, sev, text, by:me.name, ts:now, upd:now, status:'open', level:1, due: now+slaHrs(sev)*3600000, photoKey:usePh('esc') })
+      .then(()=>{ escDraft = {siteId:'',meal:'',cat:ESC_CATS[0],sev:'medium',text:''}; toast('Escalation '+escRef({n})+' raised'); renderAgEsc(); }); };
   el.querySelectorAll('[data-ea]').forEach(b=>b.onclick=()=>escAction(b.dataset.id, b.dataset.ea));
 }
 
@@ -1993,21 +2059,21 @@ function renderAgEsc(){
 function renderAgContact(){
   const el = $('p-agcontact'); if (!el) return;
   if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-  const cts = (settings.contacts||[]).filter(c=>c&&c.phone), mail = ownerEmail(), wa = ownerPhone();
+  const cts = contactsList(), mail = ownerEmail(), wa = ownerPhone();
   el.innerHTML = `<a class="sos" href="tel:112"><i>🆘</i><div><b>Emergency — call 112</b><span>Police · Ambulance · Fire — national emergency number</span></div></a>
   <div class="card">${EMERGENCY.map(([n,l])=>`<div class="rrow"><span>${l}</span><a class="badge red" style="text-decoration:none" href="tel:${n}">📞 ${n==='1800112100'?'1800-11-2100':n}</a></div>`).join('')}</div>
   <h2>Kalyana Sapadu team</h2>
   ${cts.length ? cts.map(c=>`<div class="card"><b>${esc(c.name||c.label)}</b><div class="sub">${esc(c.label||'')} · ${esc(c.phone)}</div><div class="callrow"><a href="${telHref(c.phone)}">📞 Call</a><a class="wa" href="${waHref(c.phone)}" target="_blank">WhatsApp</a></div></div>`).join('') : `<div class="card"><b>Owner / Operations</b><div class="sub">${esc(ownerPhone())}</div><div class="callrow"><a href="${telHref(ownerPhone())}">📞 Call</a><a class="wa" href="${waHref(ownerPhone())}" target="_blank">WhatsApp</a></div></div>`}
   <h2>✉️ Email us</h2>
   <div class="card"><label>Topic</label><select id="em_topic">${['General query','Menu change request','Quantity change request','Complaint','Invoice / billing','Audit / inspection visit','Other'].map(t=>`<option>${t}</option>`).join('')}</select>
-    <label>Message</label><textarea id="em_text" rows="4" placeholder="Write your message"></textarea>
+    <label>Message</label><textarea id="em_text" rows="4" placeholder="Write your message"></textarea>${photoBox(draftCtx('msg'),'Attach photo',{draft:'msg'})}
     <div class="two" style="margin-top:10px"><button class="btn" id="em_mail">Open email</button><button class="btn sec" id="em_app">Send in app</button></div>
     <div class="sub" style="margin-top:6px">Email goes to ${esc(mail)}. “Send in app” reaches the team inbox instantly.</div>
-    <div class="callrow"><a class="wa" href="${waHref(wa)}" target="_blank">WhatsApp the owner</a></div></div>
+    <div class="callrow"><a class="wa" href="${waHref(wa)}" target="_blank">WhatsApp the Director</a></div></div>
   <h2>Food-safety information</h2>
   <div class="card"><div class="sub">Every meal is checked in the kitchen and again on arrival, with food temperature recorded. Results appear under <b>Today</b>. If you suspect any food-safety issue, stop serving that item and raise a <b>Critical</b> escalation.</div></div>`;
   $('em_mail').onclick = ()=>{ const t = $('em_text').value.trim(); location.href = 'mailto:'+encodeURIComponent(mail)+'?subject='+encodeURIComponent($('em_topic').value+' — '+me.name)+'&body='+encodeURIComponent(t+'\n\n— '+me.name); };
-  $('em_app').onclick = ()=>{ const t = $('em_text').value.trim(); if (!t){ alert('Please type your message.'); return; } db.ref(P+'feedback').push({ type:'message', siteId:null, text:'['+$('em_topic').value+'] '+t, by:me.name, ts:Date.now(), status:'new' }).then(()=>{ $('em_text').value=''; toast('Message sent'); }); };
+  $('em_app').onclick = ()=>{ const t = $('em_text').value.trim(); if (!t){ alert('Please type your message.'); return; } db.ref(P+'feedback').push({ type:'message', siteId:null, text:'['+$('em_topic').value+'] '+t, by:me.name, ts:Date.now(), status:'new', n:nextFb(), photoKey:usePh('msg') }).then(()=>{ $('em_text').value=''; toast('Message sent'); }); };
 }
 
 /* ================= STAFF: CLIENT INBOX ================= */
@@ -2019,10 +2085,10 @@ function renderClient(){
   const tabs = [['esc','🚨 Escalations'+(openE?' ('+openE+')':'')],['fb','💬 Feedback'+(newF?' ('+newF+')':'')],['rt','⭐ Ratings'],['send','📤 Send update']];
   let body = '';
   if (clTab==='esc'){ const l = Object.entries(escs).sort((a,b)=>(a[1].status==='closed'||a[1].status==='resolved')-(b[1].status==='closed'||b[1].status==='resolved') || b[1].ts-a[1].ts); body = l.length ? l.map(([id,e])=>escCard(id,e,true)).join('') : '<div class="empty">No escalations from the client.</div>'; }
-  else if (clTab==='fb'){ const l = Object.entries(feedbacks).sort((a,b)=>!!a[1].reply-!!b[1].reply || b[1].ts-a[1].ts).slice(0,60); body = l.length ? l.map(([id,f])=>`<div class="card"><div class="row"><b class="grow">${(FB_TYPES.find(x=>x[0]===f.type)||[0,'✉️ '+f.type])[1]}</b><span class="badge ${f.reply?'':'amber'}">${f.reply?'replied':'new'}</span></div><div class="sub">${esc(f.by)} · ${esc((sites[f.siteId]||{}).name||'general')} · ${ago(f.ts)}</div><div style="font-size:13.5px;margin-top:6px">${esc(f.text)}</div>
+  else if (clTab==='fb'){ const l = Object.entries(feedbacks).sort((a,b)=>!!a[1].reply-!!b[1].reply || b[1].ts-a[1].ts).slice(0,60); body = l.length ? l.map(([id,f])=>`<div class="card"><div class="row"><b class="grow">${(FB_TYPES.find(x=>x[0]===f.type)||[0,'✉️ '+f.type])[1]}</b><span class="badge ${f.reply?'':'amber'}">${f.reply?'replied':'new'}</span></div><div class="sub">${f.n?fbRef(f)+' · ':''}${esc(f.by)} · ${esc((sites[f.siteId]||{}).name||'general')} · ${ago(f.ts)}</div><div style="font-size:13.5px;margin-top:6px">${esc(f.text)}</div>${f.photoKey?photoBox(f.photoKey,'',{ro:true}):''}${f.photoKey?photoBox(f.photoKey,'',{ro:true}):''}
       ${f.reply?`<div class="notice info" style="margin:8px 0 0"><div><b>${esc(f.repBy||'')}:</b> ${esc(f.reply)}</div></div>`:`<div class="row" style="margin-top:8px"><input class="fr grow" data-id="${id}" placeholder="Type a reply"><button class="btn" data-fr="${id}" style="padding:10px 14px">Reply</button></div>`}</div>`).join('') : '<div class="empty">No feedback yet.</div>'; }
   else if (clTab==='rt'){ const days = ownDay(14).reverse(); body = days.map(d=>{ const rs = Object.values(ratings).filter(r=>r.date===d); if (!rs.length) return '';
-      return `<div class="card"><b>${dayShort(d)}</b>${rs.map(r=>`<div class="rrow"><span>${esc((sites[r.siteId]||{}).name||'')} · ${esc(r.meal)}<div class="sub">${DIMS.filter(([k])=>r.r[k]).map(([k,l])=>l.split(' ')[0]+' '+r.r[k]).join(' · ')}${r.comment?'<br>“'+esc(r.comment)+'”':''}</div></span><b style="font-size:18px">${r.r.overall||'—'} ⭐</b></div>`).join('')}</div>`; }).join('') || '<div class="empty">No ratings yet.</div>'; }
+      return `<div class="card"><b>${dayShort(d)}</b>${rs.map(r=>`<div class="rrow"><span>${esc((sites[r.siteId]||{}).name||'')} · ${esc(r.meal)}<div class="sub">${DIMS.filter(([k])=>r.r[k]).map(([k,l])=>l.split(' ')[0]+' '+r.r[k]).join(' · ')}${r.comment?'<br>“'+esc(r.comment)+'”':''}</div>${photoBox('rt_'+r.date+'_'+r.siteId+'_'+r.meal,'',{ro:true})}</span><b style="font-size:18px">${r.r.overall||'—'} ⭐</b></div>`).join('')}</div>`; }).join('') || '<div class="empty">No ratings yet.</div>'; }
   else body = `<div class="card"><div class="sub">Send the client today's service update — dispatch times, quality checks and wastage.</div><textarea id="cl_text" rows="12" style="margin-top:8px">${esc(clientSummary(todayKey()))}</textarea><div class="two" style="margin-top:10px"><button class="btn" id="cl_wa">WhatsApp</button><button class="btn sec" id="cl_mail">Email</button></div></div>`;
   el.innerHTML = `<div class="chips">${tabs.map(([k,l])=>`<div class="chip ${clTab===k?'active':''}" data-ct="${k}">${l}</div>`).join('')}</div>${body}`;
   el.querySelectorAll('[data-ct]').forEach(c=>c.onclick=()=>{ clTab = c.dataset.ct; renderClient(); });
@@ -2034,16 +2100,16 @@ function renderClient(){
 
 /* ================= MASTERS: CONTACTS & ESCALATION ================= */
 function mContacts(){
-  const st = settings, cts = st.contacts||[], esl = st.esc||[], sla = st.sla||{};
+  const st = settings, cts = contactsList(), esl = escList(), sla = st.sla||{};
   const rows = [0,1,2,3,4].map(i=>cts[i]||{});
   $('mBody').innerHTML = formShell('Client contacts, escalation & emergency', `
-    <div class="sub">Shown to the aggregator in their Contact and Escalate screens.</div>
+    <div class="sub">Shown to the aggregator in Contact, Escalate and the chatbot. Pre-filled: Site Supervisor → Operations Head → Director (escalation levels 1-3).</div>
     <label>Aggregator email-us address</label><input id="ct_mail" value="${esc(st.aggEmail||'')}" placeholder="${OWNER_EMAIL_DEFAULT}">
-    <label>Owner WhatsApp / phone</label><input id="ct_wa" inputmode="tel" value="${esc(st.waNumber||'')}" placeholder="${OWNER_PHONE_DEFAULT}">
+    <label>Director WhatsApp / phone</label><input id="ct_wa" inputmode="tel" value="${esc(st.waNumber||'')}" placeholder="${OWNER_PHONE_DEFAULT}">
     <h2>Team contacts (up to 5)</h2>
     ${rows.map((c,i)=>`<div class="two"><div><input class="ct_n" data-i="${i}" value="${esc(c.name||'')}" placeholder="Name"></div><div><input class="ct_p" data-i="${i}" inputmode="tel" value="${esc(c.phone||'')}" placeholder="Phone"></div></div><input class="ct_l" data-i="${i}" value="${esc(c.label||'')}" placeholder="Role e.g. Kitchen head (first contact is used for live-tracking calls)" style="margin:6px 0 10px">`).join('')}
     <h2>Escalation ladder</h2>
-    ${[0,1,2].map(i=>`<div class="two"><div><input class="es_n" data-i="${i}" value="${esc((esl[i]||{}).name||'')}" placeholder="Level ${i+1} name"></div><div><input class="es_p" data-i="${i}" inputmode="tel" value="${esc((esl[i]||{}).phone||'')}" placeholder="Phone"></div></div><input class="es_r" data-i="${i}" value="${esc((esl[i]||{}).role||['Production Manager','Operations Head','Owner'][i])}" style="margin:6px 0 10px">`).join('')}
+    ${[0,1,2].map(i=>`<div class="two"><div><input class="es_n" data-i="${i}" value="${esc((esl[i]||{}).name||'')}" placeholder="Level ${i+1} name"></div><div><input class="es_p" data-i="${i}" inputmode="tel" value="${esc((esl[i]||{}).phone||'')}" placeholder="Phone"></div></div><input class="es_r" data-i="${i}" value="${esc((esl[i]||{}).role||'')}" style="margin:6px 0 10px">`).join('')}
     <h2>Response targets (hours)</h2>
     <div class="two"><div><label>Critical</label><input id="sl_c" type="number" step="any" value="${slaHrs('critical')}"></div><div><label>High</label><input id="sl_h" type="number" step="any" value="${slaHrs('high')}"></div></div>
     <div class="two"><div><label>Medium</label><input id="sl_m" type="number" step="any" value="${slaHrs('medium')}"></div><div><label>Low</label><input id="sl_l" type="number" step="any" value="${slaHrs('low')}"></div></div>`, 'ct_save');
@@ -2112,6 +2178,238 @@ document.documentElement.style.setProperty('--kslogo','url('+KS_LOGO+')'); docum
 (function(){ const ls = document.getElementById('lockScene'); if (ls) ls.innerHTML = sceneSvg({seed:11}); })();
 
 /* ---- restore a saved login LAST, after every module above has been defined ---- */
+/* ================= v3: references, photos, chatbot, push ================= */
+const pad3 = n => String(n||0).padStart(3,'0');
+const escRef = e => 'ESC-'+pad3(e.n), fbRef = f => 'FB-'+pad3(f.n);
+const siteCode = id => { const w = ((sites[id]||{}).name||id||'').split(/\s+/).filter(Boolean); return (w.length>1 ? w.map(x=>x[0]).join('') : (w[0]||'')).slice(0,3).toUpperCase(); };
+const mealRef = sid => { const q = String(sid).split('_'); return 'ML-'+(q[0]||'').slice(8,10)+(q[0]||'').slice(5,7)+'-'+siteCode(q[1])+'-'+String(q[2]||'').slice(0,3).toUpperCase(); };
+function evRef(e){
+  const q = String(e.id).split(':'), k = q[0], a = q[1];
+  if (k==='es'||k==='en') return escs[a] ? escRef(escs[a]) : '';
+  if (k==='fr'||k==='fn') return feedbacks[a] ? fbRef(feedbacks[a]) : '';
+  if (['dep','arr','ld','la','qc1','qc2','ws','gps'].includes(k) && a) return mealRef(a);
+  return '';
+}
+
+/* ---------- photos ---------- */
+const PH = {}, PHsub = {}, PHD = {};
+const phId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const phCount = c => Object.keys(PH[c]||{}).length;
+function draftCtx(kind){ if (!PHD[kind]) PHD[kind] = 'd_'+(me?me.id:'x')+'_'+kind+'_'+phId(); return PHD[kind]; }
+function usePh(kind){
+  const k = PHD[kind]; if (!k || !phCount(k)) return null;
+  delete PHD[kind];
+  setTimeout(()=>{ document.querySelectorAll('.phbox[data-draft="'+kind+'"]').forEach(b=>{ b.dataset.ctx = draftCtx(kind); phPaint(b); }); }, 0);
+  return k;
+}
+function phThumbs(ctx, ro){
+  const list = Object.entries(PH[ctx]||{}).sort((a,b)=>a[1].ts-b[1].ts);
+  return list.map(([id,p])=>`<img class="phth" data-pid="${id}" alt="photo" src="${p.data}">`).join('');
+}
+function photoBox(ctx, label, o){
+  o = o || {}; if (!ctx) return '';
+  return `<div class="phbox${o.ro?' ro':''}" data-ctx="${esc(ctx)}"${o.draft?` data-draft="${o.draft}"`:''}><div class="phrow">${phThumbs(ctx,o.ro)}</div>${o.ro?'':`<label class="phadd">📷 ${esc(label||'Add photo')}<input type="file" accept="image/*" multiple hidden></label>`}</div>`;
+}
+function phPaint(box){
+  const row = box.querySelector('.phrow'); if (!row) return;
+  const h = phThumbs(box.dataset.ctx, box.classList.contains('ro'));
+  if (row.dataset.h !== String(h.length)+':'+Object.keys(PH[box.dataset.ctx]||{}).join(',')){ row.innerHTML = h; row.dataset.h = String(h.length)+':'+Object.keys(PH[box.dataset.ctx]||{}).join(','); }
+  box.classList.toggle('empty', box.classList.contains('ro') && !h);
+}
+function phSub(ctx){
+  if (PHsub[ctx]) return; PHsub[ctx] = 1;
+  authReady.then(()=>db.ref(P+'photos/'+ctx).on('value', s=>{ PH[ctx] = s.val()||{}; document.querySelectorAll('.phbox').forEach(b=>{ if (b.dataset.ctx===ctx) phPaint(b); }); }));
+}
+let phQ = false;
+function phInit(){
+  if (phQ) return; phQ = true;
+  requestAnimationFrame(()=>{ phQ = false; document.querySelectorAll('.phbox').forEach(b=>{ phSub(b.dataset.ctx); phPaint(b); }); });
+}
+new MutationObserver(phInit).observe(document.body, {childList:true, subtree:true});
+function phCompress(file){
+  return new Promise((res,rej)=>{
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = ()=>{ URL.revokeObjectURL(url); let max = 1000;
+      const run = ()=>{
+        const sc = Math.min(1, max/Math.max(im.width, im.height)), c = document.createElement('canvas');
+        c.width = Math.max(1,Math.round(im.width*sc)); c.height = Math.max(1,Math.round(im.height*sc));
+        const x = c.getContext('2d'); x.drawImage(im,0,0,c.width,c.height);
+        const lab = new Date().toLocaleString()+' · '+(me?me.name:''), fs = Math.max(11, Math.round(c.width/42)), h = fs+10;
+        x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect(0,c.height-h,c.width,h); x.fillStyle = '#fff'; x.font = 'bold '+fs+'px sans-serif'; x.textBaseline = 'middle'; x.fillText(lab,8,c.height-h/2);
+        let q = .72, d = c.toDataURL('image/jpeg',q);
+        while (d.length>190000 && q>.38){ q -= .08; d = c.toDataURL('image/jpeg',q); }
+        if (d.length>190000 && max>500){ max = Math.round(max*.75); return run(); }
+        res(d);
+      }; run(); };
+    im.onerror = ()=>rej(new Error('Not an image')); im.src = url;
+  });
+}
+function phView(ctx, pid){
+  const list = Object.entries(PH[ctx]||{}).sort((a,b)=>a[1].ts-b[1].ts); if (!list.length) return;
+  let i = Math.max(0, list.findIndex(([id])=>id===pid));
+  let v = document.getElementById('phView'); if (!v){ v = document.createElement('div'); v.id = 'phView'; document.body.appendChild(v); }
+  const draw = ()=>{ const [id,p] = list[i]; const mine = me && (p.byId===me.id || me.role==='admin');
+    v.innerHTML = `<div class="phv-top"><span>${i+1} / ${list.length}</span><button id="phvX" aria-label="Close">✕</button></div><img src="${p.data}" alt=""><div class="phv-bot"><div>${esc(p.by||'')} · ${new Date(p.ts||0).toLocaleString()}</div><div class="phv-act">${list.length>1?'<button id="phvP">‹</button><button id="phvN">›</button>':''}${mine?'<button id="phvD" class="del">🗑 Delete</button>':''}</div></div>`;
+    $('phvX').onclick = ()=>v.classList.remove('show');
+    if ($('phvP')){ $('phvP').onclick = ()=>{ i = (i-1+list.length)%list.length; draw(); }; $('phvN').onclick = ()=>{ i = (i+1)%list.length; draw(); }; }
+    if ($('phvD')) $('phvD').onclick = ()=>{ if (confirm('Delete this photo?')){ db.ref(P+'photos/'+ctx+'/'+id).remove().then(()=>{ v.classList.remove('show'); toast('Photo deleted'); }); } };
+  };
+  draw(); v.classList.add('show');
+}
+document.addEventListener('click', e=>{
+  const th = e.target.closest && e.target.closest('.phth');
+  if (th){ const b = th.closest('.phbox'); if (b) phView(b.dataset.ctx, th.dataset.pid); return; }
+  const tg = e.target.closest && e.target.closest('.phtag');
+  if (tg){ const c = tg.dataset.phv; authReady.then(()=>db.ref(P+'photos/'+c).once('value')).then(s=>{ PH[c] = s.val()||{}; if (phCount(c)) phView(c); else toast('Photo not found'); }); }
+});
+document.addEventListener('change', e=>{
+  const inp = e.target; if (!(inp && inp.type==='file' && inp.closest && inp.closest('.phbox'))) return;
+  const box = inp.closest('.phbox'), files = Array.from(inp.files||[]); if (!files.length || !me) return;
+  const ctx = box.dataset.ctx; phSub(ctx); toast('Uploading '+files.length+' photo'+(files.length>1?'s':'')+'…');
+  Promise.all(files.map(f=>phCompress(f).then(data=>authReady.then(()=>db.ref(P+'photos/'+ctx).push({ ts:Date.now(), by:me.name, byId:me.id, data }))))).then(()=>toast('📷 Photo saved')).catch(()=>alert('Could not save the photo. Check the internet and try again.'));
+  inp.value = '';
+});
+
+/* ---------- notifications ---------- */
+const CAP = () => window.Capacitor && window.Capacitor.Plugins || {};
+async function notify(title, body, ref){
+  const text = (ref ? ref+' · ' : '')+(body||'');
+  toast(title);
+  try{ const LN = CAP().LocalNotifications; if (LN){ await LN.schedule({ notifications:[{ id: Math.floor(Math.random()*2000000000), title, body:text, extra:{ref:ref||''} }] }); return; } }catch(e){}
+  try{ if (window.Notification && Notification.permission==='granted') new Notification(title, { body:text, tag:ref||undefined }); }catch(e){}
+}
+let pushDone = null, pushState = 'off';
+function savePushToken(tok, platform){
+  if (!me || !tok) return; pushState = 'ok';
+  const h = String(tok).slice(-24).replace(/[^\w-]/g,'_');
+  authReady.then(()=>db.ref(P+'push/'+me.id+'/'+h).set({ token:tok, platform, ts:Date.now(), role:me.role, siteId:me.siteId||'all', name:me.name })).catch(()=>{});
+}
+function pushInit(){
+  if (!me || pushDone===me.id) return; pushDone = me.id;
+  const C = CAP(), PN = C.PushNotifications, LN = C.LocalNotifications;
+  try{ if (LN) LN.requestPermissions(); }catch(e){}
+  if (PN){
+    try{
+      PN.addListener('registration', t=>savePushToken(t.value,'android'));
+      PN.addListener('registrationError', ()=>{ pushState = 'error'; });
+      PN.addListener('pushNotificationReceived', n=>{ notify((n&&n.title)||'OneByte', (n&&n.body)||'', n&&n.data&&n.data.ref); });
+      PN.addListener('pushNotificationActionPerformed', ()=>{ try{ bellSheet(); }catch(e){} });
+      PN.requestPermissions().then(r=>{ if (r.receive==='granted') PN.register(); else pushState = 'denied'; }).catch(()=>{ pushState = 'error'; });
+    }catch(e){ pushState = 'error'; }
+  } else if (window.Notification && Notification.permission==='default'){
+    document.addEventListener('click', ()=>{ try{ Notification.requestPermission(); }catch(e){} }, {once:true});
+  }
+}
+const pushText = () => CAP().PushNotifications ? ({ok:'Phone push is ON — alerts arrive even when the app is closed.', denied:'Notifications are blocked — enable them in phone Settings → Apps → OneByte Production.', error:'Push could not register on this phone.', off:'Registering for phone push…'})[pushState] : (CAP().LocalNotifications ? 'Alerts pop up while the app is open or in the background. (Closed-app push needs the Firebase setup in PUSH_SETUP.md.)' : 'Alerts pop up while this page is open.');
+
+/* ---------- chatbot ---------- */
+let botOpen = false, botLog = [], botFlow = null;
+const botEl = document.createElement('div'); botEl.id = 'bot'; document.body.appendChild(botEl);
+const botFab = document.createElement('button'); botFab.id = 'botFab'; botFab.setAttribute('aria-label','Chat assistant'); botFab.innerHTML = '💬'; document.body.appendChild(botFab);
+botFab.onclick = ()=>botToggle(true);
+function botShow(){ botFab.style.display = (me && $('app').style.display!=='none') ? 'flex' : 'none'; if (!me && botOpen) botToggle(false); }
+const botChips = () => isAgg()
+  ? ['Where is my food?','Today\'s wastage','Quality check','Today\'s ratings','Raise an issue','Send feedback','Contact numbers','Emergency']
+  : ['Vehicles on road','Today\'s status','Low stock','Late trips','Open escalations','Contact numbers','Emergency'];
+function botToggle(on){
+  botOpen = on; botEl.classList.toggle('show', on); botFab.classList.toggle('hide', on);
+  if (on){ if (!botLog.length) botSay(`Hi ${esc((me&&me.name||'').split(' ')[0])}! 👋 I'm the OneByte assistant. I answer from today's live data — ask about food status, wastage, quality, ratings or contacts${isAgg()?', or raise an issue / feedback right here':''}.<div class="sub" style="margin-top:4px">I understand common questions, not free-form chat. For anything else I'll connect you to Customer Care.</div>`, true); botDraw(); }
+}
+function botSay(html, raw){ botLog.push({me:0, h:raw?html:esc(html)}); }
+function botDraw(){
+  const chips = botFlow && botFlow.chips ? botFlow.chips : botChips();
+  botEl.innerHTML = `<div class="bot-h"><div><b>OneByte Assistant</b><small>${botFlow?'Step '+botFlow.step+' · '+esc(botFlow.title):'Live answers from your service data'}</small></div><button id="botX" aria-label="Close">✕</button></div>
+  <div class="bot-m" id="botM">${botLog.map(m=>`<div class="bm ${m.me?'me':'bot'}">${m.h}</div>`).join('')}</div>
+  <div class="bot-c">${chips.map(c=>`<button data-bq="${esc(c)}">${esc(c)}</button>`).join('')}${botFlow?'<button data-bq="Cancel" class="x">Cancel</button>':''}</div>
+  <div class="bot-i"><input id="botIn" placeholder="${botFlow&&botFlow.ph?esc(botFlow.ph):'Ask something…'}" autocomplete="off"><button id="botSend" aria-label="Send">➤</button></div>`;
+  const m = $('botM'); m.scrollTop = m.scrollHeight;
+  $('botX').onclick = ()=>botToggle(false);
+  botEl.querySelectorAll('[data-bq]').forEach(b=>b.onclick=()=>botAsk(b.dataset.bq));
+  const send = ()=>{ const v = $('botIn').value.trim(); if (v) botAsk(v); };
+  $('botSend').onclick = send; $('botIn').onkeydown = e=>{ if (e.key==='Enter') send(); };
+}
+function botAsk(q){ botLog.push({me:1, h:esc(q)}); let a; try{ a = botBrain(q); }catch(e){ a = 'Sorry, I could not read that data right now.'; } if (a!=null) botSay(a, true); botDraw(); }
+const callBtns = (c) => `<div class="callrow"><a href="${telHref(c.phone)}">📞 ${esc(c.label||c.name)}</a><a class="wa" href="${waHref(c.phone)}" target="_blank">WhatsApp</a></div>`;
+function botBrain(q){
+  const t = q.toLowerCase().trim(), today = todayKey();
+  if (botFlow){
+    if (/^(cancel|stop|exit|no)$/.test(t)){ botFlow = null; return 'Okay, cancelled.'; }
+    return botFlow.next(q);
+  }
+  const vs = new Set(visibleSites().map(([k])=>k)), f = dayFacts(today);
+  if (/^(hi|hello|hey|help|menu|start|vanakkam)\b/.test(t)) return 'I can help with: <b>food status &amp; tracking</b>, <b>wastage</b>, <b>quality checks</b>, <b>ratings</b>, <b>contacts</b>, <b>emergency numbers</b>'+(isAgg()?', and I can <b>raise an issue</b> or <b>send feedback</b> for you.':'.')+' Tap a suggestion below.';
+  if (/(where|track|eta|vehicle|van|driver|reach|arriv|deliver|on the way|live|late)/.test(t) && !/stock/.test(t) && !(isAgg() && /(complain|issue|problem|raise|escalat)/.test(t))){
+    const road = onRoad().filter(v=>vs.has(v.x.siteId));
+    let out = '';
+    if (road.length) out += road.map(v=>{ const sc = (((sites[v.x.siteId]||{}).sched||{})[v.x.meal])||{}; return `🚚 <b>${esc(v.site)} — ${esc(v.x.meal)}</b>: on the road for ${v.en} min (${esc(v.x.vehicle||'vehicle ?')}${v.x.driver?' · '+esc(v.x.driver):''})${sc.arrive?', due '+esc(sc.arrive):''}.${v.x.odo&&v.x.odo.start!=null?' Meter started at '+fmt(v.x.odo.start)+' km.':''}${v.alerts.length?'<br><b style="color:var(--red)">⚠ '+esc(v.alerts[0])+'</b>':''}`; }).join('<br><br>');
+    const done = f.list.filter(([,x])=>T(x,'arrived'));
+    if (done.length) out += (out?'<br><br>':'') + done.map(([sid,x])=>{ const sc = (((sites[x.siteId]||{}).sched||{})[x.meal])||{}, lm = sc.arrive ? lateMin(today,sc.arrive,T(x,'arrived').ts) : null; return `📍 ${esc((sites[x.siteId]||{}).name||x.siteId)} — ${esc(x.meal)}: arrived ${hm(T(x,'arrived').ts)}${lm>0?' ('+lm+' min late)':lm!=null?' (on time)':''}.`; }).join('<br>');
+    if (!out) out = 'No vehicle has left the kitchen yet today. Planned times: '+(visibleSites().map(([k,s])=>Object.entries(s.sched||{}).map(([m,v])=>esc(s.name)+' '+esc(m)+' leave '+esc(v.depart||'?')+' / reach '+esc(v.arrive||'?')).join('; ')).filter(Boolean).join('; ')||'not set')+'.';
+    return out+'<div class="sub" style="margin-top:6px">Open <b>Live</b> for the map view.</div>';
+  }
+  if (/(wast)/.test(t)){
+    if (!f.list.length) return 'No meals recorded yet today.';
+    const closed = f.list.filter(([,x])=>T(x,'closed')).length;
+    if (!closed) return 'Wastage is calculated after each meal is closed at the counter. None closed yet today.';
+    const w = Object.entries(f.wd).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([id,v])=>esc((items[id]||{}).name||'?')+' '+fmt(Math.round(v*100)/100)+' '+esc((items[id]||{}).unit||'')).join(', ');
+    return `♻️ Today's wastage: <b>${f.wpct==null?'—':r1(f.wpct)+'%'}</b> (${fmt(Math.round(f.waste*10)/10)} of ${fmt(Math.round(f.load*10)/10)} loaded) across ${closed} closed meal(s).${w?'<br>Top items: '+w+'.':''}`;
+  }
+  if (/(qc|quality|temperature|temp|hygiene|safe|fssai)/.test(t)){
+    const rows = []; f.list.forEach(([sid,x])=>['qc1','qc2'].forEach(k=>{ const qq = x[k]; if (qq&&qq.ts) rows.push(`${qq.ok?'✅':'❌'} ${esc((sites[x.siteId]||{}).name||'')} ${esc(x.meal)} — ${k==='qc1'?'kitchen':'arrival'} check${qq.temp!=null?' '+qq.temp+'°C':''}${qq.ok?'':' <b>FAILED</b>'}`); }));
+    return rows.length ? '<b>Quality checks today</b><br>'+rows.join('<br>')+`<br><span class="sub">${f.qcOk}/${f.qcN} passed.</span>` : 'No quality checks recorded yet today.';
+  }
+  if (/(rating|review|star|score)/.test(t)){
+    const wk = ownDay(7).map(dayFacts), a = wk.filter(x=>x.rating!=null);
+    return `⭐ Today: <b>${f.rating?r1(f.rating):'not rated yet'}</b><br>7-day average: <b>${a.length?r1(a.reduce((s,x)=>s+x.rating,0)/a.length):'—'}</b>`+(isAgg()?'<br>Open <b>Rate</b> to rate today\'s meals.':'');
+  }
+  if (/(menu|dish|item|food today|what.*(cook|serv))/.test(t)){
+    const rows = f.list.map(([sid,x])=>`<b>${esc((sites[x.siteId]||{}).name||'')} ${esc(x.meal)}</b>: ${Object.keys(x.items||{}).map(id=>esc((items[id]||{}).name||'?')).join(', ')||'—'}`);
+    return rows.length ? rows.join('<br>') : 'Today\'s menu has not been entered yet.';
+  }
+  if (/(km|meter|odometer|distance)/.test(t)){
+    const rows = f.list.filter(([,x])=>x.odo&&x.odo.start!=null).map(([,x])=>`🛣️ ${esc((sites[x.siteId]||{}).name||'')} ${esc(x.meal)}: ${fmt(x.odo.start)}${x.odo.end!=null?' → '+fmt(x.odo.end)+' = <b>'+fmt(Math.round((x.odo.end-x.odo.start)*10)/10)+' km</b>':' (running)'}`);
+    return rows.length ? rows.join('<br>') : 'No trip meter readings today yet.';
+  }
+  if (/(emergency|ambulance|fire|police|accident|112|108)/.test(t))
+    return '🆘 <b>Emergency</b><br>All-in-one: <a href="tel:112">112</a> · Ambulance <a href="tel:108">108</a> · Fire <a href="tel:101">101</a> · Police <a href="tel:100">100</a> · FSSAI <a href="tel:1800112100">1800-11-2100</a><br><br>Food-safety problem? Stop serving that item and tell us:'+callBtns(contactsList()[0]);
+  if (/(contact|call|phone|number|supervisor|director|operations|care|whatsapp|mail|email)/.test(t))
+    return '<b>Kalyana Sapadu team</b>'+contactsList().map(c=>`<div class="rrow"><span>${esc(c.label||c.name)}<div class="sub">${esc(c.phone)}</div></span><span><a class="badge" style="text-decoration:none" href="${telHref(c.phone)}">📞</a> <a class="badge" style="text-decoration:none" href="${waHref(c.phone)}" target="_blank">💬</a></span></div>`).join('')+`<div class="sub">Email: <a href="mailto:${esc(ownerEmail())}">${esc(ownerEmail())}</a></div>`;
+  if (/(my (escalation|issue|complaint)|status of|escalation status|open escalation|open issue|ticket|esc-)/.test(t) || (/escalat/.test(t) && !isAgg())){
+    const m = t.match(/esc-?0*(\d+)/); const list = Object.entries(escs).filter(([,e])=>m ? e.n===+m[1] : e.status!=='closed'&&e.status!=='resolved').sort((a,b)=>b[1].ts-a[1].ts).slice(0,5);
+    return list.length ? list.map(([,e])=>`<b>${escRef(e)}</b> · ${esc(e.cat)} · ${esc(stLabel(e.status))} (level ${e.level||1}) · ${ago(e.ts)}`).join('<br>') : 'No open escalations.';
+  }
+  if (isAgg() && /(escalat|complain|issue|problem|bad|cold|late|less|short|dirty|hair|stale|raise|wrong)/.test(t)){
+    const s0 = {}; botFlow = { step:1, title:'What happened?', ph:'Or type your own…', chips:ESC_CATS.slice(0,6), next(a){
+      const cat = ESC_CATS.find(c=>c.toLowerCase()===a.toLowerCase()) || ESC_CATS.find(c=>a.toLowerCase().split(/\W+/).some(w=>w.length>3 && c.toLowerCase().includes(w))) || 'Other'; s0.cat = cat; s0.text = ESC_CATS.includes(a)?'':a;
+      botFlow = { step:2, title:'Which counter?', chips:visibleSites().map(([,s])=>s.name).concat(['All / general']), ph:'', next(b){
+        const hit = visibleSites().find(([,s])=>s.name.toLowerCase()===b.toLowerCase()); s0.siteId = hit ? hit[0] : 'all';
+        botFlow = { step:3, title:'How serious?', chips:['Low','Medium','High','Critical'], next(c){
+          s0.sev = (['low','medium','high','critical'].find(v=>c.toLowerCase().startsWith(v))) || 'medium';
+          botFlow = { step:4, title:'Details', ph:'Describe in a sentence…', chips:s0.text?['Same as above']:[], next(d){
+            const text = (/^same as above$/i.test(d) ? s0.text : (s0.text? s0.text+' — '+d : d)) || s0.cat, n = Object.values(escs).reduce((x,e)=>Math.max(x,e.n||0),0)+1, now = Date.now();
+            botFlow = null; db.ref(P+'escalations').push({ n, siteId:s0.siteId, meal:null, cat:s0.cat, sev:s0.sev, text, by:me.name, ts:now, upd:now, status:'open', level:1, due:now+slaHrs(s0.sev)*3600000, via:'chatbot' });
+            const l1 = escList()[0]; setTimeout(botDraw, 50);
+            return `✅ Raised <b>${escRef({n})}</b> — ${esc(s0.cat)} (${esc(s0.sev)}). The kitchen team has been alerted; we respond within <b>${slaHrs(s0.sev)} h</b>. Track it under <b>Escalate</b>.<div class="sub">To add a photo, open <b>Escalate</b> → your issue → Add photo.</div>`+(s0.sev==='critical'||s0.sev==='high'?`<div style="margin-top:6px">Urgent? Call now:</div>${callBtns({phone:l1.phone,label:'Call '+l1.role})}`:''); } };
+          return 'Please describe the problem in one line.'; } };
+        return 'Severity?'; } };
+      return 'Which counter is this about?'; } };
+    return 'Sorry about that. Let\'s raise it quickly. <b>What went wrong?</b> (pick one or type it)';
+  }
+  if (isAgg() && /(feedback|suggest|appreciat|compliment|request|thank)/.test(t)){
+    botFlow = { step:1, title:'Your message', ph:'Type your feedback…', chips:[], next(a){ const n = nextFb(); botFlow = null; db.ref(P+'feedback').push({ type:/thank|appreciat|great|good|excellent/i.test(a)?'appreciation':'feedback', siteId:null, text:a, by:me.name, ts:Date.now(), status:'new', n, via:'chatbot' }); setTimeout(botDraw,50); return `✅ Sent as <b>${fbRef({n})}</b>. The team will reply soon.`; } };
+    return 'Sure — what would you like to tell us?';
+  }
+  if (!isAgg() && /(stock|low|reorder|inventory|short)/.test(t)){
+    const low = Object.entries(items).filter(([id,i])=>i.active!==false && i.type==='raw' && i.minStock>0 && stockOf(id)<=i.minStock).slice(0,10);
+    return low.length ? '<b>Low stock</b><br>'+low.map(([id,i])=>`${esc(i.name)}: ${fmt(stockOf(id))} ${esc(i.unit)} (min ${fmt(i.minStock)})`).join('<br>') : 'No items below minimum stock.';
+  }
+  if (!isAgg() && /(status|today|pending|meals)/.test(t)){
+    return f.list.length ? f.list.map(([sid,x])=>`${esc((sites[x.siteId]||{}).name||'')} ${esc(x.meal)} — ${esc(mealStatus(x)[0])}`).join('<br>') : 'No meal sheets started today.';
+  }
+  if (/(thank|ok|okay|fine|good|great)/.test(t) && t.length<18) return 'You\'re welcome! 😊';
+  return 'I\'m not sure I understood that. Try one of the suggestions below, or talk to a person:'+callBtns(contactsList().find(c=>/care/i.test(c.label))||contactsList()[0]);
+}
+
 const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
 if (saved && ROLES[saved.role]){ me = saved; enter(); }
 </script>
