@@ -192,7 +192,7 @@ function login(){
     Object.entries(u).forEach(([id,x])=>{
       if (!ROLES[x.role]) return;
       const pw = x.password || x.pin;
-      if (pw===entered && ((x.username||'').toLowerCase()===uname || (!uname && !x.username))) m = Object.assign({id},x);
+      if (pw===entered && ((x.username||'').toLowerCase()===uname || !x.username)) m = Object.assign({id},x);
     });
     if (!m && Object.keys(u).length===0 && entered===SETUP_PIN && (!uname || uname==='admin')) m = { id:'setup', name:'Setup Admin', role:'admin', siteId:'all' };
     if (m){ me = m; try{ store.setItem('prod_user', JSON.stringify(m)); }catch(e){} enter(); }
