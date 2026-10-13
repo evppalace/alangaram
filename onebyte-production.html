@@ -109,13 +109,16 @@
   <div class="page" id="p-stock"></div>
   <div class="page" id="p-purchase"></div>
   <div class="page" id="p-issue"></div>
+  <div class="page" id="p-meals"></div>
   <div class="page" id="p-reports"></div>
+  <div class="page" id="p-trends"></div>
   <div class="page" id="p-masters"></div>
   <div class="page" id="p-users"></div>
 </div>
 
 <nav id="nav" style="display:none;"></nav>
 <div class="toast" id="toast"></div>
+<div id="tt" style="display:none;position:fixed;z-index:60;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.15);pointer-events:none;min-width:130px"></div>
 
 <script>
 /* ============ CONFIG ============ */
@@ -132,16 +135,18 @@ const SETUP_PIN = "1234"; // works only until the first Admin user is created
 const P = 'prod_'; // all data of this module lives under prod_* in Firebase, separate from the old sales data
 
 const ROLES = {
-  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','reports','masters','users'] },
-  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','stock','purchase','issue','masters'] },
+  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','meals','reports','trends','masters','users'] },
+  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','stock','purchase','issue','meals','masters'] },
   store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','stock','purchase','issue'] },
-  kitchen:     { label:'Kitchen',            desc:'Daily issue & stock',         tabs:['home','stock','issue'] },
-  driver:      { label:'Driver',             desc:'Trips',                         tabs:['home'] },
-  supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter',tabs:['home'], site:true },
-  counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home'], site:true }
+  kitchen:     { label:'Kitchen',            desc:'Daily issue & stock',         tabs:['home','stock','issue','meals'] },
+  driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals'] },
+  supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter',tabs:['home','meals'], site:true },
+  counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals'], site:true }
 };
-const NAV = { home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], reports:['📄','Reports'], masters:['⚙️','Masters'], users:['👥','Users'] };
-const UNITS = ['kg','g','L','ml','nos','pkt'];
+const NAV = { home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
+const MEALS = ['breakfast','lunch','snacks','dinner'];
+const MEAL_ICON = {breakfast:'🌅', lunch:'🍛', snacks:'☕', dinner:'🌙'};
+const UNITS = ['kg','g','L','ml','nos','pack','box','bunch','pkt'];
 
 /* ============ HELPERS ============ */
 const $ = id => document.getElementById(id);
@@ -156,17 +161,19 @@ const store = (function(){ try{ localStorage.setItem('_t','1'); localStorage.rem
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
 let me = null;
-let users = {}, sites = {}, items = {}, basins = {}, ledger = {}, notices = {};
+let users = {}, sites = {}, items = {}, basins = {}, ledger = {}, notices = {}, sessions = {}, settings = {};
 let stockFilter = 'all', stockSearch = '';
 
 function can(tab){
   if (!me || !ROLES[me.role]) return false;
-  if (tab==='reports') return me.role==='admin' || !!(me.perms && me.perms.reports);
+  if (tab==='reports' || tab==='trends') return me.role==='admin' || !!(me.perms && me.perms.reports);
   return ROLES[me.role].tabs.includes(tab);
 }
 function tabsFor(){
   const t = ROLES[me.role].tabs.filter(x=>can(x));
-  if (can('reports') && !t.includes('reports')){ const i = t.indexOf('issue'); t.splice(i>=0?i+1:t.length, 0, 'reports'); }
+  ['reports','trends'].forEach(k=>{
+    if (can(k) && !t.includes(k)){ let i = Math.max(t.indexOf('meals'), t.indexOf('reports'), t.indexOf('issue')); t.splice(i>=0?i+1:t.length, 0, k); }
+  });
   return t;
 }
 function isAdmin(){ return me && me.role==='admin'; }
@@ -230,6 +237,8 @@ function listen(){
   bind('items',  v=>items=v);
   bind('basins', v=>basins=v);
   bind('notices', v=>notices=v);
+  bind('settings', v=>settings=v);
+  db.ref(P+'sessions').limitToLast(600).on('value', s=>{ sessions = s.val()||{}; renderAll(); });
   db.ref(P+'ledger').limitToLast(30000).on('value', s=>{ ledger = s.val()||{}; renderAll(); });
 }
 function stockOf(itemId){
@@ -242,13 +251,15 @@ function renderAll(){
   if (can('stock'))    renderStock();
   if (can('purchase')) renderPurchase();
   if (can('issue'))    renderIssue();
+  if (can('meals'))    renderMeals();
   if (can('reports'))  renderReports();
+  if (can('trends'))   renderTrends();
   if (can('masters'))  renderMasters();
   if (can('users'))    renderUsers();
 }
 
 /* ============ HOME ============ */
-const STAGES = [['🛒','Purchase',1],['📦','Store',1],['📤','Kitchen issue',1],['🍳','Cook & QC',0],['🚚','Dispatch',0],['📍','Tracking',0],['⚖️','Counter load',0],['📊','Reconcile',0]];
+const STAGES = [['🛒','Purchase',1],['📦','Store',1],['📤','Kitchen issue',1],['🍳','Cook & QC',1],['🚚','Dispatch',1],['📍','Tracking',1],['⚖️','Counter load',1],['📊','Reconcile',1]];
 function heroSvg(){
   return `<svg viewBox="0 0 360 130" role="img" aria-label="Kitchen to counter delivery">
     <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#02764a"/><stop offset="1" stop-color="#015B36"/></linearGradient></defs>
@@ -479,8 +490,267 @@ function reverseIssue(id){
     .then(()=>db.ref(P+'ledger/'+id+'/reversed').set(true)).then(()=>toast('Issue reversed'));
 }
 
+/* ============ MEAL SESSIONS (production → dispatch → arrival → counter → sales/waste) ============ */
+const REASONS = ['Unsold leftover','Spoilage','Spill / damage','Quality reject','Over-production','Other'];
+const STEP_ROLES = {
+  prod:['admin','prodmanager','kitchen'], qc1:['admin','prodmanager'],
+  dispatch:['admin','prodmanager','kitchen'], depart:['admin','prodmanager','kitchen','driver'],
+  arrive:['admin','prodmanager','driver','supervisor','counter'],
+  qc2:['admin','prodmanager','supervisor','counter'], weigh:['admin','prodmanager','supervisor','counter'],
+  close:['admin','prodmanager','supervisor','counter'], send:['admin','prodmanager','kitchen','driver','supervisor','counter']
+};
+const canStep = k => me && STEP_ROLES[k].includes(me.role);
+let mDate = todayKey(), openSid = null, tracker = null;
+
+const sidOf = (d,site,meal) => d+'_'+site+'_'+meal;
+const hm = ts => ts ? new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
+function dur(a,b){ if(!a||!b) return '—'; const m = Math.round((b-a)/60000); return m>=60 ? Math.floor(m/60)+'h '+(m%60)+'m' : m+' min'; }
+function visibleSites(){
+  const all = Object.entries(sites);
+  const r = ROLES[me.role];
+  return r && r.site ? all.filter(([k])=>k===me.siteId) : all;
+}
+const T = (s,k) => s && s.times && s.times[k];
+const MEAL_STAGES = [['prodDone','Cooked'],['qc1','QC'],['packed','Packed'],['loaded','Loaded'],['departed','Departed'],['arrived','Arrived'],['qc2','Arrival QC'],['counterLoaded','At counter'],['closed','Closed']];
+function stageOf(s){
+  if (!s) return { n:0, label:'Not started' };
+  let n = 0, label = 'Not started';
+  MEAL_STAGES.forEach(([k,l],i)=>{ const v = k==='qc1' ? (s.qc1&&s.qc1.ts) : k==='qc2' ? (s.qc2&&s.qc2.ts) : T(s,k); if (v){ n=i+1; label=l; } });
+  return { n, label };
+}
+function sessionCalc(s){
+  const tol = (settings.tolerance||3);
+  const out = {}; const ids = new Set();
+  Object.keys((s&&s.items)||{}).forEach(k=>ids.add(k));
+  Object.keys((s&&s.weights)||{}).forEach(k=>ids.add(k));
+  Object.keys((s&&s.close)||{}).forEach(k=>ids.add(k));
+  ids.forEach(id=>{
+    const it = (s.items||{})[id]||{}, c = (s.close||{})[id]||{};
+    const loaded = Object.values((s.weights||{})[id]||{}).reduce((a,w)=>a+(w.net||0),0);
+    const prepared = it.prepared||0, sold = c.sold||0, left = c.leftover||0, waste = c.waste||0;
+    const hasClose = (s.close||{})[id]!=null;
+    const variance = hasClose ? loaded - sold - left - waste : null;
+    const pct = hasClose && loaded>0 ? variance/loaded*100 : null;
+    out[id] = { prepared, loaded, sold, left, waste, reason:c.reason||'', soldPlates:c.soldPlates||null, variance, pct, flag: pct!=null && Math.abs(pct)>tol, transit: prepared>0 && loaded>0 ? prepared-loaded : null };
+  });
+  return out;
+}
+
+function renderMeals(){
+  const el = $('p-meals');
+  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (openSid) return renderSession(el);
+  const list = visibleSites();
+  const cards = [];
+  list.forEach(([siteId,site])=>{
+    (MEALS.filter(m=>(site.meals||[]).includes(m))).forEach(meal=>{
+      const sid = sidOf(mDate,siteId,meal), s = sessions[sid], st = stageOf(s);
+      cards.push(`<div class="card" data-open="${sid}" style="cursor:pointer"><div class="row"><div style="font-size:26px">${MEAL_ICON[meal]}</div>
+        <div class="grow"><b>${esc(site.name)} — ${meal}</b><div class="sub">${s?esc(st.label)+(st.n? ' · '+hm(lastStamp(s)):''):'Not started'}</div></div>
+        <div style="text-align:right"><div class="qty" style="font-size:14px;color:${st.n>=9?'var(--green)':st.n?'var(--amber)':'var(--muted)'}">${st.n}/9</div></div></div>
+        <div style="height:5px;background:var(--line);border-radius:9px;margin-top:9px"><div style="height:5px;border-radius:9px;background:var(--green);width:${st.n/9*100}%"></div></div></div>`);
+    });
+  });
+  el.innerHTML = `
+    <div class="row" style="margin-bottom:10px"><button class="btn sec" id="dPrev" style="padding:9px 14px">‹</button>
+      <input type="date" id="dPick" value="${mDate}" style="text-align:center"><button class="btn sec" id="dNext" style="padding:9px 14px">›</button></div>
+    ${cards.length ? cards.join('') : '<div class="empty">No counters/meals set up yet. Admin: Masters → Counters.</div>'}
+    <div class="sub" style="margin-top:6px">Tap a meal to open its checklist: cooking → QC → packing → loading → departure → arrival → weighing at the counter → sales &amp; wastage.</div>`;
+  const shift = n => { const d = new Date(mDate+'T00:00:00'); d.setDate(d.getDate()+n); mDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); renderMeals(); };
+  $('dPrev').onclick = ()=>shift(-1); $('dNext').onclick = ()=>shift(1);
+  $('dPick').onchange = ()=>{ if ($('dPick').value){ mDate = $('dPick').value; renderMeals(); } };
+  el.querySelectorAll('[data-open]').forEach(c=>c.onclick=()=>{ openSid = c.dataset.open; renderMeals(); window.scrollTo(0,0); });
+}
+function lastStamp(s){
+  let t = 0; Object.values(s.times||{}).forEach(x=>{ if (x&&x.ts>t) t=x.ts; });
+  if (s.qc1&&s.qc1.ts>t) t=s.qc1.ts; if (s.qc2&&s.qc2.ts>t) t=s.qc2.ts; return t;
+}
+
+function stepHead(n, title, ts, extra){
+  return `<div class="row" style="margin-bottom:8px"><div style="width:26px;height:26px;border-radius:99px;background:${ts?'var(--green)':'var(--line)'};color:${ts?'#fff':'var(--muted)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">${ts?'✓':n}</div>
+    <b class="grow">${title}</b><span class="sub" style="margin:0">${ts?hm(ts)+(extra||''):''}</span></div>`;
+}
+function renderSession(el){
+  const sid = openSid, parts = sid.split('_'), date = parts[0], siteId = parts[1], meal = parts[2];
+  const site = sites[siteId] || {name:siteId}, s = sessions[sid] || {};
+  const calc = sessionCalc(s);
+  const foods = Object.entries(items).filter(([,i])=>i.type==='food' && i.active!==false).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const sItems = Object.entries(s.items||{});
+  const dishIds = [...new Set([...Object.keys(s.items||{}), ...Object.keys(s.weights||{})])];
+  const adm = me.role==='admin';
+  const lock = (k, ts) => ts && adm ? ` <a href="#" data-reset="${k}" style="font-size:11px;color:var(--red)">reset</a>` : '';
+  const btn = (id,label,step,cls) => canStep(step) ? `<button class="btn ${cls||''} save" id="${id}">${label}</button>` : `<div class="sub" style="margin-top:8px">Needs: ${STEP_ROLES[step].filter(r=>r!=='admin').map(r=>ROLES[r].label).join(' / ')}</div>`;
+  const qcBlock = (key, title, n, minTemp, roleStep) => {
+    const q = s[key]||{};
+    if (q.ts) return `${stepHead(n,title,q.ts,' · '+esc(q.by||''))}<div style="font-size:13px"><b style="color:${q.ok?'var(--green)':'var(--red)'}">${q.ok?'PASSED':'FAILED'}</b> · ${q.temp!=null?q.temp+'°C · ':''}${esc((q.fails||[]).join(', '))}${q.note?' · '+esc(q.note):''}</div>`;
+    return `${stepHead(n,title,0)}${canStep(roleStep)?`
+      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" class="${key}_c" style="width:auto"> Taste &amp; texture OK</label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" class="${key}_c" style="width:auto"> Hygiene, covers &amp; labels OK</label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" class="${key}_c" style="width:auto"> Packing / containers sealed</label>
+      <div class="two"><div><label>Food temperature °C (min ${minTemp})</label><input id="${key}_t" type="number" inputmode="decimal"></div><div><label>Note</label><input id="${key}_n"></div></div>
+      <div class="two" style="margin-top:12px"><button class="btn" id="${key}_pass">Pass</button><button class="btn danger" id="${key}_fail">Fail</button></div>`:`<div class="sub">Needs: ${STEP_ROLES[roleStep].filter(r=>r!=='admin').map(r=>ROLES[r].label).join(' / ')}</div>`}`;
+  };
+  const prodDone = T(s,'prodDone'), packed = T(s,'packed'), loaded = T(s,'loaded'), dep = T(s,'departed'), arr = T(s,'arrived'), cl = T(s,'counterLoaded'), closed = T(s,'closed');
+
+  el.innerHTML = `
+  <div class="row" style="margin-bottom:10px"><button class="btn sec" id="sBack" style="padding:9px 14px">‹ Back</button>
+    <div class="grow"><b>${MEAL_ICON[meal]} ${esc(site.name)} — ${meal}</b><div class="sub">${date}</div></div></div>
+
+  <div class="card">${stepHead(1,'Cooking & production',prodDone&&prodDone.ts,' · '+esc((prodDone||{}).by||''))}
+    ${sItems.length? sItems.map(([id,it])=>{ const d = items[id]||{name:'(deleted)',unit:''}; return `<div class="row" style="margin-bottom:8px"><div class="grow"><b>${esc(d.name)}</b><div class="sub">Planned ${it.planned?fmt(it.planned)+' '+esc(d.unit):'—'}${it.preparedAt?' · made '+hm(it.preparedAt):''}</div></div>
+      ${!(prodDone&&prodDone.ts)&&canStep('prod')?`<input class="pq" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.prepared||''}" placeholder="made" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span><button class="btn danger" data-rmdish="${id}" style="padding:7px 10px">✕</button>`:`<div class="qty">${fmt(it.prepared||0)} <small>${esc(d.unit)}</small></div>`}</div>`; }).join('') : '<div class="sub">No dishes added yet.</div>'}
+    ${!(prodDone&&prodDone.ts)&&canStep('prod')?`
+      <div class="row" style="margin-top:8px"><select id="addDish" class="grow"><option value="">+ Add dish…</option>${(()=>{ const av = foods.filter(([id])=>!(s.items||{})[id]); const o = ([id,i])=>`<option value="${id}">${i.diet==='nonveg'?'🔴 ':i.diet==='veg'?'🟢 ':''}${esc(i.name)} (${esc(i.unit)})</option>`;
+        const sug = av.filter(([,i])=>(i.meals||[]).includes(meal)), oth = av.filter(([,i])=>!(i.meals||[]).includes(meal));
+        return (sug.length?`<optgroup label="Usual for ${meal}">${sug.map(o).join('')}</optgroup>`:'')+(oth.length?`<optgroup label="Other dishes">${oth.map(o).join('')}</optgroup>`:''); })()}</select>
+      <input id="addPlan" type="number" inputmode="decimal" step="any" placeholder="planned" style="width:92px"></div>
+      <button class="btn sec save" id="saveProd">Save quantities</button><button class="btn save" id="prodDoneBtn">Cooking complete</button>`:(prodDone&&prodDone.ts?lock('prodDone',1):'')}
+    ${!foods.length?'<div class="sub" style="margin-top:6px">No cooked dishes in Masters yet — add them under Masters → Items (type: Cooked food).</div>':''}
+  </div>
+
+  <div class="card">${qcBlock('qc1','Production QC (before loading)',2,settings.minTempDispatch||65,'qc1')}${s.qc1&&s.qc1.ts?lock('qc1',1):''}</div>
+
+  <div class="card">${stepHead(3,'Packed & loaded in vehicle',loaded&&loaded.ts||packed&&packed.ts)}
+    <div class="row"><div class="grow">Packed</div><b>${hm(packed&&packed.ts)}</b>${lock('packed',packed&&packed.ts)}</div>
+    <div class="row" style="margin-top:6px"><div class="grow">Loaded in vehicle</div><b>${hm(loaded&&loaded.ts)}</b>${lock('loaded',loaded&&loaded.ts)}</div>
+    ${!(packed&&packed.ts)?btn('btnPacked','Mark packed','dispatch','sec'):''}
+    ${packed&&packed.ts&&!(loaded&&loaded.ts)?btn('btnLoaded','Mark loaded in vehicle','dispatch'):''}
+  </div>
+
+  <div class="card">${stepHead(4,'Vehicle trip',dep&&dep.ts,' → '+(arr&&arr.ts?hm(arr.ts)+' ('+dur(dep.ts,arr.ts)+')':'on the way'))}
+    ${dep&&dep.ts?`<div class="sub">Vehicle ${esc(s.vehicle||'—')} · Driver ${esc(s.driver||'—')}${dep.loc?` · <a href="https://maps.google.com/?q=${dep.loc.lat},${dep.loc.lng}" target="_blank">start location</a>`:''}</div>`:''}
+    ${!(dep&&dep.ts)&&canStep('depart')?`<div class="two"><div><label>Vehicle no.</label><input id="veh" value="${esc(s.vehicle||'')}" placeholder="TN 09 AB 1234"></div><div><label>Driver</label><input id="drv" value="${esc(s.driver||(me.role==='driver'?me.name:''))}"></div></div>
+      ${loaded&&loaded.ts?`<button class="btn save" id="btnDepart">🚚 Start trip (departed)</button>`:'<div class="sub" style="margin-top:8px">Mark the food loaded first.</div>'}`:''}
+    ${dep&&dep.ts&&!(arr&&arr.ts)?`
+      ${s.trackLast?`<div class="sub" style="margin-top:6px">Last position ${hm(s.trackLast.ts)} · <a href="https://maps.google.com/?q=${s.trackLast.lat},${s.trackLast.lng}" target="_blank">open map</a></div>`:''}
+      ${canStep('depart')?`<button class="btn sec save" id="btnTrack">${tracker?'⏸ Stop sharing location':'📍 Share live location'}</button>
+      <div class="sub" style="margin-top:4px">Works while this screen stays open. Background tracking with the screen off needs the native Android app (planned) and "Allow all the time" location permission.</div>`:''}
+      ${btn('btnArrive','📍 Arrived at site','arrive')}`:''}
+    ${arr&&arr.ts?`<div class="sub">Arrived ${hm(arr.ts)} · trip ${dur(dep&&dep.ts,arr.ts)} · ${esc(arr.by||'')}${arr.loc?` · <a href="https://maps.google.com/?q=${arr.loc.lat},${arr.loc.lng}" target="_blank">arrival location</a>`:''}${lock('arrived',1)}</div>`:''}
+    ${dep&&dep.ts?lock('departed',1):''}
+  </div>
+
+  <div class="card">${qcBlock('qc2','Arrival QC (at the counter)',5,settings.minTempArrival||60,'qc2')}${s.qc2&&s.qc2.ts?lock('qc2',1):''}</div>
+
+  <div class="card">${stepHead(6,'Transfer to counter basins & weigh',cl&&cl.ts,' · '+esc((cl||{}).by||''))}
+    ${!dishIds.length?'<div class="sub">Add dishes in step 1 first.</div>':dishIds.map(id=>{
+      const d = items[id]||{name:'(deleted)',unit:'kg'}; const ws = Object.entries((s.weights||{})[id]||{});
+      const tot = calc[id]?calc[id].loaded:0;
+      return `<div style="margin-bottom:14px"><div class="row"><b class="grow">${esc(d.name)}</b><span class="qty" style="font-size:15px">${fmt(tot)} <small>${esc(d.unit)} at counter${calc[id]&&calc[id].prepared?' / '+fmt(calc[id].prepared)+' made':''}</small></span></div>
+      ${ws.map(([wid,w])=>`<div class="sub" style="display:flex;justify-content:space-between;margin:3px 0">${esc(w.basinName||'basin')}: ${fmt(w.gross)} − ${fmt(w.tare)} = <b style="color:var(--ink)">${fmt(w.net)} ${esc(d.unit)}</b> · ${hm(w.ts)}${!(cl&&cl.ts)&&canStep('weigh')?` <a href="#" data-rmw="${id}|${wid}" style="color:var(--red)">remove</a>`:''}</div>`).join('')}
+      ${!(cl&&cl.ts)&&canStep('weigh')&&d.unit==='nos'?`<div class="row" style="margin-top:6px"><div class="grow sub" style="margin:0">Count the pieces (no basin needed)</div><input class="wg" data-id="${id}" type="number" inputmode="numeric" step="1" placeholder="count" style="width:96px"><button class="btn" data-addw="${id}" style="padding:10px 12px">Add</button></div>`:''}
+      ${!(cl&&cl.ts)&&canStep('weigh')&&d.unit!=='nos'?`<div class="row" style="margin-top:6px"><select class="wb grow" data-id="${id}"><option value="">Basin…</option>${Object.entries(basins).map(([k,b])=>`<option value="${k}">${esc(b.name)} (${fmt(b.tare)} kg)</option>`).join('')}</select>
+        <input class="wg" data-id="${id}" type="number" inputmode="decimal" step="any" placeholder="scale kg" style="width:96px"><button class="btn" data-addw="${id}" style="padding:10px 12px">Add</button></div>`:''}</div>`; }).join('')}
+    ${!Object.keys(basins).length?'<div class="sub">No basins yet — add each basin\'s empty weight in Masters → Basins.</div>':''}
+    <div class="sub">Weigh the full basin on the scale; the app subtracts the basin weight. (Type the reading now — live smart-scale input can fill this box later.)</div>
+    ${!(cl&&cl.ts)?btn('btnCounter','Loaded into food counter','weigh'):lock('counterLoaded',1)}
+  </div>
+
+  <div class="card">${stepHead(7,'Sales, leftover & wastage',closed&&closed.ts,' · '+esc((closed||{}).by||''))}
+    ${!(cl&&cl.ts)?'<div class="sub">Opens after the food is loaded into the counter.</div>':dishIds.map(id=>{
+      const d = items[id]||{name:'(deleted)',unit:'kg',portionG:null}; const c = (s.close||{})[id]||{}, k = calc[id]||{};
+      const plate = d.portionG>0;
+      const edit = !(closed&&closed.ts) && canStep('close');
+      return `<div style="margin-bottom:14px"><b>${esc(d.name)}</b> <span class="sub">at counter ${fmt(k.loaded||0)} ${esc(d.unit)}</span>
+        ${edit?`<div class="two"><div><label>Sold ${plate?'(plates)':'('+esc(d.unit)+')'} — aggregator report</label><input class="cs" data-id="${id}" type="number" inputmode="decimal" step="any" value="${plate?(c.soldPlates??''):(c.sold??'')}"></div>
+          <div><label>Leftover (${esc(d.unit)})</label><input class="cl" data-id="${id}" type="number" inputmode="decimal" step="any" value="${c.leftover??''}"></div></div>
+          <div class="two"><div><label>Wastage (${esc(d.unit)})</label><input class="cw" data-id="${id}" type="number" inputmode="decimal" step="any" value="${c.waste??''}"></div>
+          <div><label>Reason</label><select class="cr" data-id="${id}"><option value="">—</option>${REASONS.map(r=>`<option ${c.reason===r?'selected':''}>${r}</option>`).join('')}</select></div></div>`
+        :`<div class="sub">Sold ${fmt(k.sold||0)} ${esc(d.unit)}${k.soldPlates?' ('+fmt(k.soldPlates)+' plates)':''} · leftover ${fmt(k.left||0)} · wastage ${fmt(k.waste||0)}${k.reason?' ('+esc(k.reason)+')':''}</div>`}
+        ${k.variance!=null?`<div class="notice ${k.flag?'alert':'info'}" style="margin:6px 0 0;padding:7px 10px;font-size:12.5px">${Math.abs(k.variance)<0.0005?'✓ Fully accounted for':(k.flag?'⚠ ':'')+(k.variance>0?'Shortage / unaccounted':'Excess')+': <b>'+fmt(Math.abs(k.variance))+' '+esc(d.unit)+'</b> ('+fmt(Math.round(Math.abs(k.pct||0)*10)/10)+'% of loaded)'}</div>`:''}</div>`; }).join('')}
+    ${cl&&cl.ts&&!(closed&&closed.ts)?(canStep('close')?`<button class="btn sec save" id="saveClose">Save sales &amp; wastage</button><button class="btn save" id="btnClose">Close this meal</button>`:`<div class="sub">Needs: ${STEP_ROLES.close.filter(r=>r!=='admin').map(r=>ROLES[r].label).join(' / ')}</div>`):(closed&&closed.ts?lock('closed',1):'')}
+  </div>
+
+  <div class="card"><b>Report</b><div class="sub">Send this meal sheet to management${settings.reportEmails?' ('+esc(settings.reportEmails)+')':''}.${s.sentAt?' Last sent '+hm(s.sentAt)+' by '+esc(s.sentBy||''):''}</div>
+    ${canStep('send')?`<div class="two" style="margin-top:10px"><button class="btn" id="rWA">WhatsApp</button><button class="btn sec" id="rMail">Email</button></div>
+    <div class="two" style="margin-top:8px"><button class="btn sec" id="rCopy">Copy</button><button class="btn sec" id="rCsv">Export CSV</button></div>`:''}
+  </div>`;
+
+  const stamp = (k, extra) => db.ref(P+'sessions/'+sid).update(Object.assign({ date, siteId, meal }, { ['times/'+k]: Object.assign({ts:Date.now(), by:me.name}, extra||{}) }));
+  const base = () => db.ref(P+'sessions/'+sid).update({ date, siteId, meal });
+  const q = (sel, fn) => el.querySelectorAll(sel).forEach(fn);
+  $('sBack').onclick = ()=>{ openSid = null; renderMeals(); };
+  q('[data-reset]', a=>a.onclick=e=>{ e.preventDefault(); const k=a.dataset.reset; if(!confirm('Reset this step?')) return;
+    if (k==='qc1'||k==='qc2') db.ref(P+'sessions/'+sid+'/'+k).remove(); else db.ref(P+'sessions/'+sid+'/times/'+k).remove(); });
+
+  // 1 production
+  const ad = $('addDish');
+  if (ad) ad.onchange = ()=>{ if (!ad.value) return; const pl = num($('addPlan').value); base().then(()=>db.ref(P+'sessions/'+sid+'/items/'+ad.value).set({ planned: pl>0?pl:null, prepared: 0 })); };
+  q('[data-rmdish]', b=>b.onclick=()=>db.ref(P+'sessions/'+sid+'/items/'+b.dataset.rmdish).remove());
+  const sp = $('saveProd');
+  const saveProd = () => { const ups = {}; el.querySelectorAll('.pq').forEach(i=>{ const v = num(i.value); if (v>=0){ const old=(s.items||{})[i.dataset.id]||{}; if ((old.prepared||0)!==v){ ups['items/'+i.dataset.id+'/prepared']=v; ups['items/'+i.dataset.id+'/preparedAt']=Date.now(); } } }); return Object.keys(ups).length ? db.ref(P+'sessions/'+sid).update(ups) : Promise.resolve(); };
+  if (sp) sp.onclick = ()=>saveProd().then(()=>toast('Saved'));
+  const pd = $('prodDoneBtn'); if (pd) pd.onclick = ()=>{ saveProd().then(()=>{ const any = [...el.querySelectorAll('.pq')].some(i=>num(i.value)>0) || sItems.some(([,i])=>i.prepared>0); if (!any){ alert('Enter the quantity made for at least one dish.'); return; } stamp('prodDone'); }); };
+
+  // QC
+  ['qc1','qc2'].forEach(key=>{
+    const go = ok => {
+      const checks = [...el.querySelectorAll('.'+key+'_c')]; const labels = ['Taste & texture','Hygiene / labels','Packing sealed'];
+      const fails = checks.map((c,i)=>c.checked?null:labels[i]).filter(Boolean);
+      const te = $(key+'_t'); const temp = te ? num(te.value) : NaN;
+      const min = key==='qc1' ? (settings.minTempDispatch||65) : (settings.minTempArrival||60);
+      if (isFinite(temp) && temp<min) fails.push('Temp '+temp+'°C below '+min);
+      if (!isFinite(temp)) fails.push('Temp not recorded');
+      if (ok && fails.length && !confirm('Some checks are not OK: '+fails.join(', ')+'.\nPass anyway?')) return;
+      base().then(()=>db.ref(P+'sessions/'+sid+'/'+key).set({ ok: !!ok, temp: isFinite(temp)?temp:null, fails, note:$(key+'_n').value.trim(), by:me.name, ts:Date.now() }));
+    };
+    const p = $(key+'_pass'), f = $(key+'_fail'); if (p) p.onclick = ()=>go(true); if (f) f.onclick = ()=>go(false);
+  });
+
+  // 3 dispatch
+  const bp = $('btnPacked'); if (bp) bp.onclick = ()=>{ if (!(s.qc1&&s.qc1.ok) && !confirm('Production QC has not passed yet. Mark packed anyway?')) return; stamp('packed'); };
+  const bl = $('btnLoaded'); if (bl) bl.onclick = ()=>stamp('loaded');
+
+  // 4 trip
+  const withLoc = cb => { if (!navigator.geolocation) return cb(null); navigator.geolocation.getCurrentPosition(p=>cb({lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6)}), ()=>cb(null), {timeout:6000, maximumAge:30000}); };
+  const bd = $('btnDepart'); if (bd) bd.onclick = ()=>{ withLoc(loc=>{ db.ref(P+'sessions/'+sid).update({ date, siteId, meal, vehicle:$('veh').value.trim(), driver:$('drv').value.trim(), ['times/departed']: {ts:Date.now(), by:me.name, loc:loc||null} }).then(()=>{ if (loc) startTracking(sid); }); }); };
+  const ba = $('btnArrive'); if (ba) ba.onclick = ()=>{ withLoc(loc=>{ stopTracking(); db.ref(P+'sessions/'+sid).update({ ['times/arrived']: {ts:Date.now(), by:me.name, loc:loc||null} }); }); };
+  const bt = $('btnTrack'); if (bt) bt.onclick = ()=>{ if (tracker) stopTracking(); else startTracking(sid); renderMeals(); };
+
+  // 6 weigh
+  q('[data-addw]', b=>b.onclick=()=>{ const id=b.dataset.addw; const isN = (items[id]||{}).unit==='nos'; const wbEl = el.querySelector('.wb[data-id="'+id+'"]'); const bs = isN ? 'count' : wbEl.value, g = num(el.querySelector('.wg[data-id="'+id+'"]').value);
+    if (isN){ if (!(g>0)){ alert('Enter the count.'); return; } base().then(()=>db.ref(P+'sessions/'+sid+'/weights/'+id).push({ basinId:'count', basinName:'count', gross:g, tare:0, net:g, ts:Date.now(), by:me.name })); return; }
+    if (!bs){ alert('Choose the basin.'); return; } if (!(g>0)){ alert('Enter the scale reading in kg.'); return; }
+    const tare = basins[bs].tare||0, net = Math.round((g-tare)*1000)/1000; if (net<=0){ alert('Scale reading is not more than the basin weight ('+fmt(tare)+' kg).'); return; }
+    base().then(()=>db.ref(P+'sessions/'+sid+'/weights/'+id).push({ basinId:bs, basinName:basins[bs].name, gross:g, tare, net, ts:Date.now(), by:me.name })); });
+  q('[data-rmw]', a=>a.onclick=e=>{ e.preventDefault(); const [id,wid]=a.dataset.rmw.split('|'); db.ref(P+'sessions/'+sid+'/weights/'+id+'/'+wid).remove(); });
+  const bc = $('btnCounter'); if (bc) bc.onclick = ()=>{ if (!Object.keys(s.weights||{}).length){ alert('Weigh at least one dish into the counter first.'); return; } if (!(s.qc2&&s.qc2.ts) && !confirm('Arrival QC is not recorded. Continue?')) return; stamp('counterLoaded'); };
+
+  // 7 close
+  const collect = () => { const ups = {}; dishIds.forEach(id=>{ const d = items[id]||{}; const plate = d.portionG>0;
+      const sv = num(el.querySelector('.cs[data-id="'+id+'"]').value), lv = num(el.querySelector('.cl[data-id="'+id+'"]').value), wv = num(el.querySelector('.cw[data-id="'+id+'"]').value);
+      const reason = el.querySelector('.cr[data-id="'+id+'"]').value;
+      const soldKg = isFinite(sv) ? (plate ? Math.round(sv*d.portionG)/1000 : sv) : 0;
+      ups['close/'+id] = { sold:soldKg, soldPlates: plate&&isFinite(sv)?sv:null, leftover:isFinite(lv)?lv:0, waste:isFinite(wv)?wv:0, reason }; });
+    return ups; };
+  const sc = $('saveClose'); if (sc) sc.onclick = ()=>db.ref(P+'sessions/'+sid).update(collect()).then(()=>toast('Saved'));
+  const bcl = $('btnClose'); if (bcl) bcl.onclick = ()=>{ const ups = collect(); const bad = Object.entries(ups).filter(([,v])=>v.waste>0&&!v.reason); if (bad.length){ alert('Add a reason for every wastage entry.'); return; }
+    db.ref(P+'sessions/'+sid).update(Object.assign(ups,{ ['times/closed']:{ts:Date.now(), by:me.name} })).then(()=>toast('Meal closed — send the report')); };
+
+  // report
+  const rp = () => buildReport({ type:'meals', from:date, to:date, site:siteId, meal, cat:'', item:'' });
+  const logSend = () => db.ref(P+'sessions/'+sid).update({ sentAt:Date.now(), sentBy:me.name });
+  const w = $('rWA'); if (w) w.onclick = ()=>{ const t = rp().text; logSend(); const url='https://wa.me/?text='+encodeURIComponent(t); const x=window.open(url,'_blank'); if(!x) location.href=url; };
+  const m = $('rMail'); if (m) m.onclick = ()=>{ const r = rp(); logSend(); location.href = 'mailto:'+encodeURIComponent((settings.reportEmails||'').replace(/\s/g,''))+'?subject='+encodeURIComponent('OneByte '+r.title+' '+site.name+' '+meal+' '+date)+'&body='+encodeURIComponent(r.text.replace(/\*/g,'')); };
+  const cp = $('rCopy'); if (cp) cp.onclick = ()=>copyText(rp().text);
+  const cv = $('rCsv'); if (cv) cv.onclick = ()=>downloadCsv(rp());
+}
+
+/* live location while the screen is open (checkpoints go to Firebase every ~30s) */
+function startTracking(sid){
+  if (tracker || !navigator.geolocation) return;
+  let last = 0;
+  tracker = navigator.geolocation.watchPosition(p=>{
+    const now = Date.now(); if (now-last < 30000) return; last = now;
+    const pt = { lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6), ts:now };
+    db.ref(P+'sessions/'+sid+'/trackLast').set(pt); db.ref(P+'trips/'+sid).push(pt);
+  }, ()=>{}, {enableHighAccuracy:true, maximumAge:10000});
+  toast('Sharing live location');
+}
+function stopTracking(){ if (tracker!=null && navigator.geolocation){ navigator.geolocation.clearWatch(tracker); } tracker = null; }
+
 /* ============ REPORTS ============ */
-const REPORT_TYPES = [['master','Daily master (lifecycle)'],['stock','Stock & usage'],['purchase','Purchases'],['issue','Kitchen issue']];
+const REPORT_TYPES = [['master','Daily master (lifecycle)'],['meals','Meal sheets — per meal / day / week'],['stock','Stock & usage'],['purchase','Purchases'],['issue','Kitchen issue']];
 const rep0 = ()=>({ type:'master', from:todayKey(), to:todayKey(), site:'', meal:'', cat:'', item:'' });
 let rep = rep0();
 let lastReport = null;
@@ -488,6 +758,44 @@ let lastReport = null;
 function inRange(e){ return e.date && e.date>=rep.from && e.date<=rep.to; }
 function sectionTable(h, cols, rows, note){ return { h, cols, rows, note }; }
 
+function mealSections(R){
+  const order = m => MEALS.indexOf(m);
+  const list = Object.entries(sessions).map(([id,x])=>Object.assign({id},x)).filter(x=>x.date && x.date>=R.from && x.date<=R.to && (!R.site||x.siteId===R.site) && (!R.meal||x.meal===R.meal))
+    .sort((a,b)=>a.date.localeCompare(b.date)||String(a.siteId).localeCompare(String(b.siteId))||order(a.meal)-order(b.meal));
+  const sn = x => (sites[x.siteId]||{name:x.siteId}).name;
+  const qcs = q => q&&q.ts ? (q.ok?'Pass':'FAIL') : '—';
+  const pend = (h)=>({ h, cols:[], rows:[], note:'No meal sheets recorded for this period / filter yet.' });
+  if (!list.length) return [pend('Meal timeline'), pend('Dish-wise production, sales & wastage')];
+  const timeline = { h:'Meal timeline', cols:['Date','Counter','Meal','Cooked','QC','Packed','Loaded','Departed','Arrived','Trip','Arr. QC','At counter','Closed'],
+    rows:list.map(x=>[x.date, sn(x), x.meal, hm(T(x,'prodDone')&&T(x,'prodDone').ts), qcs(x.qc1), hm(T(x,'packed')&&T(x,'packed').ts), hm(T(x,'loaded')&&T(x,'loaded').ts), hm(T(x,'departed')&&T(x,'departed').ts), hm(T(x,'arrived')&&T(x,'arrived').ts), dur(T(x,'departed')&&T(x,'departed').ts, T(x,'arrived')&&T(x,'arrived').ts), qcs(x.qc2), hm(T(x,'counterLoaded')&&T(x,'counterLoaded').ts), hm(T(x,'closed')&&T(x,'closed').ts)]),
+    line:r=>'• '+r[1]+' '+r[2]+(r[0]!==R.from||R.from!==R.to?' ('+r[0]+')':'')+': cooked '+r[3]+' · QC '+r[4]+' · packed '+r[5]+' · loaded '+r[6]+' · departed '+r[7]+' · arrived '+r[8]+(r[9]!=='—'?' ('+r[9]+')':'')+' · arrival QC '+r[10]+' · at counter '+r[11]+' · closed '+r[12] };
+  const vtxt = v => v==null ? '—' : Math.abs(v)<0.0005 ? '0' : v>0 ? fmt(v)+' short' : fmt(-v)+' excess';
+  const dishRows = [], tot = {}, daily = {}, waste = {};
+  list.forEach(x=>{
+    const calc = sessionCalc(x);
+    Object.entries(calc).forEach(([id,k])=>{
+      if (R.item && R.item!==id) return;
+      const it = items[id]||{name:'(deleted)',unit:''};
+      dishRows.push({ r:[x.date, sn(x), x.meal, it.name, fmt(k.prepared), fmt(k.loaded), fmt(k.sold), fmt(k.left), fmt(k.waste), vtxt(k.variance)+(k.flag?' ⚠':''), it.unit], k });
+      const t = tot[id] = tot[id]||{name:it.name,unit:it.unit,p:0,l:0,s:0,le:0,w:0,v:0,hasV:false}; t.p+=k.prepared; t.l+=k.loaded; t.s+=k.sold; t.le+=k.left; t.w+=k.waste; if (k.variance!=null){ t.v+=k.variance; t.hasV=true; }
+      if (it.unit!=='nos'){ const d = daily[x.date] = daily[x.date]||{p:0,l:0,s:0,w:0,v:0}; d.p+=k.prepared; d.l+=k.loaded; d.s+=k.sold; d.w+=k.waste; if (k.variance!=null) d.v+=k.variance; }
+      if (k.waste>0){ const key = (k.reason||'No reason')+'||'+it.name+'||'+it.unit; waste[key]=(waste[key]||0)+k.waste; }
+    });
+  });
+  const dish = { h:'Dish-wise production, sales & wastage', cols:['Date','Counter','Meal','Dish','Made','At counter','Sold','Leftover','Wastage','Variance','Unit'], rows:dishRows.map(d=>d.r),
+    line:r=>'• '+r[1]+' '+r[2]+(R.from!==R.to?' ('+r[0]+')':'')+' — '+r[3]+': made '+r[4]+' | counter '+r[5]+' | sold '+r[6]+' | left '+r[7]+' | waste '+r[8]+' | '+r[9]+' '+r[10] };
+  const out = [timeline, dish];
+  if (R.from!==R.to){
+    out.push({ h:'Daily totals (kg / L — counted pieces excluded)', cols:['Date','Made','At counter','Sold','Wastage','Variance'], rows:Object.entries(daily).sort().map(([d,v])=>[d,fmt(v.p),fmt(v.l),fmt(v.s),fmt(v.w),vtxt(v.v)]),
+      line:r=>'• '+r[0]+': made '+r[1]+' | counter '+r[2]+' | sold '+r[3]+' | waste '+r[4]+' | '+r[5] });
+    out.push({ h:'Dish totals for the period', cols:['Dish','Unit','Made','At counter','Sold','Leftover','Wastage','Waste %','Variance'],
+      rows:Object.values(tot).sort((a,b)=>b.s-a.s).map(t=>[t.name,t.unit,fmt(t.p),fmt(t.l),fmt(t.s),fmt(t.le),fmt(t.w), t.l>0?fmt(Math.round(t.w/t.l*1000)/10)+'%':'—', t.hasV?vtxt(t.v):'—']),
+      line:r=>'• '+r[0]+': made '+r[2]+' | counter '+r[3]+' | sold '+r[4]+' | left '+r[5]+' | waste '+r[6]+' ('+r[7]+') '+r[1]+' | '+r[8] });
+  }
+  const wr = Object.entries(waste).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{ const [reason,name,unit]=k.split('||'); return [reason,name,fmt(v)+' '+unit]; });
+  out.push({ h:'Wastage by reason', cols:['Reason','Dish','Quantity'], rows:wr, note:wr.length?'':'No wastage recorded.', line:r=>'• '+r[0]+' — '+r[1]+': '+r[2] });
+  return out;
+}
 function buildReport(f){
   const R = f;
   const inR = e => e.date && e.date>=R.from && e.date<=R.to;
@@ -531,20 +839,13 @@ function buildReport(f){
   const issRows = Object.entries(agg).filter(([,v])=>Math.abs(v)>0.0005).map(([k,v])=>{ const [t,id]=k.split('||'); return [t, items[id].name, fmt(v)+' '+items[id].unit]; }).sort((a,b)=>a[0].localeCompare(b[0])||a[1].localeCompare(b[1]));
   const issSec = sectionTable('Issued to kitchen', ['Counter / meal','Item','Quantity'], issRows, issRows.length?'':'Nothing issued in this period / filter.');
 
-  // 4. Later lifecycle stages
-  const pending = (h, step)=>sectionTable(h, [], [], 'Not recorded yet — this fills in once '+step+' is added to the app.');
-  const later = [
-    pending('Food prepared & production QC','the preparation & QC step'),
-    pending('Dispatch & vehicle trips','the dispatch & tracking step'),
-    pending('Counter loading (weighed) & arrival QC','the counter loading step'),
-    pending('Sales (aggregator report) & reconciliation','the reconciliation step'),
-    pending('Wastage & shortage','the wastage step')
-  ];
+  const later = mealSections(R);
 
   let title, secs;
   if (R.type==='stock') { title='Stock & usage report'; secs=[stockSec]; }
   else if (R.type==='purchase') { title='Purchase report'; secs=[purSec]; }
   else if (R.type==='issue') { title='Kitchen issue report'; secs=[issSec]; }
+  else if (R.type==='meals') { title = R.from===R.to ? 'Meal sheet' : 'Meal report'; secs = later; }
   else { title='Daily master report'; secs=[stockSec, purSec, issSec].concat(later); }
 
   const period = R.from===R.to ? R.from : R.from+' to '+R.to;
@@ -557,7 +858,8 @@ function buildReport(f){
     L.push('', '*'+sec.h+'*');
     if (!sec.rows.length){ L.push('_'+sec.note+'_'); return; }
     sec.rows.forEach(r=>{
-      if (sec.cols[0]==='Item') L.push('• '+r[0]+': open '+r[2]+' | +'+r[3]+' | used '+r[4]+(r[5]!=='0'?' | adj '+r[5]:'')+' | *close '+r[6]+'* '+r[1]);
+      if (sec.line) L.push(sec.line(r));
+      else if (sec.cols[0]==='Item') L.push('• '+r[0]+': open '+r[2]+' | +'+r[3]+' | used '+r[4]+(r[5]!=='0'?' | adj '+r[5]:'')+' | *close '+r[6]+'* '+r[1]);
       else L.push('• '+r.filter(x=>x!=='').join(' · '));
     });
   });
@@ -569,8 +871,8 @@ function renderReports(){
   const el = $('p-reports');
   if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
   const cats = [...new Set(Object.values(items).filter(i=>i.type==='raw').map(i=>i.category||'').filter(Boolean))].sort();
-  const raws = Object.entries(items).filter(([,i])=>i.type==='raw').sort((a,b)=>a[1].name.localeCompare(b[1].name));
-  const meals = [...new Set(Object.values(sites).flatMap(s=>s.meals||[]))];
+  const raws = Object.entries(items).filter(([,i])=>i.type===(rep.type==='meals'?'food':'raw')).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const meals = MEALS.filter(m=>Object.values(sites).some(s=>(s.meals||[]).includes(m)));
   const o = (arr,sel)=>arr.map(([v,l])=>`<option value="${esc(v)}" ${v===sel?'selected':''}>${esc(l)}</option>`).join('');
   const quick = [['Today',0],['Yesterday',1],['Last 7 days',7],['This month',-1]];
   lastReport = buildReport(rep);
@@ -582,7 +884,7 @@ function renderReports(){
       <div class="two"><div><label>Counter</label><select id="r_site">${o([['','All counters']].concat(Object.entries(sites).map(([k,s])=>[k,s.name])), rep.site)}</select></div>
       <div><label>Meal</label><select id="r_meal">${o([['','All meals']].concat(meals.map(m=>[m,m])), rep.meal)}</select></div></div>
       <div class="two"><div><label>Category</label><select id="r_cat">${o([['','All categories']].concat(cats.map(c=>[c,c])), rep.cat)}</select></div>
-      <div><label>Item</label><select id="r_item">${o([['','All items']].concat(raws.map(([k,i])=>[k,i.name])), rep.item)}</select></div></div>
+      <div><label>${rep.type==='meals'?'Dish':'Item'}</label><select id="r_item">${o([['','All items']].concat(raws.map(([k,i])=>[k,i.name])), rep.item)}</select></div></div>
     </div>
     <div class="two" style="margin-bottom:6px"><button class="btn" id="r_wa">Send to WhatsApp</button><button class="btn sec" id="r_copy">Copy text</button></div>
     <div class="two" style="margin-bottom:10px"><button class="btn sec" id="r_csv">Download CSV</button><button class="btn sec" id="r_print">Print / PDF</button></div>
@@ -626,16 +928,145 @@ function downloadCsv(r){
   document.body.appendChild(a); a.click(); a.remove();
 }
 
+/* ============ TRENDS (sales, production & wastage graphs) ============ */
+const SERIES_COL = ['#2a78d6','#eb6834','#1baf7a','#eda100','#8a8f87'];
+const fmt1 = n => (Math.round(n*10)/10).toString();
+let tr = { days:14, site:'', meal:'', item:'' };
+
+function dayKeys(n){
+  const out = [], d = new Date();
+  for (let i=n-1;i>=0;i--){ const x = new Date(d); x.setDate(x.getDate()-i); out.push(x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')); }
+  return out;
+}
+const shortDay = k => { const d = new Date(k+'T00:00:00'); return d.toLocaleDateString([], {day:'numeric', month:'short'}); };
+
+function chartFrame(id, labels, maxV, inner, W, H, ml, mb, mt){
+  const iw = W-ml-10, ih = H-mt-mb;
+  const ticks = [0,1,2,3,4].map(i=>maxV*i/4);
+  const grid = ticks.map(v=>{ const y = mt+ih-(v/maxV)*ih; return `<line x1="${ml}" x2="${W-10}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/><text x="${ml-6}" y="${y+4}" text-anchor="end" font-size="10.5" fill="var(--muted)">${fmt1(v)}</text>`; }).join('');
+  const step = Math.max(1, Math.ceil(labels.length/7));
+  const xl = labels.map((l,i)=> i%step===0 || i===labels.length-1 ? `<text x="${ml+(labels.length===1?iw/2:i*iw/(labels.length-1))}" y="${H-6}" text-anchor="${i===labels.length-1&&labels.length>1?'end':'middle'}" font-size="10.5" fill="var(--muted)">${esc(shortDay(l))}</text>` : '').join('');
+  return { iw, ih, svgOpen:`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;touch-action:pan-y" role="img">${grid}${xl}`, svgClose:'</svg>' };
+}
+const chartData = {};
+function niceMax(v){ if (v<=0) return 4; const p = Math.pow(10, Math.floor(Math.log10(v))); const f = v/p; const n = f<=1?1:f<=2?2:f<=4?4:f<=5?5:10; return n*p; }
+
+function lineChart(id, labels, series, unit){
+  const W = 640, H = 230, ml = 42, mb = 24, mt = 12;
+  const maxV = niceMax(Math.max(0, ...series.flatMap(s=>s.vals)));
+  const f = chartFrame(id, labels, maxV, '', W, H, ml, mb, mt);
+  const X = i => ml + (labels.length===1 ? f.iw/2 : i*f.iw/(labels.length-1)), Y = v => mt + f.ih - (v/maxV)*f.ih;
+  let body = '';
+  series.forEach(s=>{
+    const pts = s.vals.map((v,i)=>X(i)+','+Y(v)).join(' ');
+    body += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (labels.length<=16) body += s.vals.map((v,i)=>`<circle cx="${X(i)}" cy="${Y(v)}" r="4" fill="${s.color}" stroke="var(--card)" stroke-width="2"/>`).join('');
+  });
+  // direct labels at the right end (de-collided)
+  const ends = series.map(s=>({s, y:Y(s.vals[s.vals.length-1])})).sort((a,b)=>a.y-b.y);
+  for (let i=1;i<ends.length;i++) if (ends[i].y-ends[i-1].y<12) ends[i].y = ends[i-1].y+12;
+  const lab = ends.map(e=>`<text x="${W-10}" y="${e.y-6}" text-anchor="end" font-size="11" font-weight="700" fill="var(--ink)">${esc(e.s.name)}</text>`).join('');
+  // hover columns
+  const colw = labels.length===1 ? f.iw : f.iw/(labels.length-1);
+  const hits = labels.map((l,i)=>`<rect class="hit" data-ch="${id}" data-i="${i}" x="${X(i)-colw/2}" y="${mt}" width="${colw}" height="${f.ih}" fill="transparent"/>`).join('');
+  chartData[id] = { labels, series, unit };
+  return `<div class="chart">${f.svgOpen}${body}${lab}${hits}${f.svgClose}${legend(series)}</div>`;
+}
+function barChart(id, labels, series, unit){
+  const W = 640, H = 210, ml = 42, mb = 24, mt = 12; const s = series[0];
+  const maxV = niceMax(Math.max(0, ...s.vals));
+  const f = chartFrame(id, labels, maxV, '', W, H, ml, mb, mt);
+  const slot = f.iw/labels.length, bw = Math.min(26, slot*0.62);
+  let body = '', hits = '';
+  s.vals.forEach((v,i)=>{ const x = ml + slot*i + (slot-bw)/2, h = (v/maxV)*f.ih, y = mt+f.ih-h;
+    if (h>0.5) body += `<path d="M${x},${mt+f.ih} V${y+Math.min(4,h)} Q${x},${y} ${x+Math.min(4,bw/2)},${y} H${x+bw-Math.min(4,bw/2)} Q${x+bw},${y} ${x+bw},${y+Math.min(4,h)} V${mt+f.ih} Z" fill="${s.color}"/>`;
+    hits += `<rect class="hit" data-ch="${id}" data-i="${i}" x="${ml+slot*i}" y="${mt}" width="${slot}" height="${f.ih}" fill="transparent"/>`; });
+  chartData[id] = { labels, series, unit };
+  return `<div class="chart">${f.svgOpen}${body}${hits}${f.svgClose}</div>`;
+}
+function legend(series){
+  return series.length>1 ? `<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px">${series.map(s=>`<span style="display:inline-flex;align-items:center;gap:5px"><i style="width:10px;height:3px;border-radius:2px;background:${s.color};display:inline-block"></i>${esc(s.name)}</span>`).join('')}</div>` : '';
+}
+function hbar(rows, unit){
+  const mx = Math.max(...rows.map(r=>r[1]), 0.0001);
+  return rows.map(r=>`<div style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px"><div style="width:120px;flex:none">${esc(r[0])}</div><div style="flex:1;background:var(--line);border-radius:6px;height:10px"><div style="width:${Math.max(2,r[1]/mx*100)}%;height:10px;border-radius:0 4px 4px 0;background:#eb6834"></div></div><b style="width:64px;text-align:right">${fmt1(r[1])}</b></div>`).join('');
+}
+function dataTable(labels, series, unit){
+  return `<details style="margin-top:6px"><summary style="font-size:12px;color:var(--muted);cursor:pointer">Show data table</summary><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:5px">Date</th>${series.map(s=>`<th style="text-align:right;padding:5px">${esc(s.name)}</th>`).join('')}</tr></thead><tbody>${labels.map((l,i)=>`<tr><td style="padding:4px 5px;border-top:1px solid var(--line)">${esc(shortDay(l))}</td>${series.map(s=>`<td style="text-align:right;padding:4px 5px;border-top:1px solid var(--line)">${fmt1(s.vals[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+}
+
+function renderTrends(){
+  const el = $('p-trends');
+  if (el.contains(document.activeElement) && /SELECT/.test(document.activeElement.tagName)) return;
+  const allDays = dayKeys(tr.days), first = allDays[0], last = allDays[allDays.length-1];
+  const sel = tr.item && items[tr.item] ? items[tr.item] : null;
+  const dishOk = id => { const it = items[id]; if (!it) return false; if (tr.item) return id===tr.item; return it.unit!=='nos'; };
+  const unit = sel ? sel.unit : 'kg / L';
+  const list = Object.values(sessions).filter(x=>x.date && x.date>=first && x.date<=last && (!tr.site||x.siteId===tr.site) && (!tr.meal||x.meal===tr.meal));
+  const have = new Set(list.map(x=>x.date)); const days = allDays.filter(d=>have.has(d)); // days with no meals (e.g. Sat/Sun off) are skipped
+  const idx = {}; days.forEach((d,i)=>idx[d]=i);
+  const zero = () => days.map(()=>0);
+  const loaded = zero(), sold = zero(), waste = zero(), made = zero();
+  const perItem = {}, byReason = {}, byDish = {}, byWd = {};
+  let sess = 0, closedN = 0;
+  list.forEach(x=>{
+    sess++; if (T(x,'closed')) closedN++;
+    const calc = sessionCalc(x);
+    Object.entries(calc).forEach(([id,k])=>{
+      if (!dishOk(id)) return; const i = idx[x.date];
+      made[i]+=k.prepared; loaded[i]+=k.loaded; sold[i]+=k.sold; waste[i]+=k.waste;
+      (perItem[id] = perItem[id]||{name:items[id].name, vals:zero(), tot:0}).vals[i]+=k.sold; perItem[id].tot+=k.sold;
+      if (k.waste>0){ const r = k.reason||'No reason'; byReason[r]=(byReason[r]||0)+k.waste; byDish[items[id].name]=(byDish[items[id].name]||0)+k.waste; }
+      const wd = new Date(x.date+'T00:00:00').getDay(); const o = (byWd[id]=byWd[id]||{}); (o[wd]=o[wd]||[]).push(k.sold);
+    });
+  });
+  const sum = a => a.reduce((x,y)=>x+y,0);
+  const topItems = Object.entries(perItem).filter(([,v])=>v.tot>0).sort((a,b)=>b[1].tot-a[1].tot);
+  const top = topItems.slice(0,4), rest = topItems.slice(4);
+  const prodSeries = top.map(([,v],i)=>({name:v.name, color:SERIES_COL[i], vals:v.vals}));
+  if (rest.length) prodSeries.push({name:'Other', color:SERIES_COL[4], vals:days.map((_,i)=>sum(rest.map(([,v])=>v.vals[i])))});
+  const dish = o => Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const o = (arr,s)=>arr.map(([v,l])=>`<option value="${esc(v)}" ${v===s?'selected':''}>${esc(l)}</option>`).join('');
+  const wpct = sum(loaded)>0 ? sum(waste)/sum(loaded)*100 : 0;
+  const foods = Object.entries(items).filter(([,i])=>i.type==='food').sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const wdNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const wdRows = topItems.slice(0,6).map(([id,v])=>{ const o2 = byWd[id]||{}; return `<tr><td style="padding:5px;border-top:1px solid var(--line)">${esc(v.name)}</td>${[1,2,3,4,5].map(w=>`<td style="text-align:right;padding:5px;border-top:1px solid var(--line)">${o2[w]?fmt1(sum(o2[w])/o2[w].length):'—'}</td>`).join('')}</tr>`; }).join('');
+  el.innerHTML = `
+    <div class="card"><div class="two"><div><label>Period</label><select id="t_days">${o([[7,'Last 7 days'],[14,'Last 14 days'],[30,'Last 30 days']].map(([a,b])=>[String(a),b]), String(tr.days))}</select></div>
+      <div><label>Dish</label><select id="t_item">${o([['','All dishes (kg / L)']].concat(foods.map(([k,i])=>[k,i.name+' ('+i.unit+')'])), tr.item)}</select></div></div>
+      <div class="two"><div><label>Counter</label><select id="t_site">${o([['','All counters']].concat(Object.entries(sites).map(([k,s])=>[k,s.name])), tr.site)}</select></div>
+      <div><label>Meal</label><select id="t_meal">${o([['','All meals']].concat(MEALS.map(m=>[m,m])), tr.meal)}</select></div></div></div>
+    <div class="kpi"><div class="card"><div class="sub">Meals recorded</div><div class="n">${sess}</div><div class="sub">${closedN} closed</div></div>
+      <div class="card"><div class="sub">Sold (${esc(unit)})</div><div class="n">${fmt1(sum(sold))}</div></div>
+      <div class="card"><div class="sub">Wastage (${esc(unit)})</div><div class="n" style="${wpct>3?'color:var(--red)':''}">${fmt1(sum(waste))}</div><div class="sub">${fmt1(wpct)}% of food at counter</div></div>
+      <div class="card"><div class="sub">At counter (${esc(unit)})</div><div class="n">${fmt1(sum(loaded))}</div><div class="sub">made ${fmt1(sum(made))}</div></div></div>
+    ${sess ? `
+    <h2>Food at counter vs sold vs wasted (${esc(unit)})</h2><div class="card">${lineChart('c1', days, [{name:'At counter',color:SERIES_COL[0],vals:loaded},{name:'Sold',color:SERIES_COL[1],vals:sold},{name:'Wastage',color:SERIES_COL[2],vals:waste}], unit)}${dataTable(days,[{name:'At counter',vals:loaded},{name:'Sold',vals:sold},{name:'Wastage',vals:waste}],unit)}</div>
+    <h2>Daily wastage (${esc(unit)})</h2><div class="card">${barChart('c2', days, [{name:'Wastage',color:'#eb6834',vals:waste}], unit)}</div>
+    ${prodSeries.length ? `<h2>Sales by product (${esc(unit)})</h2><div class="card">${lineChart('c3', days, prodSeries, unit)}${dataTable(days, prodSeries, unit)}</div>` : ''}
+    ${Object.keys(byReason).length ? `<h2>Wastage by reason</h2><div class="card">${hbar(dish(byReason), unit)}</div><h2>Most wasted dishes</h2><div class="card">${hbar(dish(byDish), unit)}</div>` : '<div class="soon" style="margin-top:12px">No wastage recorded in this period.</div>'}
+    ${wdRows ? `<h2>Average sold by weekday</h2><div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:5px">Dish</th>${[1,2,3,4,5].map(w=>`<th style="text-align:right;padding:5px">${wdNames[w]}</th>`).join('')}</tr></thead><tbody>${wdRows}</tbody></table><div class="sub" style="margin-top:6px">This pattern drives the tomorrow's-quantity suggestions once a few weeks of data exist.</div></div>` : ''}
+    ` : '<div class="empty">No meal sheets recorded in this period yet. Graphs appear once meals are closed with sales and wastage.</div>'}`;
+  const bind = (id,key,num_) => $(id).onchange = ()=>{ tr[key] = num_ ? +$(id).value : $(id).value; renderTrends(); };
+  bind('t_days','days',true); bind('t_item','item'); bind('t_site','site'); bind('t_meal','meal');
+  el.querySelectorAll('.hit').forEach(h=>{
+    const show = e => { const c = chartData[h.dataset.ch], i = +h.dataset.i; const tt = $('tt'); const r = h.getBoundingClientRect(); const pt = e.touches ? e.touches[0] : e;
+      tt.innerHTML = '<b>'+esc(shortDay(c.labels[i]))+'</b>'+c.series.map(s=>'<div><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+s.color+';margin-right:5px"></i>'+esc(s.name)+': <b>'+fmt1(s.vals[i])+'</b> '+esc(c.unit)+'</div>').join('');
+      tt.style.display='block'; tt.style.left = Math.min(window.innerWidth-170, Math.max(8, pt.clientX+10))+'px'; tt.style.top = Math.max(8, pt.clientY-60)+'px'; };
+    h.addEventListener('mousemove', show); h.addEventListener('touchstart', show, {passive:true}); h.addEventListener('mouseleave', ()=>{ $('tt').style.display='none'; });
+  });
+}
+
 /* ============ MASTERS ============ */
 let mTab = 'items';
 function renderMasters(){
   const el = $('p-masters');
   if (el.querySelector('input:focus, select:focus')) return;
   el.innerHTML = `
-    <div class="chips">${[['items','Items'],['sites','Counters'],['basins','Basins']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
+    <div class="chips">${[['items','Items'],['sites','Counters'],['basins','Basins'],['settings','Settings']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
     <div id="mBody"></div>`;
   el.querySelectorAll('[data-m]').forEach(c=>c.onclick=()=>{ mTab=c.dataset.m; renderMasters(); });
-  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else mBasins();
+  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else if (mTab==='basins') mBasins(); else mSettings();
 }
 function formShell(title, body, saveId){
   return `<div class="card" id="mForm"><b>${title}</b>${body}<button class="btn save" id="${saveId}">Save</button></div>`;
@@ -644,12 +1075,26 @@ function unitOpts(sel){ return UNITS.map(u=>`<option ${u===sel?'selected':''}>${
 
 function mItems(){
   const rows = Object.entries(items).sort((a,b)=>a[1].name.localeCompare(b[1].name));
-  $('mBody').innerHTML = `<button class="btn save" id="addItem" style="margin:0 0 12px">+ Add item</button><div id="mf"></div>` +
-    (rows.length ? rows.map(([id,i])=>`<div class="card" style="${i.active===false?'opacity:.5':''}"><div class="row"><div class="grow"><b>${esc(i.name)}</b><span class="tag">${i.type==='raw'?'Raw':'Cooked'}</span><div class="sub">${esc(i.category||'')} · ${esc(i.unit)}${i.type==='raw'&&i.minStock?' · min '+fmt(i.minStock):''}</div></div></div>
+  const missing = SEED.concat(SEED_DISHES).filter(x=>!Object.values(items).some(i=>i.name.toLowerCase()===x.n.toLowerCase())).length;
+  $('mBody').innerHTML = `<button class="btn save" id="addItem" style="margin:0 0 12px">+ Add item</button>` +
+    (missing ? `<div class="card" style="background:var(--ok-soft)"><b>Starter items</b><div class="sub">Add the ${missing} items still missing — provisions &amp; vegetables (with Tamil names) and every cooked dish from the Teleperformance veg / non-veg main-meal menu (no prices) — at zero stock. Existing items are skipped.</div><button class="btn save" id="seedBtn" style="margin-top:10px">Import starter items</button></div>` : '') + `<div id="mf"></div>` +
+    (rows.length ? rows.map(([id,i])=>`<div class="card" style="${i.active===false?'opacity:.5':''}"><div class="row"><div class="grow"><b>${esc(i.name)}</b><span class="tag">${i.type==='raw'?'Raw':'Cooked'}</span>${i.diet==='nonveg'?' 🔴':i.diet==='veg'?' 🟢':''}<div class="sub">${i.ta?esc(i.ta)+' · ':''}${esc(i.category||'')} · ${esc(i.unit)}${i.portionG?' · plate '+esc(i.portionG)+' g':''}${i.type==='raw'&&i.minStock?' · min '+fmt(i.minStock):''}</div></div></div>
       <div class="actions"><button data-e="${id}">Edit</button><button data-t="${id}">${i.active===false?'Activate':'Hide'}</button></div></div>`).join('') : '<div class="empty">No items yet.</div>');
   $('addItem').onclick = ()=>itemForm(null);
+  const sb=$('seedBtn'); if (sb) sb.onclick=importSeed;
   $('mBody').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>itemForm(b.dataset.e));
   $('mBody').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>db.ref(P+'items/'+b.dataset.t+'/active').set(items[b.dataset.t].active===false));
+}
+const SEED = [{"n":"Turmeric powder","t":"மஞ்சள் பொடி","c":"Masala / Spices","u":"kg"},{"n":"Chilli powder","t":"மிளகாய் தூள்","c":"Masala / Spices","u":"kg"},{"n":"Coriander powder","t":"மல்லி தூள்","c":"Masala / Spices","u":"kg"},{"n":"Sambar powder","t":"சாம்பார் தூள்","c":"Masala / Spices","u":"kg"},{"n":"Garam masala","t":"கரம் மசாலா","c":"Masala / Spices","u":"kg"},{"n":"Sakthi Chicken masala","t":"Sakthi சிக்கன் மசாலா","c":"Masala / Spices","u":"kg"},{"n":"Mutton masala","t":"மட்டன் மசாலா","c":"Masala / Spices","u":"kg"},{"n":"Kari (curry) masala","t":"கறி மசாலா","c":"Masala / Spices","u":"kg"},{"n":"Kulambu chilli powder","t":"குழம்பு மிளகாய் தூள்","c":"Masala / Spices","u":"kg"},{"n":"Cinnamon","t":"பட்டை","c":"Whole Spices","u":"kg"},{"n":"Cloves","t":"லவங்கம்","c":"Whole Spices","u":"kg"},{"n":"Cardamom","t":"ஏலக்காய்","c":"Whole Spices","u":"kg"},{"n":"Star anise","t":"Star அன்னாசிப்பூ","c":"Whole Spices","u":"kg"},{"n":"Mustard seeds","t":"கடுகு","c":"Whole Spices","u":"kg"},{"n":"Cumin seeds","t":"சீரகம்","c":"Whole Spices","u":"kg"},{"n":"Black pepper","t":"மிளகு","c":"Whole Spices","u":"kg"},{"n":"Fennel seeds","t":"சோம்பு","c":"Whole Spices","u":"kg"},{"n":"Mace (Jathipathri)","t":"ஜாதிபத்திரி","c":"Whole Spices","u":"kg"},{"n":"Fenugreek","t":"வெந்தயம்","c":"Whole Spices","u":"kg"},{"n":"Poppy seeds","t":"கசகசா","c":"Whole Spices","u":"kg"},{"n":"Dry red chilli","t":"வர மிளகாய்","c":"Whole Spices","u":"kg"},{"n":"Tata Salt","t":"Tata Salt","c":"Salt / Sugar / Tamarind","u":"pack"},{"n":"Rock salt","t":"கல் உப்பு","c":"Salt / Sugar / Tamarind","u":"pack"},{"n":"Sugar","t":"சர்க்கரை","c":"Salt / Sugar / Tamarind","u":"kg"},{"n":"Jaggery","t":"வெல்லம்","c":"Salt / Sugar / Tamarind","u":"kg"},{"n":"Tamarind","t":"புளி","c":"Salt / Sugar / Tamarind","u":"kg"},{"n":"Asafoetida powder","t":"பெருங்காயம் தூள்","c":"Salt / Sugar / Tamarind","u":"box"},{"n":"Asafoetida cake","t":"பெருங்காயம் கட்டி","c":"Salt / Sugar / Tamarind","u":"nos"},{"n":"Garlic","t":"பூண்டு","c":"Dry fruits / Nuts / Others","u":"kg"},{"n":"Cashew (whole)","t":"Cashew","c":"Dry fruits / Nuts / Others","u":"kg"},{"n":"Cashew (pieces)","t":"தூள் Cashew","c":"Dry fruits / Nuts / Others","u":"kg"},{"n":"Raisins","t":"திராட்சை","c":"Dry fruits / Nuts / Others","u":"kg"},{"n":"Groundnut","t":"வேர்கடலை","c":"Dry fruits / Nuts / Others","u":"kg"},{"n":"Appalam","t":"அப்பளம்","c":"Dry fruits / Nuts / Others","u":"pack"},{"n":"Sundakkai vathal","t":"சுண்ட வத்தல்","c":"Dry fruits / Nuts / Others","u":"kg"},{"n":"Ghee","t":"Ghee","c":"Oil / Ghee","u":"L"},{"n":"Sunflower oil","t":"Sunflower Oil","c":"Oil / Ghee","u":"box"},{"n":"Gingelly oil","t":"நல்லெண்ணெய்","c":"Oil / Ghee","u":"kg"},{"n":"Coconut oil","t":"தே. எண்ணெய்","c":"Oil / Ghee","u":"kg"},{"n":"Biryani rice","t":"Biryani Rice","c":"Rice / Dals / Flours","u":"kg"},{"n":"Raw rice","t":"Raw Rice","c":"Rice / Dals / Flours","u":"kg"},{"n":"Boiled rice","t":"Boiled Rice","c":"Rice / Dals / Flours","u":"kg"},{"n":"Toor dal","t":"துவரம் பருப்பு","c":"Rice / Dals / Flours","u":"kg"},{"n":"Moong dal","t":"பாசி பருப்பு","c":"Rice / Dals / Flours","u":"kg"},{"n":"Chana dal","t":"கடலை பருப்பு","c":"Rice / Dals / Flours","u":"kg"},{"n":"Urad dal","t":"உளுந்து பருப்பு","c":"Rice / Dals / Flours","u":"kg"},{"n":"Rava","t":"ரவை","c":"Rice / Dals / Flours","u":"kg"},{"n":"Maida","t":"மைதா","c":"Rice / Dals / Flours","u":"kg"},{"n":"Corn flour","t":"Corn Flour","c":"Rice / Dals / Flours","u":"kg"},{"n":"Wheat flour","t":"கோதுமை மாவு","c":"Rice / Dals / Flours","u":"kg"},{"n":"Rice flour","t":"அரிசி மாவு","c":"Rice / Dals / Flours","u":"kg"},{"n":"Gram flour (besan)","t":"கடலை மாவு","c":"Rice / Dals / Flours","u":"kg"},{"n":"Onion","t":"வெங்காயம்","c":"Vegetables","u":"kg"},{"n":"Small onion","t":"சின்ன வெங்காயம்","c":"Vegetables","u":"kg"},{"n":"Tomato","t":"தக்காளி","c":"Vegetables","u":"kg"},{"n":"Green chilli","t":"பச்சை மிளகாய்","c":"Vegetables","u":"kg"},{"n":"Ginger","t":"இஞ்சி","c":"Vegetables","u":"kg"},{"n":"Potato","t":"உருளைக்கிழங்கு","c":"Vegetables","u":"kg"},{"n":"Carrot","t":"கேரட்","c":"Vegetables","u":"kg"},{"n":"Beans","t":"பீன்ஸ்","c":"Vegetables","u":"kg"},{"n":"Green peas","t":"பச்சை பட்டாணி","c":"Vegetables","u":"kg"},{"n":"Brinjal","t":"கத்திரிக்காய்","c":"Vegetables","u":"kg"},{"n":"Pumpkin (ash gourd)","t":"பூசணிக்காய்","c":"Vegetables","u":"kg"},{"n":"Raw mango","t":"மாங்காய்","c":"Vegetables","u":"kg"},{"n":"Drumstick","t":"முருங்கைக்காய்","c":"Vegetables","u":"nos"},{"n":"Kovakkai (ivy gourd)","t":"கோவைக்காய்","c":"Vegetables","u":"kg"},{"n":"Mint","t":"புதினா","c":"Fresh herbs","u":"bunch"},{"n":"Coriander leaves","t":"கொத்தமல்லி","c":"Fresh herbs","u":"bunch"},{"n":"Curry leaf","t":"கறிவேப்பிலை","c":"Fresh herbs","u":"bunch"},{"n":"Lemon","t":"எலுமிச்சை","c":"Vegetables","u":"nos"},{"n":"Coconut","t":"தேங்காய்","c":"Vegetables","u":"nos"},{"n":"Curd (Hatsun)","t":"தயிர் (Hatsun)","c":"Dairy","u":"L"},{"n":"Milk","t":"பால்","c":"Dairy","u":"L"}];
+const SEED_DISHES = [{"n":"Idly","u":"nos","c":"Breakfast & tiffin","d":"veg","m":["breakfast","lunch","dinner"]},{"n":"Kal Dosa","u":"nos","c":"Breakfast & tiffin","d":"veg","m":["breakfast","lunch","dinner"]},{"n":"Medu Vada","u":"nos","c":"Breakfast & tiffin","d":"veg","m":["breakfast"]},{"n":"Masala Vada","u":"nos","c":"Breakfast & tiffin","d":"veg","m":["breakfast"]},{"n":"Idiyappam","u":"nos","c":"Breakfast & tiffin","d":"veg","m":["breakfast"]},{"n":"Poori","u":"nos","c":"Breakfast & tiffin","d":"veg","m":["breakfast"]},{"n":"Pongal","u":"kg","c":"Breakfast & tiffin","d":"veg","m":["breakfast"],"g":400},{"n":"Rava Khichadi","u":"kg","c":"Breakfast & tiffin","d":"veg","m":["breakfast"],"g":350},{"n":"Onion Uthappam","u":"nos","c":"Breakfast & tiffin","d":"veg","m":["breakfast"]},{"n":"Chutney","u":"kg","c":"Sides & gravies","d":"veg","m":["breakfast","lunch","dinner"],"g":60},{"n":"Kurma","u":"L","c":"Sides & gravies","d":"veg","m":["breakfast","lunch","dinner"]},{"n":"Sambar","u":"L","c":"Sides & gravies","d":"veg","m":["breakfast","lunch","dinner"]},{"n":"Karakuzhambu","u":"L","c":"Sides & gravies","d":"veg","m":["lunch","dinner"]},{"n":"Rasam","u":"L","c":"Sides & gravies","d":"veg","m":["lunch","dinner"]},{"n":"Butter Milk","u":"L","c":"Sides & gravies","d":"veg","m":["lunch","dinner"]},{"n":"Kootu","u":"kg","c":"Sides & gravies","d":"veg","m":["lunch","dinner"],"g":100},{"n":"Poriyal","u":"kg","c":"Sides & gravies","d":"veg","m":["lunch","dinner"],"g":100},{"n":"Sweet","u":"kg","c":"Sides & gravies","d":"veg","m":["lunch","dinner"],"g":60},{"n":"Pappad","u":"nos","c":"Sides & gravies","d":"veg","m":["lunch","dinner"]},{"n":"Pickle","u":"kg","c":"Sides & gravies","d":"veg","m":["lunch","dinner"]},{"n":"Raita","u":"kg","c":"Sides & gravies","d":"nonveg","m":["lunch","dinner"]},{"n":"Brinjal side (biryani)","u":"kg","c":"Sides & gravies","d":"nonveg","m":["lunch","dinner"]},{"n":"White Rice","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":400},{"n":"Sambar Rice","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":400},{"n":"Curd Rice","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":400},{"n":"Tomato Rice","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":400},{"n":"Variety Rice","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":400},{"n":"Veg Biryani","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":400},{"n":"Paneer Biryani","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":400},{"n":"Schezwan Fried Rice","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":300},{"n":"Schezwan Noodles","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":300},{"n":"Chapathi","u":"nos","c":"Rice & mains","d":"veg","m":["lunch","dinner"]},{"n":"Parotta","u":"nos","c":"Rice & mains","d":"veg","m":["lunch","dinner"]},{"n":"Paneer Butter Masala","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":150},{"n":"Mushroom Masala","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":150},{"n":"Veg Kothu Parotta","u":"kg","c":"Rice & mains","d":"veg","m":["lunch","dinner"],"g":250},{"n":"Chicken Curry","u":"kg","c":"Non-veg","d":"nonveg","m":["lunch","dinner"]},{"n":"Chicken 65","u":"kg","c":"Non-veg","d":"nonveg","m":["lunch","dinner"]},{"n":"Chicken Dum Biryani","u":"kg","c":"Non-veg","d":"nonveg","m":["lunch","dinner"]},{"n":"Plain Biryani","u":"kg","c":"Non-veg","d":"nonveg","m":["lunch","dinner"],"g":400},{"n":"Egg Biryani","u":"kg","c":"Non-veg","d":"nonveg","m":["lunch","dinner"],"g":400},{"n":"Boiled Egg","u":"nos","c":"Non-veg","d":"nonveg","m":["lunch","dinner"]},{"n":"Chicken Noodles","u":"kg","c":"Non-veg","d":"nonveg","m":["lunch","dinner"],"g":300},{"n":"Egg Fried Rice","u":"kg","c":"Non-veg","d":"nonveg","m":["lunch","dinner"],"g":300},{"n":"Chicken Fried Rice","u":"kg","c":"Non-veg","d":"nonveg","m":["lunch","dinner"],"g":300}];
+function importSeed(){
+  const have = new Set(Object.values(items).map(i=>i.name.toLowerCase()));
+  const slug = n => n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const upd = {};
+  SEED.forEach(x=>{ if (!have.has(x.n.toLowerCase())) upd[slug(x.n)] = { name:x.n, ta:x.t, type:'raw', unit:x.u, category:x.c, minStock:0, active:true }; });
+  SEED_DISHES.forEach(x=>{ if (!have.has(x.n.toLowerCase())) upd['dish-'+slug(x.n)] = { name:x.n, type:'food', unit:x.u, category:x.c, diet:x.d, meals:x.m, portionG:x.g||null, minStock:0, active:true }; });
+  const n = Object.keys(upd).length; if (!n){ toast('Nothing new to add'); return; }
+  db.ref(P+'items').update(upd).then(()=>toast(n+' items added — set minimum stock for the ones you track'));
 }
 function itemForm(id){
   const i = id ? items[id] : { name:'', type:'raw', unit:'kg', category:'', minStock:0 };
@@ -658,12 +1103,14 @@ function itemForm(id){
     <div class="two"><div><label>Type</label><select id="i_type"><option value="raw" ${i.type==='raw'?'selected':''}>Raw material</option><option value="food" ${i.type==='food'?'selected':''}>Cooked food</option></select></div>
     <div><label>Unit</label><select id="i_unit">${unitOpts(i.unit)}</select></div></div>
     <div class="two"><div><label>Category</label><input id="i_cat" value="${esc(i.category||'')}" placeholder="Rice / Veg / Dal / Oil…"></div>
-    <div><label>Minimum stock (raw only)</label><input id="i_min" type="number" inputmode="decimal" step="any" value="${i.minStock||0}"></div></div>`, 'i_save');
+    <div><label>Minimum stock (raw only)</label><input id="i_min" type="number" inputmode="decimal" step="any" value="${i.minStock||0}"></div></div>
+    <div class="two"><div><label>Tamil name (optional)</label><input id="i_ta" value="${esc(i.ta||'')}"></div>
+    <div><label>Plate size in grams (cooked, optional)</label><input id="i_portion" type="number" inputmode="decimal" step="any" value="${i.portionG||''}" placeholder="to enter sales as plates"></div></div>`, 'i_save');
   $('i_save').onclick = ()=>{
     const name = $('i_name').value.trim(); if (!name){ alert('Enter a name.'); return; }
     const dup = Object.entries(items).some(([k,x])=>k!==id && x.name.toLowerCase()===name.toLowerCase());
     if (dup){ alert('An item with this name already exists.'); return; }
-    const rec = { name, type:$('i_type').value, unit:$('i_unit').value, category:$('i_cat').value.trim(), minStock:Math.max(0,num($('i_min').value)||0), active:true };
+    const rec = { name, type:$('i_type').value, unit:$('i_unit').value, category:$('i_cat').value.trim(), minStock:Math.max(0,num($('i_min').value)||0), ta:$('i_ta').value.trim()||null, portionG:num($('i_portion').value)>0?num($('i_portion').value):null, active:true };
     const ref = id ? db.ref(P+'items/'+id) : db.ref(P+'items').push();
     ref.update(rec).then(()=>{ toast('Saved'); $('mf').innerHTML=''; });
   };
@@ -684,7 +1131,7 @@ function siteForm(id){
     <label>Counter name</label><input id="s_name" value="${esc(s.name)}" placeholder="e.g. Teleperformance">
     <label>Company / site note</label><input id="s_co" value="${esc(s.company||'')}" placeholder="optional">
     <label>Meals served</label>
-    <div class="chips">${['breakfast','lunch','dinner'].map(x=>`<label style="margin:0"><input type="checkbox" class="s_meal" value="${x}" ${m.includes(x)?'checked':''} style="width:auto;margin-right:5px;">${x}</label>`).join('')}</div>`, 's_save');
+    <div class="chips">${MEALS.map(x=>`<label style="margin:0"><input type="checkbox" class="s_meal" value="${x}" ${m.includes(x)?'checked':''} style="width:auto;margin-right:5px;">${x}</label>`).join('')}</div>`, 's_save');
   $('s_save').onclick = ()=>{
     const name = $('s_name').value.trim(); if (!name){ alert('Enter a counter name.'); return; }
     const meals = [...document.querySelectorAll('.s_meal:checked')].map(x=>x.value);
@@ -695,6 +1142,17 @@ function siteForm(id){
   };
 }
 
+function mSettings(){
+  const st = settings;
+  $('mBody').innerHTML = formShell('Report & quality settings', `
+    <label>Send reports by email to (comma-separated, optional)</label><input id="st_mail" value="${esc(st.reportEmails||'')}" placeholder="boss@example.com, manager@example.com">
+    <div class="sub">WhatsApp: the Send button opens WhatsApp — pick your management group there.</div>
+    <div class="two"><div><label>Min. temp when leaving kitchen (°C)</label><input id="st_t1" type="number" value="${st.minTempDispatch||65}"></div>
+    <div><label>Min. temp on arrival (°C)</label><input id="st_t2" type="number" value="${st.minTempArrival||60}"></div></div>
+    <label>Acceptable variance (% of food loaded)</label><input id="st_tol" type="number" step="any" value="${st.tolerance||3}">
+    <div class="sub">Loaded − sold − leftover − wastage beyond this % is flagged as shortage/excess.</div>`, 'st_save');
+  $('st_save').onclick = ()=>db.ref(P+'settings').update({ reportEmails:$('st_mail').value.trim(), minTempDispatch:num($('st_t1').value)||65, minTempArrival:num($('st_t2').value)||60, tolerance:num($('st_tol').value)||3 }).then(()=>toast('Settings saved'));
+}
 function mBasins(){
   const rows = Object.entries(basins);
   $('mBody').innerHTML = `<div class="sub" style="margin-bottom:10px">Empty weight of each basin/container. The scale reading minus this gives the food weight.</div>
