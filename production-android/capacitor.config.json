@@ -1,0 +1,12 @@
+{
+  "appId": "com.evp.onebyte.production",
+  "appName": "OneByte Production",
+  "webDir": "www",
+  "android": {
+    "useLegacyBridge": true,
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

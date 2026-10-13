@@ -1,0 +1,67 @@
+name: Build OneByte Production APK
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'onebyte-production.html'
+      - 'production-android/**'
+      - '.github/workflows/android-apk.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v3
+      - name: Install and add Android platform
+        working-directory: production-android
+        run: |
+          npm install
+          mkdir -p www
+          cp ../onebyte-production.html www/index.html
+          npx cap add android
+      - name: Permissions, icon, background tracking
+        working-directory: production-android
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          python3 - <<'PY'
+          p='android/app/src/main/AndroidManifest.xml'
+          s=open(p).read()
+          perms='''
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.WAKE_LOCK"/>
+          '''
+          if 'ACCESS_BACKGROUND_LOCATION' not in s:
+              s=s.replace('</manifest>',perms+'</manifest>')
+          open(p,'w').write(s)
+          PY
+          npm install --no-save @capacitor/assets
+          mkdir -p assets && cp resources/icon.png assets/icon-only.png && cp resources/icon.png assets/icon-foreground.png && echo '#02764A' > /dev/null
+          npx capacitor-assets generate --android --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' || true
+          npx cap sync android
+      - name: Build debug APK
+        working-directory: production-android/android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Rename APK
+        run: cp production-android/android/app/build/outputs/apk/debug/app-debug.apk OneByte-Production.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OneByte-Production-APK
+          path: OneByte-Production.apk
+      - name: Publish release (direct download link)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: production-apk-latest
+          name: OneByte Production APK (latest)
+          body: Latest Android build of OneByte Production. Download OneByte-Production.apk and install.
+          files: OneByte-Production.apk
