@@ -110,6 +110,7 @@
   <div class="page" id="p-purchase"></div>
   <div class="page" id="p-issue"></div>
   <div class="page" id="p-meals"></div>
+  <div class="page" id="p-plan"></div>
   <div class="page" id="p-reports"></div>
   <div class="page" id="p-trends"></div>
   <div class="page" id="p-masters"></div>
@@ -135,15 +136,15 @@ const SETUP_PIN = "1234"; // works only until the first Admin user is created
 const P = 'prod_'; // all data of this module lives under prod_* in Firebase, separate from the old sales data
 
 const ROLES = {
-  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','meals','reports','trends','masters','users'] },
-  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','stock','purchase','issue','meals','masters'] },
-  store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','stock','purchase','issue'] },
-  kitchen:     { label:'Kitchen',            desc:'Daily issue & stock',         tabs:['home','stock','issue','meals'] },
+  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','plan','meals','reports','trends','masters','users'] },
+  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','stock','purchase','issue','plan','meals','masters'] },
+  store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','stock','purchase','issue','plan'] },
+  kitchen:     { label:'Kitchen',            desc:'Daily issue & stock',         tabs:['home','stock','issue','plan','meals'] },
   driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals'] },
   supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter',tabs:['home','meals'], site:true },
   counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals'], site:true }
 };
-const NAV = { home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
+const NAV = { home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
 const MEALS = ['breakfast','lunch','snacks','dinner'];
 const MEAL_ICON = {breakfast:'🌅', lunch:'🍛', snacks:'☕', dinner:'🌙'};
 const UNITS = ['kg','g','L','ml','nos','pack','box','bunch','pkt'];
@@ -161,7 +162,7 @@ const store = (function(){ try{ localStorage.setItem('_t','1'); localStorage.rem
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
 let me = null;
-let users = {}, sites = {}, items = {}, basins = {}, ledger = {}, notices = {}, sessions = {}, settings = {};
+let users = {}, sites = {}, items = {}, basins = {}, ledger = {}, notices = {}, sessions = {}, settings = {}, recipes = {};
 let stockFilter = 'all', stockSearch = '';
 
 function can(tab){
@@ -238,6 +239,7 @@ function listen(){
   bind('basins', v=>basins=v);
   bind('notices', v=>notices=v);
   bind('settings', v=>settings=v);
+  bind('recipes', v=>recipes=v);
   db.ref(P+'sessions').limitToLast(600).on('value', s=>{ sessions = s.val()||{}; renderAll(); });
   db.ref(P+'ledger').limitToLast(30000).on('value', s=>{ ledger = s.val()||{}; renderAll(); });
 }
@@ -251,7 +253,9 @@ function renderAll(){
   if (can('stock'))    renderStock();
   if (can('purchase')) renderPurchase();
   if (can('issue'))    renderIssue();
+  if (can('plan'))     renderPlan();
   if (can('meals'))    renderMeals();
+  resumeTracking();
   if (can('reports'))  renderReports();
   if (can('trends'))   renderTrends();
   if (can('masters'))  renderMasters();
@@ -315,6 +319,7 @@ function renderHome(){
   el.innerHTML = `
     <div class="hero">${heroSvg()}<div class="cap"><span>Kitchen → vehicle → counter</span><span>${new Date().toLocaleDateString([], {weekday:'short', day:'numeric', month:'short'})}</span></div></div>
     ${nts.map(([id,n])=>`<div class="notice ${esc(n.level||'note')}"><span>${ico[n.level]||'📝'}</span><div><div>${esc(n.text)}</div><div class="sub">${esc(n.by||'')} · ${new Date(n.ts||0).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div></div>${canPost?`<button class="x" data-nd="${id}" aria-label="Remove">✕</button>`:''}</div>`).join('')}
+    ${can('meals')?roadHtml():''}
     <div class="kpi">
       <div class="card"><div class="sub">Below minimum</div><div class="n" style="${low.length?'color:var(--amber)':''}">${low.length}</div></div>
       <div class="card"><div class="sub">Expiring ≤ 3 days</div><div class="n" style="${exp.length?'color:var(--red)':''}">${exp.length}</div></div>
@@ -335,6 +340,7 @@ function renderHome(){
       <input id="n_text" placeholder="e.g. Chicken delivery delayed — use frozen stock" style="margin-top:8px">
       <button class="btn save" id="n_post">Post</button></div>` : ''}`;
   const np=$('n_post'); if (np) np.onclick=postNotice;
+  el.querySelectorAll('[data-trip]').forEach(c=>c.onclick=()=>{ openSid = c.dataset.trip; mDate = openSid.split('_')[0]; go('meals'); });
   el.querySelectorAll('[data-nd]').forEach(b=>b.onclick=()=>db.ref(P+'notices/'+b.dataset.nd).remove());
 }
 
@@ -554,12 +560,14 @@ function renderMeals(){
   el.innerHTML = `
     <div class="row" style="margin-bottom:10px"><button class="btn sec" id="dPrev" style="padding:9px 14px">‹</button>
       <input type="date" id="dPick" value="${mDate}" style="text-align:center"><button class="btn sec" id="dNext" style="padding:9px 14px">›</button></div>
+    ${mDate===todayKey()?roadHtml():''}
     ${cards.length ? cards.join('') : '<div class="empty">No counters/meals set up yet. Admin: Masters → Counters.</div>'}
     <div class="sub" style="margin-top:6px">Tap a meal to open its checklist: cooking → QC → packing → loading → departure → arrival → weighing at the counter → sales &amp; wastage.</div>`;
   const shift = n => { const d = new Date(mDate+'T00:00:00'); d.setDate(d.getDate()+n); mDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); renderMeals(); };
   $('dPrev').onclick = ()=>shift(-1); $('dNext').onclick = ()=>shift(1);
   $('dPick').onchange = ()=>{ if ($('dPick').value){ mDate = $('dPick').value; renderMeals(); } };
   el.querySelectorAll('[data-open]').forEach(c=>c.onclick=()=>{ openSid = c.dataset.open; renderMeals(); window.scrollTo(0,0); });
+  el.querySelectorAll('[data-trip]').forEach(c=>c.onclick=()=>{ openSid = c.dataset.trip; renderMeals(); window.scrollTo(0,0); });
 }
 function lastStamp(s){
   let t = 0; Object.values(s.times||{}).forEach(x=>{ if (x&&x.ts>t) t=x.ts; });
@@ -618,13 +626,16 @@ function renderSession(el){
   </div>
 
   <div class="card">${stepHead(4,'Vehicle trip',dep&&dep.ts,' → '+(arr&&arr.ts?hm(arr.ts)+' ('+dur(dep.ts,arr.ts)+')':'on the way'))}
+    ${(()=>{ const sc = ((site.sched||{})[meal])||{}; if (!sc.depart && !sc.arrive) return ''; const lt = (ts,pl)=>{ const m = lateMin(date,pl,ts); return ts && m!=null ? (m>0?` <b style="color:var(--red)">+${m} min late</b>`:` <b style="color:var(--green)">on time</b>`) : ''; };
+      return `<div class="sub" style="margin-bottom:6px">${sc.depart?'Planned departure '+esc(sc.depart)+lt(dep&&dep.ts,sc.depart):''}${sc.depart&&sc.arrive?' · ':''}${sc.arrive?'Planned arrival '+esc(sc.arrive)+lt(arr&&arr.ts,sc.arrive):''}</div>`; })()}
     ${dep&&dep.ts?`<div class="sub">Vehicle ${esc(s.vehicle||'—')} · Driver ${esc(s.driver||'—')}${dep.loc?` · <a href="https://maps.google.com/?q=${dep.loc.lat},${dep.loc.lng}" target="_blank">start location</a>`:''}</div>`:''}
     ${!(dep&&dep.ts)&&canStep('depart')?`<div class="two"><div><label>Vehicle no.</label><input id="veh" value="${esc(s.vehicle||'')}" placeholder="TN 09 AB 1234"></div><div><label>Driver</label><input id="drv" value="${esc(s.driver||(me.role==='driver'?me.name:''))}"></div></div>
       ${loaded&&loaded.ts?`<button class="btn save" id="btnDepart">🚚 Start trip (departed)</button>`:'<div class="sub" style="margin-top:8px">Mark the food loaded first.</div>'}`:''}
     ${dep&&dep.ts&&!(arr&&arr.ts)?`
-      ${s.trackLast?`<div class="sub" style="margin-top:6px">Last position ${hm(s.trackLast.ts)} · <a href="https://maps.google.com/?q=${s.trackLast.lat},${s.trackLast.lng}" target="_blank">open map</a></div>`:''}
+      ${s.trackLast?`<div class="sub" style="margin-top:6px">Last position ${hm(s.trackLast.ts)}${s.trackLast.bg?' (background GPS)':''} · <a href="https://maps.google.com/?q=${s.trackLast.lat},${s.trackLast.lng}" target="_blank">open map</a></div>
+      <iframe title="Vehicle position" loading="lazy" style="width:100%;height:190px;border:0;border-radius:10px;margin-top:6px" src="https://www.openstreetmap.org/export/embed.html?bbox=${s.trackLast.lng-0.012},${s.trackLast.lat-0.008},${s.trackLast.lng+0.012},${s.trackLast.lat+0.008}&layer=mapnik&marker=${s.trackLast.lat},${s.trackLast.lng}"></iframe>`:''}
       ${canStep('depart')?`<button class="btn sec save" id="btnTrack">${tracker?'⏸ Stop sharing location':'📍 Share live location'}</button>
-      <div class="sub" style="margin-top:4px">Works while this screen stays open. Background tracking with the screen off needs the native Android app (planned) and "Allow all the time" location permission.</div>`:''}
+      <div class="sub" style="margin-top:4px">${window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.BackgroundGeolocation?'Background GPS is available — tracking continues with the screen off.':'Browser mode: works while this screen stays open. Screen-off tracking needs the Android app with the background-location plugin and "Allow all the time" permission.'}</div>`:''}
       ${btn('btnArrive','📍 Arrived at site','arrive')}`:''}
     ${arr&&arr.ts?`<div class="sub">Arrived ${hm(arr.ts)} · trip ${dur(dep&&dep.ts,arr.ts)} · ${esc(arr.by||'')}${arr.loc?` · <a href="https://maps.google.com/?q=${arr.loc.lat},${arr.loc.lng}" target="_blank">arrival location</a>`:''}${lock('arrived',1)}</div>`:''}
     ${dep&&dep.ts?lock('departed',1):''}
@@ -736,18 +747,172 @@ function renderSession(el){
   const cv = $('rCsv'); if (cv) cv.onclick = ()=>downloadCsv(rp());
 }
 
-/* live location while the screen is open (checkpoints go to Firebase every ~30s) */
+/* live location: native background service when the Android plugin exists, else the browser (screen must stay open) */
+let nativeWatcher = null, trackSid = null;
 function startTracking(sid){
-  if (tracker || !navigator.geolocation) return;
-  let last = 0;
-  tracker = navigator.geolocation.watchPosition(p=>{
-    const now = Date.now(); if (now-last < 30000) return; last = now;
-    const pt = { lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6), ts:now };
-    db.ref(P+'sessions/'+sid+'/trackLast').set(pt); db.ref(P+'trips/'+sid).push(pt);
-  }, ()=>{}, {enableHighAccuracy:true, maximumAge:10000});
-  toast('Sharing live location');
+  if (tracker) return;
+  const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
+  let last = 0; trackSid = sid;
+  const post = (lat,lng) => { const now = Date.now(); if (now-last < 30000) return; last = now;
+    const pt = { lat:+lat.toFixed(6), lng:+lng.toFixed(6), ts:now, bg:!!BG };
+    db.ref(P+'sessions/'+sid+'/trackLast').set(pt); db.ref(P+'trips/'+sid).push(pt); };
+  if (BG && BG.addWatcher){
+    tracker = 'native';
+    BG.addWatcher({ backgroundTitle:'Trip in progress', backgroundMessage:'OneByte is sharing this trip with the kitchen team', requestPermissions:true, stale:false, distanceFilter:25 },
+      (loc, err) => { if (err){ if (err.code==='NOT_AUTHORIZED' && BG.openSettings) BG.openSettings(); return; } post(loc.latitude, loc.longitude); })
+      .then(id => { nativeWatcher = id; });
+    toast('Live tracking on (works with screen off)'); return;
+  }
+  if (!navigator.geolocation) return;
+  tracker = navigator.geolocation.watchPosition(p=>post(p.coords.latitude, p.coords.longitude), ()=>{}, {enableHighAccuracy:true, maximumAge:10000});
+  toast('Sharing live location (keep this screen open)');
 }
-function stopTracking(){ if (tracker!=null && navigator.geolocation){ navigator.geolocation.clearWatch(tracker); } tracker = null; }
+function stopTracking(){
+  if (tracker==='native'){ const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation; if (BG && nativeWatcher!=null) BG.removeWatcher({id:nativeWatcher}); nativeWatcher = null; }
+  else if (tracker!=null && navigator.geolocation){ navigator.geolocation.clearWatch(tracker); }
+  tracker = null; trackSid = null;
+}
+/* a driver who re-opens the app during a trip gets tracking switched back on automatically */
+function resumeTracking(){
+  if (!me || me.role!=='driver' || tracker) return;
+  const t = todayKey();
+  const e = Object.entries(sessions).find(([,x])=>x.date===t && T(x,'departed') && !T(x,'arrived') && (!x.driver || x.driver===me.name));
+  if (e) startTracking(e[0]);
+}
+const lateMin = (date, hhmm, ts) => { if (!hhmm || !ts) return null; return Math.round((ts - new Date(date+'T'+hhmm+':00').getTime())/60000); };
+/* vehicles currently on the road, with alerts */
+function onRoad(){
+  const t = todayKey(), now = Date.now(), stale = settings.staleMin||10, maxM = settings.tripMaxMin||90;
+  return Object.entries(sessions).filter(([,x])=>x.date===t && T(x,'departed') && !T(x,'arrived')).map(([sid,x])=>{
+    const dep = T(x,'departed').ts, en = Math.round((now-dep)/60000), ping = x.trackLast ? Math.round((now-x.trackLast.ts)/60000) : null;
+    const alerts = [];
+    if ((ping==null && en>stale) || (ping!=null && ping>stale)) alerts.push(ping==null ? 'No GPS signal received' : 'No GPS for '+ping+' min');
+    if (en>maxM) alerts.push('Trip longer than '+maxM+' min');
+    return { sid, x, en, ping, alerts, site:(sites[x.siteId]||{}).name||x.siteId };
+  });
+}
+function roadHtml(){
+  const r = onRoad(); if (!r.length) return '';
+  return `<h2>🚚 Vehicles on the road</h2>` + r.map(v=>`<div class="card" data-trip="${v.sid}" style="cursor:pointer;${v.alerts.length?'border-color:#EBB9B2;background:#FDF3F1':''}">
+    <div class="row"><div class="grow"><b>${esc(v.site)} — ${esc(v.x.meal)}</b><div class="sub">${esc(v.x.vehicle||'vehicle ?')} · ${esc(v.x.driver||'driver ?')} · left ${hm(T(v.x,'departed').ts)} · ${v.en} min on the road</div></div>
+    <div style="text-align:right;font-size:12px">${v.x.trackLast?`<a href="https://maps.google.com/?q=${v.x.trackLast.lat},${v.x.trackLast.lng}" target="_blank" onclick="event.stopPropagation()">📍 map</a><div class="sub" style="margin:0">${v.ping} min ago</div>`:'<span class="sub">no GPS yet</span>'}</div></div>
+    ${v.alerts.map(a=>`<div style="color:var(--red);font-size:12.5px;font-weight:700;margin-top:5px">⚠ ${esc(a)}</div>`).join('')}</div>`).join('');
+}
+setInterval(()=>{ if (me){ try{ if (can('home')) renderHome(); if (can('meals') && !openSid) renderMeals(); }catch(e){} } }, 60000);
+
+/* ============ PLAN (tomorrow's menu & quantities, kitchen requirement) ============ */
+const keyOf = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function tomorrowKey(){ const d = new Date(); d.setDate(d.getDate()+1); return keyOf(d); }
+let planSt = { date: tomorrowKey(), site:'', meal:'' }, planOv = {};
+const roundQty = (v,unit) => unit==='nos' ? Math.ceil(v/5)*5 : Math.ceil(v*2)/2;
+const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0;
+
+function suggestFor(siteId, meal, dateKey){
+  const w = new Date(dateKey+'T00:00:00').getDay();
+  const nSamp = settings.samples || 6, buf = (settings.buffer!=null ? settings.buffer : 5)/100;
+  const hist = Object.values(sessions).filter(x=>x.siteId===siteId && x.meal===meal && x.date && x.date<dateKey && x.close);
+  const desc = (a,b) => b.date.localeCompare(a.date);
+  const same = hist.filter(x=>new Date(x.date+'T00:00:00').getDay()===w).sort(desc).slice(0,nSamp);
+  const use = same.length ? same : hist.slice().sort(desc).slice(0,nSamp);
+  const per = {};
+  use.forEach(x=>{ const calc = sessionCalc(x);
+    Object.entries(calc).forEach(([id,k])=>{ if (!items[id] || !x.close[id]) return; const o = (per[id] = per[id]||{sold:[],waste:[],loaded:[],dates:[]}); o.sold.push(k.sold); o.waste.push(k.waste); o.loaded.push(k.loaded); o.dates.push(x.date); }); });
+  const dishes = Object.entries(per).filter(([,o])=>o.sold.length/use.length >= 0.5).map(([id,o])=>{
+    const a = avg(o.sold); const it = items[id];
+    const trend = o.sold.length>=4 ? (()=>{ const r = avg(o.sold.slice(0,2)), p = avg(o.sold.slice(2)); return p>0 ? (r-p)/p*100 : 0; })() : null;
+    const lw = sum0(o.loaded), wp = lw>0 ? sum0(o.waste)/lw*100 : 0;
+    return { id, avg:a, sug: roundQty(a*(1+buf), it.unit), n:o.sold.length, trend, wastePct:wp };
+  }).sort((a,b)=>b.avg-a.avg);
+  return { dishes, n:use.length, basis: same.length ? 'same weekday' : (use.length?'all days (no '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][w]+' history yet)':'') };
+}
+const sum0 = a => a.reduce((x,y)=>x+y,0);
+
+function planModel(){
+  const rows = [];   // {siteId, meal, label, sug, dishes:[{...,qty}]}
+  visibleSites().forEach(([siteId,site])=>{
+    MEALS.filter(m=>(site.meals||[]).includes(m) && (!planSt.site||planSt.site===siteId) && (!planSt.meal||planSt.meal===m)).forEach(meal=>{
+      const sg = suggestFor(siteId, meal, planSt.date);
+      const dishes = sg.dishes.map(d=>({ ...d, qty: planOv[siteId+'|'+meal+'|'+d.id] != null ? planOv[siteId+'|'+meal+'|'+d.id] : d.sug }));
+      rows.push({ siteId, meal, label: site.name+' — '+meal, sg, dishes });
+    });
+  });
+  // raw-material requirement
+  const need = {}, missing = new Set();
+  rows.forEach(r=>r.dishes.forEach(d=>{ const rc = recipes[d.id]; if (!rc || !rc.lines || !Object.keys(rc.lines).length){ if (d.qty>0) missing.add(items[d.id].name); return; }
+    Object.entries(rc.lines).forEach(([raw,q])=>{ if (items[raw]) need[raw] = (need[raw]||0) + q*d.qty; }); }));
+  const req = Object.entries(need).map(([id,n])=>({ id, item:items[id], need:n, stock:stockOf(id), buy:Math.max(0, n-stockOf(id)) })).sort((a,b)=>b.buy-a.buy||a.item.name.localeCompare(b.item.name));
+  return { rows, req, missing:[...missing] };
+}
+
+function planReport(m){
+  const wd = new Date(planSt.date+'T00:00:00').toLocaleDateString([], {weekday:'long', day:'numeric', month:'short'});
+  const sections = m.rows.map(r=>({ h:r.label, cols:['Dish','Make','Unit','Avg sold','Based on'], rows:r.dishes.filter(d=>d.qty>0).map(d=>[items[d.id].name, fmt(d.qty), items[d.id].unit, fmt1(d.avg), d.n+' meals']),
+    note:'No history yet.', line:x=>'• '+x[0]+': *'+x[1]+' '+x[2]+'*  (avg sold '+x[3]+')' }));
+  sections.push({ h:'Raw material needed (from recipes)', cols:['Item','Need','In stock','To buy','Unit'], rows:m.req.map(q=>[q.item.name, fmt1(q.need), fmt1(q.stock), q.buy>0?fmt1(q.buy):'OK', q.item.unit]),
+    note:'No recipes set up yet — add them in Masters → Recipes.', line:x=>'• '+x[0]+': need '+x[1]+' '+x[4]+' | stock '+x[2]+' | '+(x[3]==='OK'?'OK':'*BUY '+x[3]+'*') });
+  if (m.missing.length) sections.push({ h:'Recipe missing for', cols:['Dish'], rows:m.missing.map(n=>[n]), line:x=>'• '+x[0] });
+  const L = ['*OneByte Production — Plan for '+wd+'*'];
+  sections.forEach(sec=>{ L.push('', '*'+sec.h+'*'); if (!sec.rows.length) L.push('_'+(sec.note||'—')+'_'); else sec.rows.forEach(r=>L.push(sec.line(r))); });
+  L.push('', '_Suggested from past sales + '+(settings.buffer!=null?settings.buffer:5)+'% buffer · Internal — Kalyana Sapadu Production Unit_');
+  return { title:'Production plan', period:planSt.date, filt:'', sections, text:L.join('\n') };
+}
+
+function renderPlan(){
+  const el = $('p-plan');
+  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  const m = planModel();
+  const o = (arr,s)=>arr.map(([v,l])=>`<option value="${esc(v)}" ${v===s?'selected':''}>${esc(l)}</option>`).join('');
+  const wdName = new Date(planSt.date+'T00:00:00').toLocaleDateString([], {weekday:'long'});
+  el.innerHTML = `
+    <div class="card"><div class="two"><div><label>Plan for</label><input type="date" id="pl_date" value="${planSt.date}"></div><div><label>Day</label><div style="padding:11px 0;font-weight:700">${wdName}</div></div></div>
+      <div class="two"><div><label>Counter</label><select id="pl_site">${o([['','All counters']].concat(visibleSites().map(([k,s])=>[k,s.name])), planSt.site)}</select></div>
+      <div><label>Meal</label><select id="pl_meal">${o([['','All meals']].concat(MEALS.map(x=>[x,x])), planSt.meal)}</select></div></div></div>
+    ${m.rows.map((r,ri)=>`<div class="card"><div class="row"><b class="grow">${MEAL_ICON[r.meal]} ${esc(r.label)}</b>${canStep('prod')&&r.dishes.length?`<button class="btn sec" data-apply="${ri}" style="padding:7px 12px;font-size:12.5px">Apply to meal sheet</button>`:''}</div>
+      ${r.dishes.length ? `<div class="sub" style="margin:4px 0 8px">Based on ${r.sg.n} past meal${r.sg.n>1?'s':''} (${esc(r.sg.basis)}) + ${settings.buffer!=null?settings.buffer:5}% buffer. Edit a quantity to override.</div>`+
+        r.dishes.map(d=>{ const it = items[d.id]; return `<div class="row" style="margin-bottom:8px"><div class="grow"><b>${esc(it.name)}</b><div class="sub">avg sold ${fmt1(d.avg)} ${esc(it.unit)}${d.trend!=null&&Math.abs(d.trend)>=0.5?` · <span style="color:${d.trend>=0?'var(--green)':'var(--red)'}">${d.trend>=0?'▲':'▼'} ${fmt1(Math.abs(d.trend))}% lately</span>`:''}${d.wastePct>5?' · wastes '+fmt1(d.wastePct)+'%':''}</div></div>
+          <input class="plq" data-k="${r.siteId}|${r.meal}|${d.id}" type="number" inputmode="decimal" step="any" value="${d.qty}" style="width:84px"><span class="sub" style="margin:0">${esc(it.unit)}</span></div>`; }).join('')
+        : '<div class="sub" style="margin-top:6px">No history for this counter and meal yet. Suggestions start once meals are closed with sales recorded.</div>'}</div>`).join('') || '<div class="empty">No counters set up yet.</div>'}
+    <h2>Raw material needed</h2>
+    ${m.req.length ? `<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:8px">Item</th><th style="text-align:right;padding:8px">Need</th><th style="text-align:right;padding:8px">Stock</th><th style="text-align:right;padding:8px">To buy</th></tr></thead><tbody>${m.req.map(q=>`<tr><td style="padding:7px 8px;border-top:1px solid var(--line)">${esc(q.item.name)}${q.item.ta?`<div class="sub" style="margin:0">${esc(q.item.ta)}</div>`:''}</td><td style="text-align:right;padding:7px 8px;border-top:1px solid var(--line)">${fmt1(q.need)} ${esc(q.item.unit)}</td><td style="text-align:right;padding:7px 8px;border-top:1px solid var(--line)">${fmt1(q.stock)}</td><td style="text-align:right;padding:7px 8px;border-top:1px solid var(--line);font-weight:700;color:${q.buy>0?'var(--red)':'var(--green)'}">${q.buy>0?fmt1(q.buy):'OK'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="soon">Needs recipes — add how much of each raw material goes into 1 kg / 1 L / 1 piece of each dish in Masters → Recipes.</div>'}
+    ${m.missing.length ? `<div class="notice note" style="margin-top:8px">📝 <div>No recipe yet for: ${m.missing.map(esc).join(', ')}</div></div>` : ''}
+    <div class="two" style="margin-top:10px"><button class="btn" id="pl_wa">Send plan on WhatsApp</button><button class="btn sec" id="pl_copy">Copy</button></div>
+    <div class="two" style="margin-top:8px"><button class="btn sec" id="pl_csv">Export CSV</button>${can('issue')&&m.req.length?`<button class="btn sec" id="pl_issue">Fill Daily Issue</button>`:'<span></span>'}</div>
+    <div class="sub" style="margin-top:8px">Quantities are rule-based: average of what sold on the same weekday recently (up to ${settings.samples||6} meals) plus a safety buffer. Set the buffer under Masters → Settings.</div>`;
+  $('pl_date').onchange = ()=>{ if ($('pl_date').value){ planSt.date = $('pl_date').value; renderPlan(); } };
+  $('pl_site').onchange = ()=>{ planSt.site = $('pl_site').value; renderPlan(); };
+  $('pl_meal').onchange = ()=>{ planSt.meal = $('pl_meal').value; renderPlan(); };
+  el.querySelectorAll('.plq').forEach(i=>i.onchange = ()=>{ const v = num(i.value); planOv[i.dataset.k] = v>=0 ? v : 0; renderPlan(); });
+  el.querySelectorAll('[data-apply]').forEach(b=>b.onclick = ()=>{
+    const r = m.rows[+b.dataset.apply], sid = sidOf(planSt.date, r.siteId, r.meal), ups = { date:planSt.date, siteId:r.siteId, meal:r.meal };
+    r.dishes.filter(d=>d.qty>0).forEach(d=>{ ups['items/'+d.id+'/planned'] = d.qty; if (!((sessions[sid]||{}).items||{})[d.id]) ups['items/'+d.id+'/prepared'] = 0; });
+    db.ref(P+'sessions/'+sid).update(ups).then(()=>toast('Planned quantities added to the meal sheet'));
+  });
+  $('pl_wa').onclick = ()=>{ const t = planReport(planModel()).text; const url='https://wa.me/?text='+encodeURIComponent(t); const x=window.open(url,'_blank'); if(!x) location.href=url; };
+  $('pl_copy').onclick = ()=>copyText(planReport(planModel()).text);
+  $('pl_csv').onclick = ()=>{ const r = planReport(planModel()); rep.from = planSt.date; downloadCsv(r); };
+  const pi = $('pl_issue'); if (pi) pi.onclick = ()=>{ issueRows = m.req.map(q=>({ itemId:q.id, qty:String(Math.round(q.need*1000)/1000) })); issueFor=''; issueNote='Plan for '+planSt.date; go('issue'); };
+}
+
+/* ---- recipes master: raw material per 1 unit of each cooked dish ---- */
+let recEdit = null;
+function mRecipes(){
+  const foods = Object.entries(items).filter(([,i])=>i.type==='food' && i.active!==false).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  $('mBody').innerHTML = `<div class="sub" style="margin-bottom:10px">For each dish, enter how much of each raw material goes into <b>1 kg / 1 L / 1 piece</b> of finished food. The Plan tab then works out the kitchen's raw material requirement.</div><div id="mf"></div>` +
+    (foods.length ? foods.map(([id,i])=>{ const n = Object.keys((recipes[id]||{}).lines||{}).length; return `<div class="card row"><div class="grow"><b>${esc(i.name)}</b><div class="sub">per 1 ${esc(i.unit)} · ${n?n+' ingredients':'no recipe yet'}</div></div><button class="btn sec" data-r="${id}" style="padding:7px 12px">${n?'Edit':'Add'}</button></div>`; }).join('') : '<div class="empty">Import the starter items first.</div>');
+  $('mBody').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ recEdit = { id:b.dataset.r, lines:Object.entries(((recipes[b.dataset.r]||{}).lines)||{}).map(([raw,q])=>({raw,qty:q})) }; if (!recEdit.lines.length) recEdit.lines.push({raw:'',qty:''}); recForm(); window.scrollTo(0,0); });
+}
+function recForm(){
+  const it = items[recEdit.id], raws = Object.entries(items).filter(([,i])=>i.type==='raw' && i.active!==false).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  $('mf').innerHTML = `<div class="card"><b>Recipe — ${esc(it.name)} <span class="sub" style="display:inline">(per 1 ${esc(it.unit)})</span></b>
+    ${recEdit.lines.map((l,n)=>`<div class="row" style="margin-top:8px"><select class="grow rr" data-n="${n}"><option value="">Raw material…</option>${raws.map(([k,i])=>`<option value="${k}" ${k===l.raw?'selected':''}>${esc(i.name)} (${esc(i.unit)})</option>`).join('')}</select>
+      <input class="rq" data-n="${n}" type="number" inputmode="decimal" step="any" value="${l.qty}" placeholder="qty" style="width:90px"><button class="btn danger" data-rm="${n}" style="padding:8px 10px">✕</button></div>`).join('')}
+    <button class="btn sec save" id="rAdd">+ Add ingredient</button><button class="btn save" id="rSave">Save recipe</button></div>`;
+  const grab = () => { document.querySelectorAll('.rr').forEach(s=>recEdit.lines[+s.dataset.n].raw = s.value); document.querySelectorAll('.rq').forEach(s=>recEdit.lines[+s.dataset.n].qty = s.value); };
+  $('rAdd').onclick = ()=>{ grab(); recEdit.lines.push({raw:'',qty:''}); recForm(); };
+  document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{ grab(); recEdit.lines.splice(+b.dataset.rm,1); if(!recEdit.lines.length) recEdit.lines.push({raw:'',qty:''}); recForm(); });
+  $('rSave').onclick = ()=>{ grab(); const lines = {}; for (const l of recEdit.lines){ if (!l.raw && l.qty==='') continue; const q = num(l.qty); if (!l.raw || !(q>0)){ alert('Each ingredient needs a raw material and a quantity above 0.'); return; } lines[l.raw] = (lines[l.raw]||0)+q; }
+    db.ref(P+'recipes/'+recEdit.id).set(Object.keys(lines).length ? { lines } : null).then(()=>{ toast('Recipe saved'); $('mf').innerHTML=''; recEdit=null; }); };
+}
 
 /* ============ REPORTS ============ */
 const REPORT_TYPES = [['master','Daily master (lifecycle)'],['meals','Meal sheets — per meal / day / week'],['stock','Stock & usage'],['purchase','Purchases'],['issue','Kitchen issue']];
@@ -764,10 +929,11 @@ function mealSections(R){
     .sort((a,b)=>a.date.localeCompare(b.date)||String(a.siteId).localeCompare(String(b.siteId))||order(a.meal)-order(b.meal));
   const sn = x => (sites[x.siteId]||{name:x.siteId}).name;
   const qcs = q => q&&q.ts ? (q.ok?'Pass':'FAIL') : '—';
+  const hmL = (x,k,pk)=>{ const t = T(x,k)&&T(x,k).ts; if (!t) return '—'; const sc = (((sites[x.siteId]||{}).sched||{})[x.meal]||{})[pk]; const l = sc ? lateMin(x.date, sc, t) : null; return hm(t)+(l>0?' (+'+l+'m late)':''); };
   const pend = (h)=>({ h, cols:[], rows:[], note:'No meal sheets recorded for this period / filter yet.' });
   if (!list.length) return [pend('Meal timeline'), pend('Dish-wise production, sales & wastage')];
   const timeline = { h:'Meal timeline', cols:['Date','Counter','Meal','Cooked','QC','Packed','Loaded','Departed','Arrived','Trip','Arr. QC','At counter','Closed'],
-    rows:list.map(x=>[x.date, sn(x), x.meal, hm(T(x,'prodDone')&&T(x,'prodDone').ts), qcs(x.qc1), hm(T(x,'packed')&&T(x,'packed').ts), hm(T(x,'loaded')&&T(x,'loaded').ts), hm(T(x,'departed')&&T(x,'departed').ts), hm(T(x,'arrived')&&T(x,'arrived').ts), dur(T(x,'departed')&&T(x,'departed').ts, T(x,'arrived')&&T(x,'arrived').ts), qcs(x.qc2), hm(T(x,'counterLoaded')&&T(x,'counterLoaded').ts), hm(T(x,'closed')&&T(x,'closed').ts)]),
+    rows:list.map(x=>[x.date, sn(x), x.meal, hm(T(x,'prodDone')&&T(x,'prodDone').ts), qcs(x.qc1), hm(T(x,'packed')&&T(x,'packed').ts), hm(T(x,'loaded')&&T(x,'loaded').ts), hmL(x,'departed','depart'), hmL(x,'arrived','arrive'), dur(T(x,'departed')&&T(x,'departed').ts, T(x,'arrived')&&T(x,'arrived').ts), qcs(x.qc2), hm(T(x,'counterLoaded')&&T(x,'counterLoaded').ts), hm(T(x,'closed')&&T(x,'closed').ts)]),
     line:r=>'• '+r[1]+' '+r[2]+(r[0]!==R.from||R.from!==R.to?' ('+r[0]+')':'')+': cooked '+r[3]+' · QC '+r[4]+' · packed '+r[5]+' · loaded '+r[6]+' · departed '+r[7]+' · arrived '+r[8]+(r[9]!=='—'?' ('+r[9]+')':'')+' · arrival QC '+r[10]+' · at counter '+r[11]+' · closed '+r[12] };
   const vtxt = v => v==null ? '—' : Math.abs(v)<0.0005 ? '0' : v>0 ? fmt(v)+' short' : fmt(-v)+' excess';
   const dishRows = [], tot = {}, daily = {}, waste = {};
@@ -1063,10 +1229,10 @@ function renderMasters(){
   const el = $('p-masters');
   if (el.querySelector('input:focus, select:focus')) return;
   el.innerHTML = `
-    <div class="chips">${[['items','Items'],['sites','Counters'],['basins','Basins'],['settings','Settings']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
+    <div class="chips">${[['items','Items'],['recipes','Recipes'],['sites','Counters'],['basins','Basins'],['settings','Settings']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
     <div id="mBody"></div>`;
   el.querySelectorAll('[data-m]').forEach(c=>c.onclick=()=>{ mTab=c.dataset.m; renderMasters(); });
-  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else if (mTab==='basins') mBasins(); else mSettings();
+  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else if (mTab==='basins') mBasins(); else if (mTab==='recipes') mRecipes(); else mSettings();
 }
 function formShell(title, body, saveId){
   return `<div class="card" id="mForm"><b>${title}</b>${body}<button class="btn save" id="${saveId}">Save</button></div>`;
@@ -1131,14 +1297,18 @@ function siteForm(id){
     <label>Counter name</label><input id="s_name" value="${esc(s.name)}" placeholder="e.g. Teleperformance">
     <label>Company / site note</label><input id="s_co" value="${esc(s.company||'')}" placeholder="optional">
     <label>Meals served</label>
-    <div class="chips">${MEALS.map(x=>`<label style="margin:0"><input type="checkbox" class="s_meal" value="${x}" ${m.includes(x)?'checked':''} style="width:auto;margin-right:5px;">${x}</label>`).join('')}</div>`, 's_save');
+    <div class="chips">${MEALS.map(x=>`<label style="margin:0"><input type="checkbox" class="s_meal" value="${x}" ${m.includes(x)?'checked':''} style="width:auto;margin-right:5px;">${x}</label>`).join('')}</div>
+    <label>Planned schedule (optional — late trips get flagged)</label>
+    ${MEALS.map(x=>{ const sc = ((s.sched||{})[x])||{}; return `<div class="row" style="margin-bottom:6px"><div style="width:78px;font-size:13px">${MEAL_ICON[x]} ${x}</div><input type="time" class="s_dep" data-m="${x}" value="${esc(sc.depart||'')}" title="leave kitchen"><input type="time" class="s_arr" data-m="${x}" value="${esc(sc.arrive||'')}" title="arrive at site"></div>`; }).join('')}
+    <div class="sub">Left box: leaves kitchen by · Right box: reaches the counter by</div>`, 's_save');
   $('s_save').onclick = ()=>{
     const name = $('s_name').value.trim(); if (!name){ alert('Enter a counter name.'); return; }
     const meals = [...document.querySelectorAll('.s_meal:checked')].map(x=>x.value);
     if (!meals.length){ alert('Pick at least one meal.'); return; }
     const key = id || name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
     if (!id && sites[key]){ alert('This counter already exists.'); return; }
-    db.ref(P+'sites/'+key).update({ name, company:$('s_co').value.trim(), meals }).then(()=>{ toast('Saved'); $('mf').innerHTML=''; });
+    const sched = {}; MEALS.forEach(x=>{ const dp = document.querySelector('.s_dep[data-m="'+x+'"]').value, ar = document.querySelector('.s_arr[data-m="'+x+'"]').value; if (meals.includes(x) && (dp||ar)) sched[x] = { depart:dp||null, arrive:ar||null }; });
+    db.ref(P+'sites/'+key).update({ name, company:$('s_co').value.trim(), meals, sched:Object.keys(sched).length?sched:null }).then(()=>{ toast('Saved'); $('mf').innerHTML=''; });
   };
 }
 
@@ -1150,8 +1320,12 @@ function mSettings(){
     <div class="two"><div><label>Min. temp when leaving kitchen (°C)</label><input id="st_t1" type="number" value="${st.minTempDispatch||65}"></div>
     <div><label>Min. temp on arrival (°C)</label><input id="st_t2" type="number" value="${st.minTempArrival||60}"></div></div>
     <label>Acceptable variance (% of food loaded)</label><input id="st_tol" type="number" step="any" value="${st.tolerance||3}">
-    <div class="sub">Loaded − sold − leftover − wastage beyond this % is flagged as shortage/excess.</div>`, 'st_save');
-  $('st_save').onclick = ()=>db.ref(P+'settings').update({ reportEmails:$('st_mail').value.trim(), minTempDispatch:num($('st_t1').value)||65, minTempArrival:num($('st_t2').value)||60, tolerance:num($('st_tol').value)||3 }).then(()=>toast('Settings saved'));
+    <div class="sub">Loaded − sold − leftover − wastage beyond this % is flagged as shortage/excess.</div>
+    <div class="two"><div><label>Plan safety buffer (%)</label><input id="st_buf" type="number" step="any" value="${st.buffer!=null?st.buffer:5}"></div>
+    <div><label>Past meals used for plan</label><input id="st_smp" type="number" value="${st.samples||6}"></div></div>
+    <div class="two"><div><label>Alert if trip longer than (min)</label><input id="st_trip" type="number" value="${st.tripMaxMin||90}"></div>
+    <div><label>Alert if no GPS for (min)</label><input id="st_stale" type="number" value="${st.staleMin||10}"></div></div>`, 'st_save');
+  $('st_save').onclick = ()=>db.ref(P+'settings').update({ reportEmails:$('st_mail').value.trim(), minTempDispatch:num($('st_t1').value)||65, minTempArrival:num($('st_t2').value)||60, tolerance:num($('st_tol').value)||3, buffer:Math.max(0,num($('st_buf').value)||0), samples:Math.max(1,num($('st_smp').value)||6), tripMaxMin:num($('st_trip').value)||90, staleMin:num($('st_stale').value)||10 }).then(()=>toast('Settings saved'));
 }
 function mBasins(){
   const rows = Object.entries(basins);
