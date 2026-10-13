@@ -44,9 +44,19 @@ jobs:
               s=s.replace('</manifest>',perms+'</manifest>')
           open(p,'w').write(s)
           PY
-          npm install --no-save @capacitor/assets
-          mkdir -p assets && cp resources/icon.png assets/icon-only.png && cp resources/icon.png assets/icon-foreground.png && echo '#02764A' > /dev/null
-          npx capacitor-assets generate --android --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' || true
+          pip install pillow
+          python3 - <<'PY'
+          from PIL import Image
+          import os, shutil
+          res='android/app/src/main/res'
+          shutil.rmtree(res+'/mipmap-anydpi-v26', ignore_errors=True)
+          im=Image.open('resources/icon.png').convert('RGBA')
+          for d,sz in {'mdpi':48,'hdpi':72,'xhdpi':96,'xxhdpi':144,'xxxhdpi':192}.items():
+              os.makedirs(f'{res}/mipmap-{d}', exist_ok=True)
+              r=im.resize((sz,sz), Image.LANCZOS)
+              for n in ('ic_launcher.png','ic_launcher_round.png','ic_launcher_foreground.png'):
+                  r.save(f'{res}/mipmap-{d}/{n}')
+          PY
           npx cap sync android
       - name: Build debug APK
         working-directory: production-android/android
