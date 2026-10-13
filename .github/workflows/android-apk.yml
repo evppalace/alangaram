@@ -58,6 +58,12 @@ jobs:
                   r.save(f'{res}/mipmap-{d}/{n}')
           PY
           npx cap sync android
+      - name: Fixed signing key + version number
+        working-directory: production-android
+        run: |
+          mkdir -p ~/.android && cp debug.keystore ~/.android/debug.keystore
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          grep -n "versionCode" android/app/build.gradle
       - name: Build debug APK
         working-directory: production-android/android
         run: |
