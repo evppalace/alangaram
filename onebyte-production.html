@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B3D20">
+<title>OneByte Production</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --ink:#0F2A1B; --paper:#FAFAF7; --card:#FFFFFF;
+    --green:#1B6B34; --green-dark:#0B3D20; --orange:#F4791E;
+    --line:#E4E7E1; --muted:#7C8579; --red:#A23B2E; --amber:#B9822E; --amber-soft:#FBEFDD; --ok-soft:#E4F2E8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:'Segoe UI','Noto Sans',system-ui,sans-serif;}
+  #lock{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:24px;}
+  #lock h1{font-size:21px;margin:0;} #lock p{color:var(--muted);font-size:13.5px;margin:0;text-align:center;}
+  #pin{font-size:22px;letter-spacing:6px;text-align:center;padding:14px;width:220px;border:1.5px solid var(--line);border-radius:12px;outline:none;}
+  #pin:focus{border-color:var(--green);}
+  .btn{background:var(--green);color:#fff;border:none;padding:13px 28px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;}
+  .btn.sec{background:#fff;color:var(--ink);border:1.5px solid var(--line);}
+  .btn.danger{background:#fff;color:var(--red);border:1.5px solid var(--line);}
+  #pinErr{color:var(--red);font-size:13px;min-height:16px;}
+  #app{display:none;max-width:680px;margin:0 auto;padding-bottom:84px;}
+  header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:10;}
+  header .t{display:flex;flex-direction:column;line-height:1.2;} header .t b{font-size:16px;} header .t span{font-size:12px;color:var(--muted);}
+  header .out{margin-left:auto;background:none;border:none;color:var(--muted);text-decoration:underline;font-size:12.5px;cursor:pointer;}
+  .page{display:none;padding:14px 18px;} .page.active{display:block;}
+  nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid var(--line);z-index:20;padding-bottom:env(safe-area-inset-bottom);}
+  nav button{flex:1;border:none;background:none;padding:9px 2px;font-size:11px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;}
+  nav button .i{font-size:19px;} nav button.active{color:var(--green);font-weight:700;}
+  h2{font-size:15px;margin:18px 0 8px;} h2:first-child{margin-top:0;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:13px 14px;margin-bottom:10px;}
+  .row{display:flex;align-items:center;gap:10px;} .grow{flex:1;min-width:0;}
+  .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .qty{font-weight:800;font-size:17px;text-align:right;white-space:nowrap;} .qty small{font-weight:600;color:var(--muted);font-size:11px;}
+  .low{background:var(--amber-soft);border-color:#E9CFA0;} .low .qty{color:var(--amber);}
+  .neg .qty{color:var(--red);}
+  label{display:block;font-size:12.5px;font-weight:600;margin:10px 0 4px;}
+  input,select,textarea{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit;background:#fff;color:var(--ink);}
+  input:focus,select:focus{outline:none;border-color:var(--green);}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .save{width:100%;margin-top:14px;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px;}
+  .chip{padding:6px 12px;border-radius:99px;border:1.5px solid var(--line);font-size:12.5px;font-weight:600;color:var(--muted);background:#fff;cursor:pointer;}
+  .chip.active{background:var(--green);border-color:var(--green);color:#fff;}
+  .empty{text-align:center;color:var(--muted);font-size:13px;padding:22px 8px;}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:99px;background:var(--ok-soft);color:var(--green);margin-left:6px;vertical-align:middle;}
+  .actions{display:flex;gap:8px;margin-top:10px;} .actions button{flex:1;padding:8px;border-radius:9px;border:1.5px solid var(--line);background:#fff;font-weight:600;font-size:13px;cursor:pointer;}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:50;}
+  .toast.show{opacity:1;}
+  .soon{background:#fff;border:1.5px dashed var(--line);border-radius:13px;padding:16px;color:var(--muted);font-size:13px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+
+<div id="lock">
+  <h1>OneByte Production</h1>
+  <p>Kitchen &amp; supply system — enter your PIN</p>
+  <input id="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••">
+  <button class="btn" id="unlockBtn">Unlock</button>
+  <div id="pinErr"></div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="t"><b>OneByte Production</b><span id="who"></span></div>
+    <button class="out" id="lockBtn">Lock</button>
+  </header>
+
+  <div class="page" id="p-home"></div>
+  <div class="page" id="p-stock"></div>
+  <div class="page" id="p-purchase"></div>
+  <div class="page" id="p-masters"></div>
+  <div class="page" id="p-users"></div>
+</div>
+
+<nav id="nav" style="display:none;"></nav>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ CONFIG ============ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC2c1V3cYDX5Njc78BGvbr43caM089IuiE",
+  authDomain: "evp-crm.firebaseapp.com",
+  databaseURL: "https://evp-crm-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "evp-crm",
+  storageBucket: "evp-crm.firebasestorage.app",
+  messagingSenderId: "78324247402",
+  appId: "1:78324247402:web:f4060a2bf5b04baf411313"
+};
+const SETUP_PIN = "1234"; // works only until the first Admin user is created
+const P = 'prod_'; // all data of this module lives under prod_* in Firebase, separate from the old sales data
+
+const ROLES = {
+  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','masters','users'] },
+  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','stock','purchase','masters'] },
+  store:       { label:'Store Keeper',       desc:'Purchase & stock',              tabs:['home','stock','purchase'] },
+  kitchen:     { label:'Kitchen',            desc:'Issue & preparation',           tabs:['home','stock'] },
+  driver:      { label:'Driver',             desc:'Trips',                         tabs:['home'] },
+  supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter',tabs:['home'], site:true },
+  counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home'], site:true }
+};
+const NAV = { home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], masters:['⚙️','Masters'], users:['👥','Users'] };
+const UNITS = ['kg','g','L','ml','nos','pkt'];
+
+/* ============ HELPERS ============ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function num(v){ const n = parseFloat(v); return isFinite(n) ? n : NaN; }
+function fmt(n){ return (Math.round(n*1000)/1000).toString(); }
+function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+const store = (function(){ try{ localStorage.setItem('_t','1'); localStorage.removeItem('_t'); return localStorage; }catch(e){ return sessionStorage; } })();
+
+/* ============ STATE ============ */
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+let me = null;
+let users = {}, sites = {}, items = {}, basins = {}, ledger = {};
+let stockFilter = 'all', stockSearch = '';
+
+function can(tab){ return me && ROLES[me.role] && ROLES[me.role].tabs.includes(tab); }
+function isAdmin(){ return me && me.role==='admin'; }
+
+/* ============ LOGIN ============ */
+function login(){
+  const entered = $('pin').value.trim();
+  db.ref(P+'users').once('value').then(snap=>{
+    const u = snap.val() || {};
+    let m = null;
+    Object.entries(u).forEach(([id,x])=>{ if (x.pin===entered && ROLES[x.role]) m = Object.assign({id},x); });
+    if (!m && Object.keys(u).length===0 && entered===SETUP_PIN) m = { id:'setup', name:'Setup Admin', role:'admin', siteId:'all' };
+    if (m){ me = m; try{ store.setItem('prod_user', JSON.stringify(m)); }catch(e){} enter(); }
+    else { $('pinErr').textContent = 'Incorrect PIN'; $('pin').value=''; }
+  }).catch(()=>{ $('pinErr').textContent = 'No internet — try again'; });
+}
+function logout(){ try{ store.removeItem('prod_user'); }catch(e){} location.reload(); }
+$('unlockBtn').onclick = login;
+$('pin').addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
+$('lockBtn').onclick = logout;
+
+function enter(){
+  $('lock').style.display='none'; $('app').style.display='block'; $('nav').style.display='flex';
+  const r = ROLES[me.role];
+  $('who').textContent = me.name + ' · ' + r.label;
+  $('nav').innerHTML = r.tabs.map((t,i)=>`<button data-t="${t}" class="${i===0?'active':''}"><span class="i">${NAV[t][0]}</span>${NAV[t][1]}</button>`).join('');
+  $('nav').querySelectorAll('button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+  listen();
+  go(r.tabs[0]);
+  // revoked users get signed out on next open
+  if (me.id!=='setup') db.ref(P+'users/'+me.id).once('value').then(s=>{ if(!s.exists()){ toast('Login removed'); setTimeout(logout,800);} });
+}
+function go(t){
+  if (!can(t)) return;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  $('p-'+t).classList.add('active');
+  $('nav').querySelectorAll('button').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
+  renderAll();
+}
+const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
+if (saved && ROLES[saved.role]){ me = saved; enter(); }
+
+/* ============ LIVE DATA ============ */
+function listen(){
+  const bind = (path, assign) => db.ref(P+path).on('value', s=>{ assign(s.val()||{}); renderAll(); });
+  bind('users',  v=>users=v);
+  bind('sites',  v=>sites=v);
+  bind('items',  v=>items=v);
+  bind('basins', v=>basins=v);
+  db.ref(P+'ledger').limitToLast(3000).on('value', s=>{ ledger = s.val()||{}; renderAll(); });
+}
+function stockOf(itemId){
+  let t = 0; Object.values(ledger).forEach(e=>{ if (e.itemId===itemId) t += (e.qty||0); });
+  return t;
+}
+function renderAll(){
+  if (!me) return;
+  if (can('home'))     renderHome();
+  if (can('stock'))    renderStock();
+  if (can('purchase')) renderPurchase();
+  if (can('masters'))  renderMasters();
+  if (can('users'))    renderUsers();
+}
+
+/* ============ HOME ============ */
+function renderHome(){
+  const list = Object.entries(items).filter(([,i])=>i.active!==false);
+  const raw = list.filter(([,i])=>i.type==='raw');
+  const low = raw.filter(([id,i])=>i.minStock>0 && stockOf(id) <= i.minStock);
+  const t = todayKey();
+  const todays = Object.values(ledger).filter(e=>e.date===t && e.type==='purchase').length;
+  const siteList = Object.values(sites).map(s=>esc(s.name)).join(' · ') || 'No counters yet';
+  $('p-home').innerHTML = `
+    <h2>Today</h2>
+    <div class="two">
+      <div class="card"><div class="sub">Items below minimum</div><div class="qty" style="text-align:left;font-size:26px;${low.length?'color:var(--amber)':''}">${low.length}</div></div>
+      <div class="card"><div class="sub">Purchases today</div><div class="qty" style="text-align:left;font-size:26px;">${todays}</div></div>
+    </div>
+    <div class="card"><div class="sub">Counters</div><div style="font-weight:600;margin-top:2px;">${siteList}</div></div>
+    ${low.length ? `<h2>Re-order now</h2>` + low.map(([id,i])=>`<div class="card low row"><div class="grow"><b>${esc(i.name)}</b><div class="sub">Minimum ${fmt(i.minStock)} ${esc(i.unit)}</div></div><div class="qty">${fmt(stockOf(id))} <small>${esc(i.unit)}</small></div></div>`).join('') : ''}
+    <h2>Coming next</h2>
+    <div class="soon">Kitchen issue · Preparation &amp; QC · Dispatch &amp; vehicle tracking · Counter loading by weight · Wastage &amp; reconciliation · Daily requirement suggestions</div>`;
+}
+
+/* ============ STOCK ============ */
+function renderStock(){
+  const types = [['all','All'],['raw','Raw materials'],['food','Cooked food']];
+  const q = stockSearch.toLowerCase();
+  const rows = Object.entries(items)
+    .filter(([,i])=>i.active!==false && (stockFilter==='all'||i.type===stockFilter) && (!q || i.name.toLowerCase().includes(q)))
+    .sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  $('p-stock').innerHTML = `
+    <div class="chips">${types.map(([k,l])=>`<div class="chip ${stockFilter===k?'active':''}" data-f="${k}">${l}</div>`).join('')}</div>
+    <input id="stockSearch" placeholder="Search item…" value="${esc(stockSearch)}" style="margin-bottom:10px;">
+    ${rows.length ? rows.map(([id,i])=>{
+      const s = stockOf(id), low = i.type==='raw' && i.minStock>0 && s<=i.minStock, neg = s<0;
+      return `<div class="card row ${neg?'neg':low?'low':''}"><div class="grow"><b>${esc(i.name)}</b><div class="sub">${esc(i.category||'')}${low?' · below minimum':''}${neg?' · negative — check entries':''}</div></div><div class="qty">${fmt(s)} <small>${esc(i.unit)}</small></div></div>`;
+    }).join('') : `<div class="empty">No items yet. ${can('masters')?'Add them in Masters.':'Ask the Production Manager to add items.'}</div>`}
+    ${can('purchase') ? `<h2>Recent stock movements</h2>` + recentLedger() : ''}`;
+  $('p-stock').querySelectorAll('[data-f]').forEach(c=>c.onclick=()=>{ stockFilter=c.dataset.f; renderStock(); });
+  const ss = $('stockSearch'); ss.oninput = ()=>{ stockSearch=ss.value; const pos=ss.selectionStart; renderStock(); const n=$('stockSearch'); n.focus(); n.setSelectionRange(pos,pos); };
+}
+function recentLedger(){
+  const e = Object.entries(ledger).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0)).slice(0,15);
+  if (!e.length) return '<div class="empty">No movements yet.</div>';
+  return e.map(([,x])=>{
+    const it = items[x.itemId]||{name:'(deleted item)',unit:''};
+    const d = new Date(x.ts||0);
+    return `<div class="card row"><div class="grow"><b>${esc(it.name)}</b><div class="sub">${esc(x.type)}${x.supplier?' · '+esc(x.supplier):''} · ${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · ${esc(x.by||'')}</div></div><div class="qty" style="color:${x.qty<0?'var(--red)':'var(--green)'}">${x.qty>0?'+':''}${fmt(x.qty)} <small>${esc(it.unit)}</small></div></div>`;
+  }).join('');
+}
+
+/* ============ PURCHASE ============ */
+function renderPurchase(){
+  const raws = Object.entries(items).filter(([,i])=>i.active!==false && i.type==='raw').sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const el = $('p-purchase');
+  const keep = { item: el.querySelector('#pu_item') && el.querySelector('#pu_item').value };
+  if (el.querySelector('#pu_qty') && document.activeElement && el.contains(document.activeElement)) return; // don't wipe a form being typed in
+  el.innerHTML = `
+    <h2>Record purchase (goods received)</h2>
+    ${raws.length ? `<div class="card">
+      <label>Item</label>
+      <select id="pu_item">${raws.map(([id,i])=>`<option value="${id}">${esc(i.name)} (${esc(i.unit)})</option>`).join('')}</select>
+      <div class="two"><div><label>Quantity</label><input id="pu_qty" type="number" inputmode="decimal" step="any" placeholder="0"></div>
+      <div><label>Rate per unit ₹ (optional)</label><input id="pu_rate" type="number" inputmode="decimal" step="any" placeholder="0"></div></div>
+      <label>Supplier (optional)</label><input id="pu_sup" placeholder="e.g. Koyambedu vegetable vendor">
+      <label>Bill / note (optional)</label><input id="pu_note" placeholder="Bill no.">
+      <button class="btn save" id="pu_save">Add to stock</button>
+    </div>` : `<div class="empty">Add raw materials in Masters first.</div>`}
+    <h2>Stock correction</h2>
+    <div class="soon" style="text-align:left">Wrong count? Use <b>Stock → Adjust</b> (Admin / Production Manager) — it records who changed what, so nothing is silently edited.</div>
+    ${can('masters') && raws.length ? `<div class="card">
+      <label>Item</label><select id="ad_item">${raws.map(([id,i])=>`<option value="${id}">${esc(i.name)} — now ${fmt(stockOf(id))} ${esc(i.unit)}</option>`).join('')}</select>
+      <label>Actual quantity counted</label><input id="ad_qty" type="number" inputmode="decimal" step="any">
+      <label>Reason</label><input id="ad_note" placeholder="e.g. monthly count">
+      <button class="btn sec save" id="ad_save">Set to counted quantity</button></div>` : ''}`;
+  if (keep.item && el.querySelector('#pu_item')) el.querySelector('#pu_item').value = keep.item;
+  const ps = $('pu_save'); if (ps) ps.onclick = savePurchase;
+  const as = $('ad_save'); if (as) as.onclick = saveAdjust;
+}
+function addLedger(e){
+  e.ts = Date.now(); e.date = todayKey(); e.by = me.name; e.byId = me.id;
+  return db.ref(P+'ledger').push(e);
+}
+function savePurchase(){
+  const itemId = $('pu_item').value, qty = num($('pu_qty').value), rate = num($('pu_rate').value);
+  if (!(qty>0)) { alert('Enter a quantity greater than 0.'); return; }
+  addLedger({ itemId, type:'purchase', qty, rate: isFinite(rate)?rate:null, supplier:$('pu_sup').value.trim(), note:$('pu_note').value.trim() })
+    .then(()=>{ toast('Added to stock'); $('pu_qty').value=''; $('pu_rate').value=''; $('pu_note').value=''; });
+}
+function saveAdjust(){
+  const itemId = $('ad_item').value, counted = num($('ad_qty').value);
+  if (!(counted>=0)) { alert('Enter the counted quantity.'); return; }
+  const diff = counted - stockOf(itemId);
+  if (Math.abs(diff) < 0.0005) { toast('Already matches'); return; }
+  addLedger({ itemId, type:'adjust', qty:diff, note:$('ad_note').value.trim() || 'stock count' })
+    .then(()=>{ toast('Stock corrected'); $('ad_qty').value=''; });
+}
+
+/* ============ MASTERS ============ */
+let mTab = 'items';
+function renderMasters(){
+  const el = $('p-masters');
+  if (el.querySelector('input:focus, select:focus')) return;
+  el.innerHTML = `
+    <div class="chips">${[['items','Items'],['sites','Counters'],['basins','Basins']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
+    <div id="mBody"></div>`;
+  el.querySelectorAll('[data-m]').forEach(c=>c.onclick=()=>{ mTab=c.dataset.m; renderMasters(); });
+  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else mBasins();
+}
+function formShell(title, body, saveId){
+  return `<div class="card" id="mForm"><b>${title}</b>${body}<button class="btn save" id="${saveId}">Save</button></div>`;
+}
+function unitOpts(sel){ return UNITS.map(u=>`<option ${u===sel?'selected':''}>${u}</option>`).join(''); }
+
+function mItems(){
+  const rows = Object.entries(items).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  $('mBody').innerHTML = `<button class="btn save" id="addItem" style="margin:0 0 12px">+ Add item</button><div id="mf"></div>` +
+    (rows.length ? rows.map(([id,i])=>`<div class="card" style="${i.active===false?'opacity:.5':''}"><div class="row"><div class="grow"><b>${esc(i.name)}</b><span class="tag">${i.type==='raw'?'Raw':'Cooked'}</span><div class="sub">${esc(i.category||'')} · ${esc(i.unit)}${i.type==='raw'&&i.minStock?' · min '+fmt(i.minStock):''}</div></div></div>
+      <div class="actions"><button data-e="${id}">Edit</button><button data-t="${id}">${i.active===false?'Activate':'Hide'}</button></div></div>`).join('') : '<div class="empty">No items yet.</div>');
+  $('addItem').onclick = ()=>itemForm(null);
+  $('mBody').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>itemForm(b.dataset.e));
+  $('mBody').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>db.ref(P+'items/'+b.dataset.t+'/active').set(items[b.dataset.t].active===false));
+}
+function itemForm(id){
+  const i = id ? items[id] : { name:'', type:'raw', unit:'kg', category:'', minStock:0 };
+  $('mf').innerHTML = formShell(id?'Edit item':'New item', `
+    <label>Name</label><input id="i_name" value="${esc(i.name)}" placeholder="e.g. Ponni rice / Veg biryani">
+    <div class="two"><div><label>Type</label><select id="i_type"><option value="raw" ${i.type==='raw'?'selected':''}>Raw material</option><option value="food" ${i.type==='food'?'selected':''}>Cooked food</option></select></div>
+    <div><label>Unit</label><select id="i_unit">${unitOpts(i.unit)}</select></div></div>
+    <div class="two"><div><label>Category</label><input id="i_cat" value="${esc(i.category||'')}" placeholder="Rice / Veg / Dal / Oil…"></div>
+    <div><label>Minimum stock (raw only)</label><input id="i_min" type="number" inputmode="decimal" step="any" value="${i.minStock||0}"></div></div>`, 'i_save');
+  $('i_save').onclick = ()=>{
+    const name = $('i_name').value.trim(); if (!name){ alert('Enter a name.'); return; }
+    const dup = Object.entries(items).some(([k,x])=>k!==id && x.name.toLowerCase()===name.toLowerCase());
+    if (dup){ alert('An item with this name already exists.'); return; }
+    const rec = { name, type:$('i_type').value, unit:$('i_unit').value, category:$('i_cat').value.trim(), minStock:Math.max(0,num($('i_min').value)||0), active:true };
+    const ref = id ? db.ref(P+'items/'+id) : db.ref(P+'items').push();
+    ref.update(rec).then(()=>{ toast('Saved'); $('mf').innerHTML=''; });
+  };
+}
+
+function mSites(){
+  const rows = Object.entries(sites);
+  $('mBody').innerHTML = `<button class="btn save" id="addSite" style="margin:0 0 12px">+ Add counter</button><div id="mf"></div>` +
+    (rows.length ? rows.map(([id,s])=>`<div class="card"><b>${esc(s.name)}</b><div class="sub">Meals: ${(s.meals||[]).map(esc).join(', ')||'—'}${s.company?' · '+esc(s.company):''}</div>
+      <div class="actions"><button data-e="${id}">Edit</button></div></div>`).join('') : '<div class="empty">No counters yet. Add Teleperformance and HDFC.</div>');
+  $('addSite').onclick = ()=>siteForm(null);
+  $('mBody').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>siteForm(b.dataset.e));
+}
+function siteForm(id){
+  const s = id ? sites[id] : { name:'', company:'', meals:['breakfast','lunch','dinner'] };
+  const m = s.meals||[];
+  $('mf').innerHTML = formShell(id?'Edit counter':'New counter', `
+    <label>Counter name</label><input id="s_name" value="${esc(s.name)}" placeholder="e.g. Teleperformance">
+    <label>Company / site note</label><input id="s_co" value="${esc(s.company||'')}" placeholder="optional">
+    <label>Meals served</label>
+    <div class="chips">${['breakfast','lunch','dinner'].map(x=>`<label style="margin:0"><input type="checkbox" class="s_meal" value="${x}" ${m.includes(x)?'checked':''} style="width:auto;margin-right:5px;">${x}</label>`).join('')}</div>`, 's_save');
+  $('s_save').onclick = ()=>{
+    const name = $('s_name').value.trim(); if (!name){ alert('Enter a counter name.'); return; }
+    const meals = [...document.querySelectorAll('.s_meal:checked')].map(x=>x.value);
+    if (!meals.length){ alert('Pick at least one meal.'); return; }
+    const key = id || name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    if (!id && sites[key]){ alert('This counter already exists.'); return; }
+    db.ref(P+'sites/'+key).update({ name, company:$('s_co').value.trim(), meals }).then(()=>{ toast('Saved'); $('mf').innerHTML=''; });
+  };
+}
+
+function mBasins(){
+  const rows = Object.entries(basins);
+  $('mBody').innerHTML = `<div class="sub" style="margin-bottom:10px">Empty weight of each basin/container. The scale reading minus this gives the food weight.</div>
+    <button class="btn save" id="addBasin" style="margin:0 0 12px">+ Add basin</button><div id="mf"></div>` +
+    (rows.length ? rows.map(([id,b])=>`<div class="card row"><div class="grow"><b>${esc(b.name)}</b></div><div class="qty">${fmt(b.tare)} <small>kg empty</small></div></div>
+      <div class="actions" style="margin:-4px 0 10px"><button data-e="${id}">Edit</button><button class="danger" data-d="${id}">Delete</button></div>`).join('') : '<div class="empty">No basins yet.</div>');
+  $('addBasin').onclick = ()=>basinForm(null);
+  $('mBody').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>basinForm(b.dataset.e));
+  $('mBody').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{ if(confirm('Delete this basin?')) db.ref(P+'basins/'+b.dataset.d).remove(); });
+}
+function basinForm(id){
+  const b = id ? basins[id] : { name:'', tare:'' };
+  $('mf').innerHTML = formShell(id?'Edit basin':'New basin', `
+    <label>Name</label><input id="b_name" value="${esc(b.name)}" placeholder="e.g. Big steel basin #1">
+    <label>Empty weight (kg)</label><input id="b_tare" type="number" inputmode="decimal" step="any" value="${b.tare}" placeholder="e.g. 1.250">`, 'b_save');
+  $('b_save').onclick = ()=>{
+    const name = $('b_name').value.trim(), tare = num($('b_tare').value);
+    if (!name || !(tare>=0)){ alert('Enter a name and the empty weight.'); return; }
+    const ref = id ? db.ref(P+'basins/'+id) : db.ref(P+'basins').push();
+    ref.update({ name, tare }).then(()=>{ toast('Saved'); $('mf').innerHTML=''; });
+  };
+}
+
+/* ============ USERS (admin) ============ */
+function renderUsers(){
+  const el = $('p-users');
+  if (el.querySelector('input:focus, select:focus')) return;
+  const rows = Object.entries(users);
+  el.innerHTML = `<div class="sub" style="margin-bottom:10px">Each person gets their own PIN and role. Counter Staff and Site Supervisors are locked to one counter.</div>
+    <button class="btn save" id="addUser" style="margin:0 0 12px">+ Add user</button><div id="uf"></div>` +
+    (rows.length ? rows.map(([id,u])=>`<div class="card"><b>${esc(u.name)}</b><span class="tag">${esc((ROLES[u.role]||{}).label||u.role)}</span>
+      <div class="sub">${ROLES[u.role]&&ROLES[u.role].site ? esc((sites[u.siteId]||{}).name||'— no counter —') : 'All counters'} · PIN ${esc(u.pin)}</div>
+      <div class="actions"><button data-e="${id}">Edit</button><button class="danger" data-d="${id}">Delete</button></div></div>`).join('') : '<div class="empty">No users yet. Create your Admin first — then the setup PIN stops working.</div>');
+  $('addUser').onclick = ()=>userForm(null);
+  el.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>userForm(b.dataset.e));
+  el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{
+    const u = users[b.dataset.d];
+    if (u.role==='admin' && Object.values(users).filter(x=>x.role==='admin').length===1){ alert('You cannot delete the only Admin.'); return; }
+    if (confirm('Delete login for '+u.name+'?')) db.ref(P+'users/'+b.dataset.d).remove();
+  });
+}
+function userForm(id){
+  const u = id ? users[id] : { name:'', pin:'', role:'counter', siteId:'' };
+  $('uf').innerHTML = formShell(id?'Edit user':'New user', `
+    <label>Name</label><input id="u_name" value="${esc(u.name)}" placeholder="e.g. Ravi">
+    <label>PIN (4–6 digits, unique)</label><input id="u_pin" inputmode="numeric" value="${esc(u.pin)}">
+    <label>Role</label><select id="u_role">${Object.entries(ROLES).map(([k,r])=>`<option value="${k}" ${u.role===k?'selected':''}>${r.label} — ${r.desc}</option>`).join('')}</select>
+    <div id="u_siteWrap"><label>Counter</label><select id="u_site"><option value="">Select…</option>${Object.entries(sites).map(([k,s])=>`<option value="${k}" ${u.siteId===k?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`, 'u_save');
+  const sync = ()=>{ $('u_siteWrap').style.display = ROLES[$('u_role').value].site ? 'block' : 'none'; };
+  $('u_role').onchange = sync; sync();
+  $('u_save').onclick = ()=>{
+    const name = $('u_name').value.trim(), pin = $('u_pin').value.trim(), role = $('u_role').value;
+    const siteId = ROLES[role].site ? $('u_site').value : 'all';
+    if (!name){ alert('Enter a name.'); return; }
+    if (!/^\d{4,6}$/.test(pin)){ alert('PIN must be 4–6 digits.'); return; }
+    if (ROLES[role].site && !siteId){ alert('Pick a counter for this role.'); return; }
+    if (Object.entries(users).some(([k,x])=>x.pin===pin && k!==id)){ alert('That PIN is already used.'); return; }
+    const ref = id ? db.ref(P+'users/'+id) : db.ref(P+'users').push();
+    ref.set({ name, pin, role, siteId }).then(()=>{
+      toast('Saved'); $('uf').innerHTML='';
+      if (me.id==='setup' && role==='admin') toast('Admin created — setup PIN is now disabled');
+    });
+  };
+}
+</script>
+</body>
+</html>
