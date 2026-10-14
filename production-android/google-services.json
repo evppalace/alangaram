@@ -1,0 +1,98 @@
+{
+  "project_info": {
+    "project_number": "78324247402",
+    "firebase_url": "https://evp-crm-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "evp-crm",
+    "storage_bucket": "evp-crm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:78324247402:android:f0824bbc8de2a2cb411313",
+        "android_client_info": {
+          "package_name": "com.evp.onebyte.production"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "78324247402-ov2982i64p7scf4d0povt3sbaq92maqc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAj6X5AGBDm4wK5fKabhyZ4QiKyYJOYo-U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "78324247402-ov2982i64p7scf4d0povt3sbaq92maqc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:78324247402:android:98aa127a651abc82411313",
+        "android_client_info": {
+          "package_name": "com.onebyte.business"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "78324247402-ov2982i64p7scf4d0povt3sbaq92maqc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAj6X5AGBDm4wK5fKabhyZ4QiKyYJOYo-U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "78324247402-ov2982i64p7scf4d0povt3sbaq92maqc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:78324247402:android:d5301b14ac44d157411313",
+        "android_client_info": {
+          "package_name": "com.onebyte.customer"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "78324247402-ov2982i64p7scf4d0povt3sbaq92maqc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAj6X5AGBDm4wK5fKabhyZ4QiKyYJOYo-U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "78324247402-ov2982i64p7scf4d0povt3sbaq92maqc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
