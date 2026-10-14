@@ -87,6 +87,15 @@
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style id="v2">
+#alarmBox{position:fixed;inset:0;z-index:99998;background:rgba(120,10,10,.72);display:none;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(3px)}
+#alarmBox.show{display:flex;animation:abFlash 1s infinite}
+@keyframes abFlash{0%,100%{background:rgba(120,10,10,.72)}50%{background:rgba(200,40,20,.82)}}
+#alarmBox .ab-card{background:#fff;color:#1a1a1a;border-radius:20px;padding:18px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#alarmBox .ab-ic{font-size:44px;text-align:center;animation:abShake .5s infinite}
+@keyframes abShake{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
+#alarmBox h3{margin:4px 0 10px;text-align:center;color:#b3261e}
+#alarmBox .ab-row{padding:8px 0;border-top:1px solid #eee;font-size:14px}
+
 /* ===== v2 modern theme ===== */
 :root{
   --brand:#04704a; --brand-dark:#023a27; --accent:#ff8a1f; --accent2:#ffb703; --teal:#0aa88f; --violet:#6c5ce7;
@@ -364,6 +373,7 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
   <div class="page" id="p-plan"></div>
   <div class="page" id="p-reports"></div>
   <div class="page" id="p-dishes"></div>
+  <div class="page" id="p-prod"></div>
   <div class="page" id="p-agrep"></div>
   <div class="page" id="p-trends"></div>
   <div class="page" id="p-masters"></div>
@@ -397,16 +407,17 @@ const SETUP_PIN = "1234"; // works only until the first Admin user is created
 const P = 'prod_'; // all data of this module lives under prod_* in Firebase, separate from the old sales data
 
 const ROLES = {
-  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','plan','meals','dishes','client','reports','trends','masters','users'] },
-  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','stock','purchase','issue','plan','meals','dishes','client','masters'] },
-  store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','stock','purchase','issue','plan'] },
-  kitchen:     { label:'Kitchen',            desc:'Daily issue & stock',         tabs:['home','stock','issue','plan','meals','dishes'] },
+  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','prod','plan','meals','dishes','client','reports','trends','masters','users'] },
+  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','prod','plan','issue','meals','stock','purchase','dishes','client','masters'] },
+  store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','issue','stock','purchase','prod','plan'] },
+  kitchen:     { label:'Kitchen',            desc:'Production, cooking & dishes',         tabs:['home','prod','meals','issue','stock','plan','dishes'] },
+  cook:        { label:'Cook / Chef',        desc:'Production & cooking',          tabs:['home','prod','meals','dishes','issue'] },
   driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals'] },
   supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter, client escalations',tabs:['home','meals','dishes','client'], site:true },
   aggregator:  { label:'Aggregator / Client', desc:'Live view, ratings, feedback, escalation', tabs:['agg','aglive','agrate','agesc','agrep','agcontact'], siteOpt:true },
   counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals','dishes'], site:true }
 };
-const NAV = { dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
+const NAV = { prod:['👨‍🍳','Production'], dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
 const MEALS = ['breakfast','lunch','snacks','dinner'];
 const MEAL_ICON = {breakfast:'🌅', lunch:'🍛', snacks:'☕', dinner:'🌙'};
 const UNITS = ['kg','g','L','ml','nos','pack','box','bunch','pkt'];
@@ -427,7 +438,7 @@ const db = firebase.database();
 const authReady = (firebase.auth ? firebase.auth().signInAnonymously() : Promise.resolve()).catch(e=>console.warn('anon auth',e&&e.message));
 let me = null;
 let users = {}, sites = {}, items = {}, basins = {}, ledger = {}, notices = {}, sessions = {}, settings = {}, recipes = {};
-let stockFilter = 'all', stockSearch = '';
+let stockFilter = 'all', stockSearch = '', skippedRender = false;
 
 function can(tab){
   if (!me || !ROLES[me.role]) return false;
@@ -544,6 +555,7 @@ function renderAll(){
   if (can('agcontact')) renderAgContact();
   if (can('agrep'))    renderAgRep();
   if (can('dishes'))   renderDishes();
+  if (can('prod'))     renderProd();
   try{ updateBell(); uwAttach(); botShow(); pushInit(); }catch(e){}
 }
 
@@ -583,7 +595,7 @@ function postNotice(){
 }
 function renderHome(){
   const el = $('p-home');
-  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const list = Object.entries(items).filter(([,i])=>i.active!==false);
   const raw = list.filter(([,i])=>i.type==='raw');
   const low = raw.filter(([id,i])=>i.minStock>0 && stockOf(id) <= i.minStock);
@@ -656,7 +668,7 @@ function renderPurchase(){
   const raws = Object.entries(items).filter(([,i])=>i.active!==false && i.type==='raw').sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const el = $('p-purchase');
   const keep = { item: el.querySelector('#pu_item') && el.querySelector('#pu_item').value };
-  if (el.querySelector('#pu_qty') && document.activeElement && el.contains(document.activeElement)) return; // don't wipe a form being typed in
+  if (el.querySelector('#pu_qty') && document.activeElement && el.contains(document.activeElement)) { skippedRender = true; return; } // don't wipe a form being typed in
   el.innerHTML = `
     <h2>Record purchase (goods received)</h2>
     ${raws.length ? `<div class="card">
@@ -703,24 +715,28 @@ function saveAdjust(){
 
 /* ============ DAILY ISSUE (raw material used by the kitchen) ============ */
 let issueRows = [{ itemId:'', qty:'' }];
-let issueFor = '', issueNote = '';
+let issueFor = '__', issueNote = '', issueDay = 0;
 function issueTargets(){
-  const out = [['','General kitchen use']];
+  const out = [['__','— Select counter & meal —']];
   Object.entries(sites).forEach(([k,s])=>(s.meals||[]).forEach(m=>out.push([k+'|'+m, s.name+' — '+m])));
+  out.push(['','General kitchen use (no meal)']);
   return out;
 }
+function canIssueRole(){ return me && ['admin','store','prodmanager'].includes(me.role); }
 function renderIssue(){
   const el = $('p-issue');
-  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const raws = Object.entries(items).filter(([,i])=>i.active!==false && i.type==='raw').sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const t = todayKey();
   const todays = Object.entries(ledger).filter(([,e])=>e.date===t && e.type==='issue').sort((a,b)=>(b[1].ts||0)-(a[1].ts||0));
   const opt = id => `<option value="">Select item…</option>` + raws.map(([k,i])=>`<option value="${k}" ${k===id?'selected':''}>${esc(i.name)} — ${fmt(stockOf(k))} ${esc(i.unit)} left</option>`).join('');
   el.innerHTML = `
     <h2>Issue to kitchen — ${t}</h2>
-    ${raws.length ? `<div class="card">
+    ${!canIssueRole() ? '<div class="notice info" style="margin-bottom:10px">ℹ️ <div>Raw material is issued by the Store Keeper. You will get a loud alert when it is issued for your meal.</div></div>' : ''}
+    ${raws.length && canIssueRole() ? `<div class="card">
       <label>Issued for</label>
       <select id="is_for">${issueTargets().map(([v,l])=>`<option value="${esc(v)}" ${v===issueFor?'selected':''}>${esc(l)}</option>`).join('')}</select>
+      <label>For which day</label><select id="is_day"><option value="0" ${issueDay===0?'selected':''}>Today (${t})</option><option value="1" ${issueDay===1?'selected':''}>Tomorrow</option></select>
       <div id="is_rows">${issueRows.map((r,n)=>{
         const u = r.itemId && items[r.itemId] ? items[r.itemId].unit : '';
         return `<div class="row" style="margin-top:10px;align-items:flex-end;gap:8px"><div class="grow"><select data-n="${n}" class="is_item">${opt(r.itemId)}</select></div>
@@ -730,7 +746,7 @@ function renderIssue(){
       <label>Note (optional)</label><input id="is_note" value="${esc(issueNote)}" placeholder="e.g. lunch for 150">
       ${photoBox(draftCtx('issue'),'Photo of issued material',{draft:'issue'})}
       <button class="btn save" id="is_save">Issue to kitchen</button>
-    </div>` : `<div class="empty">Add raw materials and vegetables in Masters first.</div>`}
+    </div>` : (canIssueRole() ? `<div class="empty">Add raw materials and vegetables in Masters first.</div>` : '')}
     <h2>Issued today</h2>
     ${todays.length ? todays.map(([id,e])=>{ const it=items[e.itemId]||{name:'(deleted)',unit:''}; const d=new Date(e.ts||0);
       const tgt = e.siteId && sites[e.siteId] ? sites[e.siteId].name+' '+e.meal : 'General';
@@ -738,15 +754,17 @@ function renderIssue(){
       <div class="qty">${fmt(-e.qty)} <small>${esc(it.unit)}</small></div>${e.reversed?'<span class="tag" style="background:#eee;color:#777">reversed</span>':(can('masters')||me.role==='store')?`<button class="btn danger" data-rev="${id}" style="padding:7px 10px;font-size:12px">Undo</button>`:''}</div>`;
     }).join('') : '<div class="empty">Nothing issued yet today.</div>'}`;
   const sel = (q,fn)=>el.querySelectorAll(q).forEach(fn);
-  sel('.is_item', x=>x.onchange=()=>{ issueRows[+x.dataset.n].itemId = x.value; issueFor=$('is_for').value; issueNote=$('is_note').value; el.querySelectorAll('.is_qty').forEach((q,n)=>issueRows[n].qty=q.value); renderIssue(); });
+  sel('.is_item', x=>x.onchange=()=>{ issueRows[+x.dataset.n].itemId = x.value; issueFor=$('is_for').value; issueDay=+$('is_day').value; issueNote=$('is_note').value; el.querySelectorAll('.is_qty').forEach((q,n)=>issueRows[n].qty=q.value); renderIssue(); });
   sel('.is_qty', x=>x.oninput=()=>{ issueRows[+x.dataset.n].qty = x.value; });
   sel('[data-rm]', b=>b.onclick=()=>{ issueRows.splice(+b.dataset.rm,1); renderIssue(); });
   sel('[data-rev]', b=>b.onclick=()=>reverseIssue(b.dataset.rev));
-  const add=$('is_add'); if (add) add.onclick=()=>{ issueFor=$('is_for').value; issueNote=$('is_note').value; issueRows.push({itemId:'',qty:''}); renderIssue(); };
+  const add=$('is_add'); if (add) add.onclick=()=>{ issueFor=$('is_for').value; issueDay=+$('is_day').value; issueNote=$('is_note').value; issueRows.push({itemId:'',qty:''}); renderIssue(); };
   const sv=$('is_save'); if (sv) sv.onclick=saveIssue;
 }
 function saveIssue(){
-  issueFor = $('is_for').value; issueNote = $('is_note').value.trim();
+  issueFor = $('is_for').value; issueNote = $('is_note').value.trim(); issueDay = +$('is_day').value;
+  if (!canIssueRole()) return;
+  if (issueFor==='__'){ alert('Choose which counter and meal this issue is for (or General kitchen use). This is how the kitchen sees it on the meal.'); return; }
   const lines = issueRows.filter(r=>r.itemId || r.qty!=='');
   if (!lines.length){ alert('Add at least one item.'); return; }
   const need = {};
@@ -760,8 +778,8 @@ function saveIssue(){
   const [siteId, meal] = issueFor ? issueFor.split('|') : ['',''];
   const batch = db.ref(P+'ledger').push().key, phk = usePh('issue');
   Promise.all(Object.entries(need).map(([itemId,q])=>
-    addLedger({ itemId, type:'issue', qty:-q, siteId:siteId||null, meal:meal||null, note:issueNote, batch, photoKey:phk })
-  )).then(()=>{ toast('Issued to kitchen'); issueRows=[{itemId:'',qty:''}]; issueNote=''; renderIssue(); });
+    addLedger({ itemId, type:'issue', qty:-q, siteId:siteId||null, meal:meal||null, forDate:issueDay? (function(){ const d=new Date(); d.setDate(d.getDate()+1); return keyOf(d); })() : todayKey(), note:issueNote, batch, photoKey:phk })
+  )).then(()=>{ toast('📤 Issued — kitchen alerted'); issueRows=[{itemId:'',qty:''}]; issueNote=''; issueFor='__'; renderIssue(); });
 }
 function reverseIssue(id){
   const e = ledger[id]; if (!e || e.reversed) return;
@@ -773,11 +791,11 @@ function reverseIssue(id){
 /* ============ MEAL SESSIONS (production → dispatch → arrival → counter → sales/waste) ============ */
 const REASONS = ['Unsold leftover','Spoilage','Spill / damage','Quality reject','Over-production','Other'];
 const STEP_ROLES = {
-  prod:['admin','prodmanager','kitchen'], qc1:['admin','prodmanager'],
-  dispatch:['admin','prodmanager','kitchen'], depart:['admin','prodmanager','kitchen','driver'],
+  prod:['admin','prodmanager','kitchen','cook'], plan:['admin','prodmanager'], cookstart:['admin','prodmanager','kitchen','cook'], qc1:['admin','prodmanager'],
+  dispatch:['admin','prodmanager','kitchen','cook'], depart:['admin','prodmanager','kitchen','driver'],
   arrive:['admin','prodmanager','driver','supervisor','counter'],
   qc2:['admin','prodmanager','supervisor','counter'], weigh:['admin','prodmanager','supervisor','counter'],
-  close:['admin','prodmanager','supervisor','counter'], send:['admin','prodmanager','kitchen','driver','supervisor','counter']
+  close:['admin','prodmanager','supervisor','counter'], send:['admin','prodmanager','kitchen','cook','driver','supervisor','counter']
 };
 const canStep = k => me && STEP_ROLES[k].includes(me.role);
 let mDate = todayKey(), openSid = null, tracker = null;
@@ -796,6 +814,7 @@ function stageOf(s){
   if (!s) return { n:0, label:'Not started' };
   let n = 0, label = 'Not started';
   MEAL_STAGES.forEach(([k,l],i)=>{ const v = k==='qc1' ? (s.qc1&&s.qc1.ts) : k==='qc2' ? (s.qc2&&s.qc2.ts) : T(s,k); if (v){ n=i+1; label=l; } });
+  if (!n){ if (T(s,'cookStart')) label = 'Cooking'; else if (T(s,'planned')) label = 'Plan sent to kitchen'; }
   return { n, label };
 }
 function sessionCalc(s){
@@ -819,7 +838,7 @@ function sessionCalc(s){
 
 function renderMeals(){
   const el = $('p-meals');
-  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   if (openSid) return renderSession(el);
   const list = visibleSites();
   const cards = [];
@@ -827,7 +846,7 @@ function renderMeals(){
     (MEALS.filter(m=>(site.meals||[]).includes(m))).forEach(meal=>{
       const sid = sidOf(mDate,siteId,meal), s = sessions[sid], st = stageOf(s);
       cards.push(`<div class="card" data-open="${sid}" style="cursor:pointer"><div class="row"><div style="font-size:26px">${MEAL_ICON[meal]}</div>
-        <div class="grow"><b>${esc(site.name)} — ${meal}</b><div class="sub">${s?esc(st.label)+(st.n? ' · '+hm(lastStamp(s)):''):'Not started'}</div></div>
+        <div class="grow"><b>${esc(site.name)} — ${meal}</b><div class="sub">${s?esc(st.label)+(st.n? ' · '+hm(lastStamp(s)):''):'Not started'}</div>${wfLine(sid,s)}</div>
         <div style="text-align:right"><div class="qty" style="font-size:14px;color:${st.n>=9?'var(--green)':st.n?'var(--amber)':'var(--muted)'}">${st.n}/9</div></div></div>
         <div style="height:5px;background:var(--line);border-radius:9px;margin-top:9px"><div style="height:5px;border-radius:9px;background:var(--green);width:${st.n/9*100}%"></div></div></div>`);
     });
@@ -880,6 +899,7 @@ function renderSession(el){
     <div class="grow"><b>${MEAL_ICON[meal]} ${esc(site.name)} — ${meal}</b><div class="sub">${date}</div></div></div>
 
   ${journeyCard(sid, s, {full:true})}
+  ${wfCardHtml(sid, s)}
   <div class="card">${stepHead(1,'Cooking & production',prodDone&&prodDone.ts,' · '+esc((prodDone||{}).by||''))}
     ${sItems.length? sItems.map(([id,it])=>{ const d = items[id]||{name:'(deleted)',unit:''}; return `<div class="row" style="margin-bottom:8px"><div class="grow"><b>${esc(d.name)}</b><div class="sub">Planned ${it.planned?fmt(it.planned)+' '+esc(d.unit):'—'}${it.preparedAt?' · made '+hm(it.preparedAt):''}</div></div>
       ${!(prodDone&&prodDone.ts)&&canStep('prod')?`<input class="pq" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.prepared||''}" placeholder="made" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span><button class="btn danger" data-rmdish="${id}" style="padding:7px 10px">✕</button>`:`<div class="qty">${fmt(it.prepared||0)} <small>${esc(d.unit)}</small></div>`}</div>`; }).join('') : '<div class="sub">No dishes added yet.</div>'}
@@ -967,11 +987,12 @@ function renderSession(el){
 
   // 1 production
   const ad = $('addDish');
-  if (ad) ad.onchange = ()=>{ if (!ad.value) return; const pl = num($('addPlan').value); base().then(()=>db.ref(P+'sessions/'+sid+'/items/'+ad.value).set({ planned: pl>0?pl:null, prepared: 0 })); };
+  if (ad) ad.onchange = ()=>{ const dv = ad.value; if (!dv) return; const pl = num($('addPlan').value); ad.blur(); base().then(()=>db.ref(P+'sessions/'+sid+'/items/'+dv).set({ planned: pl>0?pl:null, prepared: 0 })).then(()=>{ toast('Dish added'); renderAll(); }).catch(()=>alert('Could not add the dish. Check the internet and try again.')); };
   q('[data-rmdish]', b=>b.onclick=()=>db.ref(P+'sessions/'+sid+'/items/'+b.dataset.rmdish).remove());
   const sp = $('saveProd');
   const saveProd = () => { const ups = {}; el.querySelectorAll('.pq').forEach(i=>{ const v = num(i.value); if (v>=0){ const old=(s.items||{})[i.dataset.id]||{}; if ((old.prepared||0)!==v){ ups['items/'+i.dataset.id+'/prepared']=v; ups['items/'+i.dataset.id+'/preparedAt']=Date.now(); } } }); return Object.keys(ups).length ? db.ref(P+'sessions/'+sid).update(ups) : Promise.resolve(); };
   if (sp) sp.onclick = ()=>saveProd().then(()=>toast('Saved'));
+  q('.pq', i=>i.onchange=()=>{ saveProd(); });
   const pd = $('prodDoneBtn'); if (pd) pd.onclick = ()=>{ saveProd().then(()=>{ const any = [...el.querySelectorAll('.pq')].some(i=>num(i.value)>0) || sItems.some(([,i])=>i.prepared>0); if (!any){ alert('Enter the quantity made for at least one dish.'); return; } stamp('prodDone'); }); };
 
   // QC
@@ -1141,7 +1162,7 @@ function planReport(m){
 
 function renderPlan(){
   const el = $('p-plan');
-  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const m = planModel();
   const o = (arr,s)=>arr.map(([v,l])=>`<option value="${esc(v)}" ${v===s?'selected':''}>${esc(l)}</option>`).join('');
   const wdName = new Date(planSt.date+'T00:00:00').toLocaleDateString([], {weekday:'long'});
@@ -1172,7 +1193,7 @@ function renderPlan(){
   $('pl_wa').onclick = ()=>{ const t = planReport(planModel()).text; const url='https://wa.me/?text='+encodeURIComponent(t); const x=window.open(url,'_blank'); if(!x) location.href=url; };
   $('pl_copy').onclick = ()=>copyText(planReport(planModel()).text);
   $('pl_csv').onclick = ()=>{ const r = planReport(planModel()); rep.from = planSt.date; downloadCsv(r); };
-  const pi = $('pl_issue'); if (pi) pi.onclick = ()=>{ issueRows = m.req.map(q=>({ itemId:q.id, qty:String(Math.round(q.need*1000)/1000) })); issueFor=''; issueNote='Plan for '+planSt.date; go('issue'); };
+  const pi = $('pl_issue'); if (pi) pi.onclick = ()=>{ issueRows = m.req.map(q=>({ itemId:q.id, qty:String(Math.round(q.need*1000)/1000) })); issueFor = planSt.site&&planSt.meal ? planSt.site+'|'+planSt.meal : '__'; issueDay = planSt.date>todayKey()?1:0; issueNote='Plan for '+planSt.date; go('issue'); };
 }
 
 /* ---- recipes master: raw material per 1 unit of each cooked dish ---- */
@@ -1317,7 +1338,7 @@ function buildReport(f){
 
 function renderReports(){
   const el = $('p-reports');
-  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const cats = [...new Set(Object.values(items).filter(i=>i.type==='raw').map(i=>i.category||'').filter(Boolean))].sort();
   const raws = Object.entries(items).filter(([,i])=>i.type===(rep.type==='meals'?'food':'raw')).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const meals = MEALS.filter(m=>Object.values(sites).some(s=>(s.meals||[]).includes(m)));
@@ -1445,7 +1466,7 @@ function dataTable(labels, series, unit){
 
 function renderTrends(){
   const el = $('p-trends');
-  if (el.contains(document.activeElement) && /SELECT/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const allDays = dayKeys(tr.days), first = allDays[0], last = allDays[allDays.length-1];
   const sel = tr.item && items[tr.item] ? items[tr.item] : null;
   const dishOk = id => { const it = items[id]; if (!it) return false; if (tr.item) return id===tr.item; return it.unit!=='nos'; };
@@ -1642,6 +1663,7 @@ const STARTER_USERS = [
   {name:'Store Keeper',       username:'store',         password:'Store@2026',    role:'store'},
   {name:'Purchase',           username:'purchase',      password:'Buy@2026',      role:'store'},
   {name:'Kitchen Head',       username:'kitchen',       password:'Cook@2026',     role:'kitchen'},
+  {name:'Cook / Chef',        username:'cook',          password:'Chef@2026',     role:'cook'},
   {name:'Aggregator / Client', username:'aggregator',    password:'Agg@2026',      role:'aggregator'},
   {name:'Driver 1',           username:'driver1',       password:'Drive@2026-1',  role:'driver'},
   {name:'Driver 2',           username:'driver2',       password:'Drive@2026-2',  role:'driver'},
@@ -1816,8 +1838,8 @@ function moreSheet(tabs){
 }
 
 /* ---------- notification feed (bell) ---------- */
-const ALERT_PREFS = [['dep','🚚 Vehicle left kitchen'],['arr','📍 Vehicle arrived'],['late','⏱️ Late departure / arrival'],['qc','⚠️ Quality-check failures'],['waste','♻️ Wastage update after each meal'],['gps','📡 Tracking problems'],['esc','🚨 Escalation & feedback updates']];
-function alertPrefs(){ try{ return Object.assign({dep:1,arr:1,late:1,qc:1,waste:1,gps:1,esc:1}, JSON.parse(store.getItem('prod_alertprefs')||'{}')); }catch(e){ return {dep:1,arr:1,late:1,qc:1,waste:1,gps:1,esc:1}; } }
+const ALERT_PREFS = [['dep','🚚 Vehicle left kitchen'],['arr','📍 Vehicle arrived'],['late','⏱️ Late departure / arrival'],['qc','⚠️ Quality-check failures'],['waste','♻️ Wastage update after each meal'],['gps','📡 Tracking problems'],['esc','🚨 Escalation & feedback updates'],['wf','🍳 Kitchen & production hand-offs']];
+function alertPrefs(){ try{ return Object.assign({dep:1,arr:1,late:1,qc:1,waste:1,gps:1,esc:1,wf:1}, JSON.parse(store.getItem('prod_alertprefs')||'{}')); }catch(e){ return {dep:1,arr:1,late:1,qc:1,waste:1,gps:1,esc:1,wf:1}; } }
 function feedEvents(){
   if (!me) return [];
   const ev = [], days = [todayKey(), keyOf(new Date(Date.now()-864e5))], vs = new Set(visibleSites().map(([k])=>k));
@@ -1842,20 +1864,26 @@ function feedEvents(){
   Object.entries(feedbacks).forEach(([id,f])=>{
     if (isAgg()){ if (f.reply && f.rts) ev.push({id:'fr:'+id+':'+f.rts, ts:f.rts, k:'esc', icon:'💬', title:'Reply to your '+f.type, text:f.reply.slice(0,90)}); }
     else if (isStaffClient()) ev.push({id:'fn:'+id, ts:f.ts, k:'esc', icon:f.type==='complaint'?'😞':'💬', lvl:f.type==='complaint'?'amber':'', title:'Client '+f.type+(f.siteId&&sites[f.siteId]?' — '+sites[f.siteId].name:''), text:(f.text||'').slice(0,90)}); });
+  try{ wfEvents().forEach(x=>ev.push(x)); }catch(e){}
   const pr = alertPrefs();
   return ev.filter(e=>pr[e.k]!==0).sort((a,b)=>b.ts-a.ts);
 }
-let feedKnown = null;
+let notifiedSize = -1;
+function notifiedSet(){ try{ const a = JSON.parse(store.getItem('prod_notified_'+me.id)||'[]'); notifiedSize = a.length; return new Set(a); }catch(e){ return new Set(); } }
+function saveNotified(set){ try{ const a = Array.from(set).slice(-500); notifiedSize = a.length; store.setItem('prod_notified_'+me.id, JSON.stringify(a)); }catch(e){} }
 function seenTs(){ try{ return +store.getItem('prod_seen_'+me.id) || 0; }catch(e){ return 0; } }
 function updateBell(){
   const b = $('bell'); if (!b || !me) return;
   const ok = true; b.style.display = '';
   const ev = feedEvents(), seen = seenTs(), n = ev.filter(e=>e.ts>seen).length;
   b.classList.toggle('has', n>0); $('bellN').textContent = n>9?'9+':n;
-  const ids = new Set(ev.map(e=>e.id));
-  if (feedKnown){ const fresh = ev.filter(e=>!feedKnown.has(e.id) && e.ts>seen);
-    if (fresh.length){ fresh.slice(0,3).forEach(f=>notify(f.icon+' '+f.title, f.text, evRef(f))); } }
-  feedKnown = ids;
+  const done = notifiedSet(), now = Date.now(), loud = [], soft = [];
+  ev.forEach(e=>{ if (done.has(e.id)) return; done.add(e.id); if (e.ts < now-30*60000 || e.by===me.name) return; (e.loud?loud:soft).push(e); });
+  if (loud.length || soft.length) saveNotified(done);
+  if (loud.length){ loud.forEach(f=>notify(f.icon+' '+f.title, f.text, evRef(f), {urgent:true})); alarmRing(loud); }
+  soft.slice(0,3).forEach(f=>notify(f.icon+' '+f.title, f.text, evRef(f)));
+  if (soft.length>3) notify('🔔 '+(soft.length-3)+' more updates', 'Open the bell to read them');
+  if (!loud.length && !soft.length && done.size!==notifiedSize) saveNotified(done);
 }
 function bellSheet(){
   const ev = feedEvents(), seen = seenTs(), pr = alertPrefs();
@@ -1993,7 +2021,7 @@ let rateDate = todayKey(), rateDraft = {}, fbDraft = { type:'feedback', siteId:'
 const stars = (key, val) => `<div class="stars" data-k="${key}">${[1,2,3,4,5].map(n=>`<button type="button" data-v="${n}" class="${n<=val?'on':''}" aria-label="${n} star">★</button>`).join('')}</div>`;
 function renderAgRate(){
   const el = $('p-agrate'); if (!el) return;
-  if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const meals = []; visibleSites().forEach(([k,s])=>(s.meals&&s.meals.length?s.meals:MEALS).forEach(m=>meals.push([k,s,m])));
   meals.sort((a,b)=>MEALS.indexOf(a[2])-MEALS.indexOf(b[2]));
   const days = ownDay(7);
@@ -2057,7 +2085,7 @@ function escAction(id, a){
 }
 function renderAgEsc(){
   const el = $('p-agesc'); if (!el) return;
-  if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const mine = Object.entries(escs).sort((a,b)=>b[1].ts-a[1].ts);
   const lvls = escList();
   el.innerHTML = `<div class="sos"><i>🚨</i><div><b>Something wrong with the food?</b><span>Raise an escalation — it reaches the kitchen team instantly and is tracked until fixed.</span></div></div>
@@ -2086,7 +2114,7 @@ function renderAgEsc(){
 /* ================= AGGREGATOR: CONTACT ================= */
 function renderAgContact(){
   const el = $('p-agcontact'); if (!el) return;
-  if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const cts = contactsList(), mail = ownerEmail(), wa = ownerPhone();
   el.innerHTML = `<a class="sos" href="tel:112"><i>🆘</i><div><b>Emergency — call 112</b><span>Police · Ambulance · Fire — national emergency number</span></div></a>
   <div class="card">${EMERGENCY.map(([n,l])=>`<div class="rrow"><span>${l}</span><a class="badge red" style="text-decoration:none" href="tel:${n}">📞 ${n==='1800112100'?'1800-11-2100':n}</a></div>`).join('')}</div>
@@ -2108,7 +2136,7 @@ function renderAgContact(){
 let clTab = 'esc';
 function renderClient(){
   const el = $('p-client'); if (!el) return;
-  if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const openE = Object.entries(escs).filter(([,e])=>e.status!=='closed'&&e.status!=='resolved').length, newF = Object.values(feedbacks).filter(f=>!f.reply).length;
   const tabs = [['esc','🚨 Escalations'+(openE?' ('+openE+')':'')],['fb','💬 Feedback'+(newF?' ('+newF+')':'')],['rt','⭐ Ratings'],['send','📤 Send update']];
   let body = '';
@@ -2236,7 +2264,7 @@ function phThumbs(ctx, ro){
 }
 function photoBox(ctx, label, o){
   o = o || {}; if (!ctx) return '';
-  return `<div class="phbox${o.ro?' ro':''}" data-ctx="${esc(ctx)}"${o.draft?` data-draft="${o.draft}"`:''}><div class="phrow">${phThumbs(ctx,o.ro)}</div>${o.ro?'':`<label class="phadd">📷 ${esc(label||'Add photo')}<input type="file" accept="image/*" multiple hidden></label>`}</div>`;
+  return `<div class="phbox${o.ro?' ro':''}" data-ctx="${esc(ctx)}"${o.draft?` data-draft="${o.draft}"`:''}><div class="phrow">${phThumbs(ctx,o.ro)}</div>${o.ro?'':`<label class="phadd">📷 ${esc(label||'Take photo')}<input type="file" accept="image/*" capture="environment" hidden></label><label class="phadd phgal">🖼️ Gallery<input type="file" accept="image/*" multiple hidden></label>`}</div>`;
 }
 function phPaint(box){
   const row = box.querySelector('.phrow'); if (!row) return;
@@ -2300,10 +2328,10 @@ document.addEventListener('change', e=>{
 
 /* ---------- notifications ---------- */
 const CAP = () => window.Capacitor && window.Capacitor.Plugins || {};
-async function notify(title, body, ref){
+async function notify(title, body, ref, o){
   const text = (ref ? ref+' · ' : '')+(body||'');
   toast(title);
-  try{ const LN = CAP().LocalNotifications; if (LN){ await LN.schedule({ notifications:[{ id: Math.floor(Math.random()*2000000000), title, body:text, extra:{ref:ref||''} }] }); return; } }catch(e){}
+  try{ const LN = CAP().LocalNotifications; if (LN){ await LN.schedule({ notifications:[Object.assign({ id: Math.floor(Math.random()*2000000000), title, body:text, extra:{ref:ref||''} }, o&&o.urgent?{channelId:'urgent'}:{})] }); return; } }catch(e){}
   try{ if (window.Notification && Notification.permission==='granted') new Notification(title, { body:text, tag:ref||undefined }); }catch(e){}
 }
 let pushDone = null, pushState = 'off';
@@ -2315,12 +2343,12 @@ function savePushToken(tok, platform){
 function pushInit(){
   if (!me || pushDone===me.id) return; pushDone = me.id;
   const C = CAP(), PN = C.PushNotifications, LN = C.LocalNotifications;
-  try{ if (LN) LN.requestPermissions(); }catch(e){}
+  try{ if (LN){ LN.requestPermissions(); if (LN.createChannel) LN.createChannel({ id:'urgent', name:'Urgent kitchen & production alerts', description:'Loud alarm when material is issued or the plan is sent', importance:5, visibility:1, vibration:true, lights:true }); } }catch(e){}
   if (PN){
     try{
       PN.addListener('registration', t=>savePushToken(t.value,'android'));
       PN.addListener('registrationError', ()=>{ pushState = 'error'; });
-      PN.addListener('pushNotificationReceived', n=>{ notify((n&&n.title)||'OneByte', (n&&n.body)||'', n&&n.data&&n.data.ref); });
+      PN.addListener('pushNotificationReceived', n=>{ notify((n&&n.title)||'OneByte', (n&&n.body)||'', n&&n.data&&n.data.ref, {urgent:!!(n&&n.data&&n.data.loud)}); if (n&&n.data&&n.data.loud){ try{ alarmRing([{icon:'🔔', title:(n.title||'Urgent update'), text:(n.body||''), go:n.data.tab||'prod'}]); }catch(e){} } });
       PN.addListener('pushNotificationActionPerformed', ()=>{ try{ bellSheet(); }catch(e){} });
       PN.requestPermissions().then(r=>{ if (r.receive==='granted') PN.register(); else pushState = 'denied'; }).catch(()=>{ pushState = 'error'; });
     }catch(e){ pushState = 'error'; }
@@ -2443,7 +2471,7 @@ let miF = 'all', stockGroup = 'prov', stockCat = '';
 const VEG_CATS = /vegetable|veg\b|greens|herb|leaf|leaves/i;
 const rawGroup = i => VEG_CATS.test(i.category||'') ? 'veg' : 'prov';
 const canEditRaw = () => me && ['admin','prodmanager','store'].includes(me.role);
-const canEditDish = () => me && ['admin','prodmanager','kitchen'].includes(me.role);
+const canEditDish = () => me && ['admin','prodmanager','kitchen','cook'].includes(me.role);
 
 /* ---------- STOCK (raw materials only) ---------- */
 function renderStock(){
@@ -2498,7 +2526,7 @@ function rawForm(id){
 let dsMeal = 'all', dsDiet = 'all', dsCat = '', dsQ = '';
 function renderDishes(){
   const el = $('p-dishes'); if (!el) return;
-  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const ed = canEditDish(), t = todayKey();
   const all = Object.entries(items).filter(([,i])=>i.type==='food' && (ed || i.active!==false));
   const cats = [...new Set(all.map(([,i])=>i.category||'Other'))].sort();
@@ -2621,7 +2649,7 @@ function aggReport(R){
 }
 function renderAgRep(){
   const el = $('p-agrep'); if (!el) return;
-  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const o = (arr,sel)=>arr.map(([v,l])=>`<option value="${esc(v)}" ${v===sel?'selected':''}>${esc(l)}</option>`).join('');
   arpLast = aggReport(arp);
   const quick = [['Today',0],['Yesterday',1],['Last 7 days',7],['Last 30 days',30],['This month',-1]];
@@ -2646,6 +2674,201 @@ function renderAgRep(){
   $('ar_copy').onclick = ()=>copyText(arpLast.text);
   $('ar_csv').onclick = ()=>{ const keep = rep.from; rep.from = arp.from; downloadCsv(arpLast); rep.from = keep; };
 }
+
+
+/* ============ v5: PRODUCTION AREA, HAND-OFFS, LOUD ALERTS ============ */
+const wfBy = () => me ? me.name : '';
+function stampT(sid, k, extra){
+  const [date, siteId, meal] = sid.split('_');
+  return db.ref(P+'sessions/'+sid).update({ date, siteId, meal, ['times/'+k]: Object.assign({ ts:Date.now(), by:wfBy() }, extra||{}) });
+}
+function issuedFor(date, siteId, meal){
+  const agg = {}; let by = '', ts = 0, n = 0;
+  Object.entries(ledger).forEach(([id,e])=>{
+    if (e.type!=='issue' || e.reversed || (e.forDate||e.date)!==date || e.siteId!==siteId || e.meal!==meal) return;
+    const a = agg[e.itemId] = agg[e.itemId] || { itemId:e.itemId, qty:0 }; a.qty += -e.qty; n++; if ((e.ts||0)>ts){ ts = e.ts; by = e.by||''; }
+  });
+  return { lines:Object.values(agg), by, ts, n };
+}
+function generalIssued(date){
+  let n = 0, ts = 0; Object.values(ledger).forEach(e=>{ if (e.type==='issue' && !e.reversed && !e.siteId && (e.forDate||e.date)===date){ n++; if ((e.ts||0)>ts) ts = e.ts; } });
+  return { n, ts };
+}
+const issueTxt = lines => lines.map(l=>{ const it = items[l.itemId]||{name:'(deleted)',unit:''}; return esc(it.name)+' '+fmt(Math.round(l.qty*1000)/1000)+' '+esc(it.unit); }).join(' · ');
+function wfState(sid, s){
+  const [date, siteId, meal] = sid.split('_'); s = s || sessions[sid] || {};
+  const iss = issuedFor(date, siteId, meal), pl = T(s,'planned'), cs = T(s,'cookStart'), pd = T(s,'prodDone');
+  const planned = Object.entries(s.items||{}).filter(([,i])=>i.planned>0);
+  return { date, siteId, meal, s, iss, pl, cs, pd, planned, gen:generalIssued(date) };
+}
+function wfLine(sid, s){
+  const w = wfState(sid, s); const c = (ok,l)=>`<span style="color:${ok?'var(--green)':'var(--muted)'}">${ok?'✓':'○'} ${l}</span>`;
+  return `<div class="sub" style="margin-top:3px">${c(w.iss.n>0,'Issued')} · ${c(w.pl&&w.pl.ts,'Plan sent')} · ${c(w.cs&&w.cs.ts,'Cooking started')}</div>`;
+}
+function wfDishEdit(sid, w, edit){
+  const foods = Object.entries(items).filter(([,i])=>i.type==='food' && i.active!==false).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const av = foods.filter(([id])=>!(w.s.items||{})[id]);
+  return `${Object.entries(w.s.items||{}).map(([id,it])=>{ const d = items[id]||{name:'(deleted)',unit:''};
+    return `<div class="row" style="margin-bottom:6px"><div class="grow"><b>${esc(d.name)}</b><div class="sub">${it.prepared>0?'Made '+fmt(it.prepared)+' '+esc(d.unit):''}</div></div>
+      ${edit?`<input class="wfpl" data-sid="${sid}" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.planned||''}" placeholder="plan" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span><button class="btn danger" data-wfrm="${sid}|${id}" style="padding:6px 9px">✕</button>`:`<div class="qty">${it.planned?fmt(it.planned):'—'} <small>${esc(d.unit)} planned</small></div>`}</div>`; }).join('') || '<div class="sub">No dishes planned yet.</div>'}
+    ${edit?`<div class="row" style="margin-top:6px"><select class="grow wfadd" data-sid="${sid}"><option value="">+ Add dish…</option>${av.map(([id,i])=>`<option value="${id}">${i.diet==='nonveg'?'🔴 ':i.diet==='veg'?'🟢 ':''}${esc(i.name)} (${esc(i.unit)})</option>`).join('')}</select><input class="wfaddq" data-sid="${sid}" type="number" inputmode="decimal" step="any" placeholder="plan qty" style="width:92px"></div>
+      <button class="btn sec save" data-wf="suggest" data-sid="${sid}" style="margin-top:6px">✨ Fill suggested quantities</button>`:''}`;
+}
+function wfActions(sid, w){
+  const out = [];
+  const canPlan = canStep('plan'), canStart = canStep('cookstart');
+  if (canPlan) out.push(`<button class="btn save" data-wf="plan" data-sid="${sid}">${w.pl&&w.pl.ts?'🔁 Send updated plan to kitchen':'📣 Send plan to kitchen'}</button>`);
+  if (canStart && !(w.cs&&w.cs.ts) && !(w.pd&&w.pd.ts)) out.push(`<button class="btn save" data-wf="start" data-sid="${sid}">🍳 Start cooking</button>`);
+  return out.join('');
+}
+function wfCardHtml(sid, s){
+  const w = wfState(sid, s), step = (n,t,ok,det)=>`<div class="row" style="margin-bottom:6px;align-items:flex-start"><div style="width:24px;height:24px;border-radius:99px;flex:none;background:${ok?'var(--green)':'var(--line)'};color:${ok?'#fff':'var(--muted)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px">${ok?'✓':n}</div><div class="grow"><b>${t}</b><div class="sub" style="margin:0">${det}</div></div></div>`;
+  const edit = canStep('plan') && !(w.pd&&w.pd.ts);
+  return `<div class="card" style="border-left:4px solid var(--amber)"><b>Before cooking — hand-offs</b>
+    ${step(1,'Raw material issued (Store Keeper)', w.iss.n>0, w.iss.n>0 ? issueTxt(w.iss.lines)+'<br>by '+esc(w.iss.by)+' · '+hm(w.iss.ts) : (w.gen.n? 'Only a <b>general</b> kitchen issue was made today ('+hm(w.gen.ts)+') — not linked to this meal.' : 'Waiting for the Store Keeper'))}
+    ${step(2,'Plan sent to kitchen (Production Manager)', !!(w.pl&&w.pl.ts), w.pl&&w.pl.ts ? 'by '+esc(w.pl.by||'')+' · '+hm(w.pl.ts)+' · '+w.planned.length+' dish'+(w.planned.length===1?'':'es') : 'Waiting for the Production Manager')}
+    ${step(3,'Cooking started (Kitchen / Cook)', !!(w.cs&&w.cs.ts), w.cs&&w.cs.ts ? 'by '+esc(w.cs.by||'')+' · '+hm(w.cs.ts) : 'Not started')}
+    ${wfActions(sid,w)}</div>`;
+}
+
+/* ---------- Production page ---------- */
+function renderProd(){
+  const el = $('p-prod'); if (!el) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){ skippedRender = true; return; }
+  const date = mDate, list = visibleSites(), cards = [];
+  list.forEach(([siteId,site])=>MEALS.filter(m=>(site.meals||[]).includes(m)).forEach(meal=>{
+    const sid = sidOf(date,siteId,meal), s = sessions[sid]||{}, w = wfState(sid,s), st = stageOf(sessions[sid]);
+    const done = w.pd && w.pd.ts, started = w.cs && w.cs.ts;
+    const status = st.n ? st.label : (started?'Cooking':(w.pl&&w.pl.ts?'Plan received':(w.iss.n?'Material issued':'Waiting')));
+    const edit = canStep('plan') && !done;
+    const kEdit = canStep('prod') && !done;
+    cards.push(`<div class="card"><div class="row"><div style="font-size:26px">${MEAL_ICON[meal]}</div><div class="grow"><b>${esc(site.name)} — ${meal}</b><div class="sub">${esc(status)}</div></div><button class="btn sec" data-wf="open" data-sid="${sid}" style="padding:7px 11px;font-size:12.5px">Full sheet ›</button></div>
+      ${wfLine(sid,s)}
+      <div style="margin-top:8px"><div class="sub" style="font-weight:700;color:var(--ink)">📤 Raw material issued</div><div class="sub">${w.iss.n? issueTxt(w.iss.lines)+' · '+esc(w.iss.by)+' '+hm(w.iss.ts) : (w.gen.n?'General issue only ('+w.gen.n+' lines today) — ask Store Keeper to link it to this meal':'Not issued yet')}</div></div>
+      <div style="margin-top:8px"><div class="sub" style="font-weight:700;color:var(--ink)">🍛 Dishes</div>
+        ${edit ? wfDishEdit(sid,w,true) : Object.entries(s.items||{}).map(([id,it])=>{ const d = items[id]||{name:'(deleted)',unit:''}; return `<div class="row" style="margin-bottom:6px"><div class="grow"><b>${esc(d.name)}</b><div class="sub">Planned ${it.planned?fmt(it.planned)+' '+esc(d.unit):'—'}</div></div>
+          ${kEdit?`<input class="wfmade" data-sid="${sid}" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.prepared||''}" placeholder="made" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span>`:`<div class="qty">${fmt(it.prepared||0)} <small>${esc(d.unit)} made</small></div>`}</div>`; }).join('') || '<div class="sub">No dishes planned yet.</div>'}
+        ${edit && kEdit && Object.keys(s.items||{}).length ? '<div class="sub" style="margin-top:4px">Made quantities are entered by the kitchen after the plan is sent.</div>' : ''}
+      </div>
+      ${edit && Object.keys(s.items||{}).length && canStep('prod') ? Object.entries(s.items||{}).map(([id,it])=>{ const d=items[id]||{name:'',unit:''}; return `<div class="row" style="margin-top:4px"><div class="grow sub" style="margin:0">Made: <b>${esc(d.name)}</b></div><input class="wfmade" data-sid="${sid}" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.prepared||''}" placeholder="made" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span></div>`; }).join('') : ''}
+      ${wfActions(sid,w)}
+      ${started && !done && canStep('prod') ? `<button class="btn save" data-wf="done" data-sid="${sid}">✅ Cooking complete — pass to QC & dispatch</button>` : ''}
+      ${done ? `<div class="sub" style="margin-top:8px;color:var(--green)">✅ Cooked ${hm(w.pd.ts)} by ${esc(w.pd.by||'')} — continues in Meals (QC → packing → vehicle)</div>`:''}
+    </div>`);
+  }));
+  const hello = { store:'You issue the raw material. The kitchen is alerted with a loud alarm the moment you save an issue.', prodmanager:'Plan each meal and press <b>Send plan to kitchen</b> — the kitchen is alerted with a loud alarm.', kitchen:'Wait for the alarm, check material and plan, press <b>Start cooking</b>, enter quantities made, then <b>Cooking complete</b>.', cook:'Wait for the alarm, check material and plan, press <b>Start cooking</b>, enter quantities made, then <b>Cooking complete</b>.', admin:'Process: Store issues → Production Manager sends plan → Kitchen/Cook starts → cooking complete → QC → dispatch.' }[me.role] || '';
+  el.innerHTML = `<h2>👨‍🍳 Production</h2>
+    <div class="row" style="margin-bottom:10px"><button class="btn sec" id="prPrev" style="padding:9px 14px">‹</button><input type="date" id="prPick" value="${date}" style="text-align:center"><button class="btn sec" id="prNext" style="padding:9px 14px">›</button></div>
+    ${hello?`<div class="notice info" style="margin-bottom:10px">ℹ️ <div>${hello}</div></div>`:''}
+    ${cards.join('') || '<div class="empty">No counters/meals set up yet. Admin: Masters → Counters.</div>'}`;
+  const shift = n => { const d = new Date(mDate+'T00:00:00'); d.setDate(d.getDate()+n); mDate = keyOf(d); renderProd(); };
+  $('prPrev').onclick = ()=>shift(-1); $('prNext').onclick = ()=>shift(1); $('prPick').onchange = ()=>{ if ($('prPick').value){ mDate = $('prPick').value; renderProd(); } };
+}
+
+document.addEventListener('change', e=>{
+  const t = e.target; if (!t || !me) return;
+  if (t.classList && t.classList.contains('wfadd') && t.value){
+    const sid = t.dataset.sid, id = t.value, q = document.querySelector('.wfaddq[data-sid="'+sid+'"]'), pl = q ? num(q.value) : NaN; t.blur();
+    stampBase(sid).then(()=>db.ref(P+'sessions/'+sid+'/items/'+id).set({ planned: pl>0?pl:null, prepared:0 })).then(()=>{ toast('Dish added'); renderAll(); }).catch(()=>alert('Could not add the dish. Check the internet and try again.'));
+  }
+  else if (t.classList && t.classList.contains('wfpl')){ const v = num(t.value); db.ref(P+'sessions/'+t.dataset.sid+'/items/'+t.dataset.id+'/planned').set(v>0?v:null).then(()=>toast('Saved')); }
+  else if (t.classList && t.classList.contains('wfmade')){ const v = num(t.value); if (v>=0) db.ref(P+'sessions/'+t.dataset.sid+'/items/'+t.dataset.id).update({ prepared:v, preparedAt:Date.now() }).then(()=>toast('Saved')); }
+});
+function stampBase(sid){ const [date,siteId,meal] = sid.split('_'); return db.ref(P+'sessions/'+sid).update({ date, siteId, meal }); }
+document.addEventListener('click', e=>{
+  const rm = e.target.closest && e.target.closest('[data-wfrm]');
+  if (rm){ const [sid,id] = rm.dataset.wfrm.split('|'); db.ref(P+'sessions/'+sid+'/items/'+id).remove().then(()=>renderAll()); return; }
+  const b = e.target.closest && e.target.closest('[data-wf]'); if (!b || !me) return;
+  const sid = b.dataset.sid, act = b.dataset.wf, w = wfState(sid);
+  if (act==='open'){ openSid = sid; go('meals'); return; }
+  if (act==='suggest'){
+    const keep = { d:planSt.date, s:planSt.site, m:planSt.meal }; planSt.date = w.date; planSt.site = w.siteId; planSt.meal = w.meal;
+    let r; try{ r = planModel().rows[0]; }catch(err){} planSt.date = keep.d; planSt.site = keep.s; planSt.meal = keep.m;
+    const ds = r ? r.dishes.filter(d=>d.qty>0) : []; if (!ds.length){ alert('No past sales history for this counter and meal yet — add dishes and quantities by hand.'); return; }
+    const ups = { date:w.date, siteId:w.siteId, meal:w.meal }; ds.forEach(d=>{ ups['items/'+d.id+'/planned'] = d.qty; if (!(w.s.items||{})[d.id]) ups['items/'+d.id+'/prepared'] = 0; });
+    db.ref(P+'sessions/'+sid).update(ups).then(()=>{ toast('Suggested quantities filled'); renderAll(); }); return;
+  }
+  if (act==='plan'){
+    if (!w.planned.length){ alert('Add at least one dish with a planned quantity first.'); return; }
+    if (!(w.iss.n>0) && !confirm('No raw material has been issued for this meal yet.\nSend the plan to the kitchen anyway?')) return;
+    b.disabled = true; stampT(sid,'planned').then(()=>{ toast('📣 Plan sent — kitchen alerted'); renderAll(); }); return;
+  }
+  if (act==='start'){
+    if (!(w.pl&&w.pl.ts) && !confirm('The Production Manager has not sent the plan yet.\nStart cooking anyway?')) return;
+    if (!(w.iss.n>0) && !confirm('No raw material has been issued for this meal yet.\nStart cooking anyway?')) return;
+    b.disabled = true; stampT(sid,'cookStart').then(()=>{ toast('🍳 Cooking started'); renderAll(); }); return;
+  }
+  if (act==='done'){
+    const s = sessions[sid]||{}; const any = Object.values(s.items||{}).some(i=>i.prepared>0);
+    if (!any){ alert('Enter the quantity made for at least one dish.'); return; }
+    b.disabled = true; stampT(sid,'prodDone').then(()=>{ toast('✅ Cooking complete'); renderAll(); }); return;
+  }
+});
+
+/* ---------- hand-off alerts to the people above & below ---------- */
+const WF_DEF = {
+  planned:{ ic:'🗓️', t:'Plan sent to kitchen', to:['kitchen','cook','store','prodmanager','admin'], loud:['kitchen','cook'] },
+  cookStart:{ ic:'🍳', t:'Cooking started', to:['prodmanager','store','admin','driver','supervisor','counter'], loud:[] },
+  prodDone:{ ic:'✅', t:'Cooking complete — ready for QC', to:['prodmanager','driver','supervisor','counter','admin','kitchen','cook'], loud:['prodmanager','driver'] },
+  packed:{ ic:'📦', t:'Packed', to:['driver','prodmanager','kitchen','cook','admin'], loud:['driver'] },
+  loaded:{ ic:'🚛', t:'Loaded in vehicle', to:['driver','prodmanager','supervisor','counter','admin','kitchen','cook'], loud:['driver'] },
+  counterLoaded:{ ic:'🍽️', t:'Loaded into food counter', to:['prodmanager','kitchen','cook','admin','supervisor','counter','store'], loud:[] }
+};
+function wfEvents(){
+  const out = [], days = [todayKey(), keyOf(new Date(Date.now()-864e5)), keyOf(new Date(Date.now()+864e5))], vs = new Set(visibleSites().map(([k])=>k)), role = me.role;
+  Object.entries(sessions).forEach(([sid,x])=>{
+    if (!x.date || !days.includes(x.date) || !vs.has(x.siteId)) return;
+    const nm = (sites[x.siteId]||{}).name || x.siteId, tag = nm+' · '+x.meal;
+    Object.entries(WF_DEF).forEach(([k,d])=>{ const t = T(x,k); if (t && t.ts && d.to.includes(role)) out.push({ id:'wf:'+k+':'+sid+':'+t.ts, ts:t.ts, k:'wf', icon:d.ic, lvl:d.loud.includes(role)?'amber':'', loud:d.loud.includes(role), by:t.by, title:d.t+' — '+tag, text:'by '+(t.by||'—'), go:'prod' }); });
+    [['qc1','Production QC',['kitchen','cook','driver','prodmanager','admin']],['qc2','Arrival QC',['prodmanager','kitchen','cook','admin','driver','supervisor','counter']]].forEach(([k,l,to])=>{ const q = x[k]; if (q && q.ts && q.ok!==false && to.includes(role)) out.push({ id:'wf:'+k+':'+sid+':'+q.ts, ts:q.ts, k:'wf', icon:'🧪', by:q.by, title:l+' passed — '+tag, text:(q.temp!=null?q.temp+'°C · ':'')+'by '+(q.by||'—'), go:'meals' }); });
+  });
+  if (['kitchen','cook','prodmanager','admin'].includes(role)){
+    const batches = {};
+    Object.entries(ledger).forEach(([id,e])=>{ if (e.type!=='issue' || e.reversed) return; const k = e.batch || id; const b = batches[k] = batches[k] || { ts:0, by:'', n:0, siteId:e.siteId, meal:e.meal, d:e.forDate||e.date }; b.n++; if ((e.ts||0)>b.ts){ b.ts = e.ts; b.by = e.by||''; } });
+    Object.entries(batches).forEach(([k,b])=>{ if (!b.ts || !days.includes(b.d) || (b.siteId && !vs.has(b.siteId))) return; const tgt = b.siteId && sites[b.siteId] ? sites[b.siteId].name+' · '+b.meal : 'general kitchen use';
+      out.push({ id:'wf:issue:'+k, ts:b.ts, k:'wf', icon:'📤', lvl:'amber', loud:true, by:b.by, title:'Raw material issued — '+tgt, text:b.n+' item'+(b.n>1?'s':'')+' by '+(b.by||'Store Keeper')+' · check the Production tab', go:'prod' }); });
+  }
+  return out.filter(e=>e.by!==me.name || false);
+}
+
+/* ---------- loud alarm: siren + vibration + "Got it" screen ---------- */
+let actx = null, alarmTimer = null, alarmItems = [], alarmStart = 0;
+function audioCtx(){ try{ if (!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); if (actx.state==='suspended') actx.resume(); }catch(e){} return actx; }
+['click','touchstart','keydown'].forEach(n=>document.addEventListener(n, ()=>audioCtx(), {capture:true, passive:true}));
+function sirenOnce(){
+  const c = audioCtx(); try{ if (navigator.vibrate) navigator.vibrate([700,150,700,150,700,150,700,150,700]); }catch(e){}
+  if (!c) return;
+  const t0 = c.currentTime, g = c.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.95,t0+0.05); g.gain.setValueAtTime(0.95,t0+3.4); g.gain.exponentialRampToValueAtTime(0.0001,t0+3.6);
+  const comp = c.createDynamicsCompressor(); g.connect(comp); comp.connect(c.destination);
+  [['square',0],['sawtooth',0]].forEach(([type,off])=>{ const o = c.createOscillator(); o.type = type; for (let i=0;i<9;i++) o.frequency.setValueAtTime(i%2?740:1180, t0+i*0.4); o.connect(g); o.start(t0); o.stop(t0+3.6); });
+}
+function alarmBox(){ let b = document.getElementById('alarmBox'); if (!b){ b = document.createElement('div'); b.id = 'alarmBox'; document.body.appendChild(b); } return b; }
+function alarmStop(){ if (alarmTimer){ clearInterval(alarmTimer); alarmTimer = null; } alarmItems = []; const b = document.getElementById('alarmBox'); if (b) b.classList.remove('show'); try{ if (navigator.vibrate) navigator.vibrate(0); }catch(e){} }
+function alarmPaint(){
+  const b = alarmBox(); const it = alarmItems.slice(0,4);
+  b.innerHTML = `<div class="ab-card"><div class="ab-ic">🔔</div><h3>${alarmItems.length>1?alarmItems.length+' urgent updates':'Urgent update'}</h3>
+    ${it.map(x=>`<div class="ab-row"><b>${esc(x.icon)} ${esc(x.title)}</b><div>${esc(x.text||'')}</div></div>`).join('')}
+    <div class="two" style="margin-top:12px"><button class="btn" id="abOpen">Open</button><button class="btn sec" id="abOk">✔ Got it</button></div></div>`;
+  b.classList.add('show');
+  $('abOk').onclick = alarmStop;
+  $('abOpen').onclick = ()=>{ const g = alarmItems[0] && alarmItems[0].go; alarmStop(); if (g && can(g)) go(g); };
+}
+function alarmRing(items){
+  alarmItems = items.concat(alarmItems).slice(0,10); alarmPaint(); sirenOnce(); alarmStart = Date.now();
+  if (!alarmTimer) alarmTimer = setInterval(()=>{ if (Date.now()-alarmStart > 90000){ alarmStop(); return; } sirenOnce(); }, 7000);
+}
+document.addEventListener('visibilitychange', ()=>{ if (!document.hidden && me) { try{ updateBell(); }catch(e){} } });
+
+/* ---------- never leave a screen stale after typing finishes ---------- */
+let ptrDown = false;
+document.addEventListener('pointerdown', ()=>{ ptrDown = true; }, true);
+document.addEventListener('pointerup', ()=>{ ptrDown = false; }, true);
+document.addEventListener('pointercancel', ()=>{ ptrDown = false; }, true);
+document.addEventListener('focusout', ()=>{
+  if (!skippedRender) return;
+  setTimeout(()=>{ if (!skippedRender || ptrDown || !me) return; const a = document.activeElement; if (a && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) return; skippedRender = false; try{ renderAll(); }catch(e){} }, 700);
+});
+setInterval(()=>{ if (me && skippedRender && !ptrDown){ const a = document.activeElement; if (!(a && /INPUT|SELECT|TEXTAREA/.test(a.tagName))){ skippedRender = false; try{ renderAll(); }catch(e){} } } }, 4000);
 
 const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
 if (saved && ROLES[saved.role]){ me = saved; enter(); }

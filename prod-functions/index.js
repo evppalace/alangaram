@@ -24,7 +24,7 @@ async function send(targets, title, body, ref, extra) {
     tokens: targets.map(t => t.token),
     notification: { title, body: (ref ? ref + ' · ' : '') + body },
     data: Object.assign({ ref: ref || '' }, extra || {}),
-    android: { priority: 'high', notification: { tag: ref || undefined } }
+    android: { priority: 'high', notification: Object.assign({ tag: ref || undefined }, extra && extra.loud ? { channelId: 'urgent', sound: 'default', defaultVibrateTimings: true, priority: 'max' } : {}) }
   });
   const dead = [];
   res.responses.forEach((r, i) => { if (!r.success && /registration-token-not-registered|invalid-argument|invalid-registration/.test((r.error && r.error.code) || '')) dead.push(targets[i].path); });
@@ -72,4 +72,38 @@ exports.onSessionTimes = onValueWritten(opt('/prod_sessions/{sid}'), async ev =>
   if (!at(a, 'arrived') && at(b, 'arrived')) await send(await tokensFor(both(site)), `📍 Arrived at counter — ${tag}`, b.odo && b.odo.end != null && b.odo.start != null ? `${Math.round((b.odo.end - b.odo.start) * 10) / 10} km driven` : 'Food has reached the counter', code, { type: 'trip' });
   ['qc1', 'qc2'].forEach(async k => { if ((!a[k] || !a[k].ts) && b[k] && b[k].ts && b[k].ok === false) await send(await tokensFor(both(site)), `⚠️ Quality check failed — ${tag}`, `${k === 'qc1' ? 'Kitchen' : 'Arrival'} check${b[k].temp != null ? ' · ' + b[k].temp + '°C' : ''}`, code, { type: 'qc' }); });
   if (!at(a, 'closed') && at(b, 'closed')) await send(await tokensFor(toAgg(site)), `♻️ Wastage update — ${tag}`, 'Meal closed. Open the app for the wastage figures.', code, { type: 'waste' });
+});
+
+/* ---- Production hand-offs: loud alerts to the people above & below each step ---- */
+const roleIn = (roles, loudRoles, site) => v => roles.includes(v.role) && (!['supervisor', 'counter'].includes(v.role) || v.siteId === 'all' || !site || v.siteId === site);
+const HAND = {
+  planned: ['🗓️ Plan sent to kitchen', ['kitchen', 'cook', 'store', 'prodmanager', 'admin'], ['kitchen', 'cook']],
+  cookStart: ['🍳 Cooking started', ['prodmanager', 'store', 'admin', 'driver', 'supervisor', 'counter'], []],
+  prodDone: ['✅ Cooking complete — ready for QC', ['prodmanager', 'driver', 'supervisor', 'counter', 'admin', 'kitchen', 'cook'], ['prodmanager', 'driver']],
+  packed: ['📦 Packed', ['driver', 'prodmanager', 'kitchen', 'cook', 'admin'], ['driver']],
+  loaded: ['🚛 Loaded in vehicle', ['driver', 'prodmanager', 'supervisor', 'counter', 'admin', 'kitchen', 'cook'], ['driver']],
+  counterLoaded: ['🍽️ Loaded into food counter', ['prodmanager', 'kitchen', 'cook', 'admin', 'supervisor', 'counter', 'store'], []]
+};
+exports.onHandOffs = onValueWritten(opt('/prod_sessions/{sid}'), async ev => {
+  const a = ev.data.before.val() || {}, b = ev.data.after.val(); if (!b) return;
+  const sid = ev.params.sid, [d, site, meal] = sid.split('_'), tag = `${site.toUpperCase()} · ${meal}`;
+  const at = (o, k) => o && o.times && o.times[k] && o.times[k].ts;
+  for (const [k, [title, roles, loud]] of Object.entries(HAND)) {
+    const ts = at(b, k); if (!ts || ts === at(a, k)) continue;
+    const by = b.times[k].by || '';
+    const all = await tokensFor(roleIn(roles, loud, site));
+    const isLoud = v => loud.includes(v.role);
+    const lt = (await tokensFor(v => roleIn(roles, loud, site)(v) && isLoud(v))), st = all.filter(t => !lt.some(x => x.token === t.token));
+    await send(lt, title + ' — ' + tag, 'by ' + by, '', { type: 'handoff', loud: '1', tab: 'prod' });
+    await send(st, title + ' — ' + tag, 'by ' + by, '', { type: 'handoff' });
+  }
+});
+exports.onKitchenIssue = onValueCreated(opt('/prod_ledger/{id}'), async ev => {
+  const e = ev.data.val(); if (!e || e.type !== 'issue') return;
+  if (e.batch) {
+    const snap = await admin.database().ref('prod_ledger').orderByChild('batch').equalTo(e.batch).once('value');
+    const keys = Object.keys(snap.val() || {}).sort(); if (keys[0] !== ev.params.id) return;
+  }
+  const tgt = e.siteId ? `${String(e.siteId).toUpperCase()} · ${e.meal}` : 'general kitchen use';
+  await send(await tokensFor(v => ['kitchen', 'cook', 'prodmanager', 'admin'].includes(v.role)), `📤 Raw material issued — ${tgt}`, `by ${e.by || 'Store Keeper'} · check the Production tab`, '', { type: 'issue', loud: '1', tab: 'prod' });
 });
