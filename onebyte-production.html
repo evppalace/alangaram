@@ -87,6 +87,15 @@
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style id="v2">
+#dlBox{position:fixed;inset:0;z-index:99997;background:rgba(150,10,10,.78);display:none;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(3px)}
+#dlBox.show{display:flex;animation:abFlash .8s infinite}
+#dlBox .ab-card{background:#fff;color:#1a1a1a;border-radius:20px;padding:18px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#dlBox .ab-ic{font-size:44px;text-align:center;animation:abShake .4s infinite}
+#dlBox h3{margin:4px 0 6px;text-align:center;color:#b3261e}
+#dlBox .ab-row{padding:8px 0;border-top:1px solid #eee;font-size:14px}
+#dlBox .sub{color:#555}
+#alarmBox .btn.sec,#dlBox .btn.sec{background:#eceff1!important;color:#222!important}
+
 @media (prefers-color-scheme:dark){.seg,.soon,.jst b,.jdot{background:var(--card)!important}.bm a{color:#5fe0ab}.bm.me a{color:#fff}.bot-c button{background:var(--card)!important;color:#5fe0ab!important}.bm.bot{background:#1b3328!important;color:#e8f5ee!important}}
 
 #alarmBox{position:fixed;inset:0;z-index:99998;background:rgba(120,10,10,.72);display:none;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(3px)}
@@ -560,7 +569,7 @@ function renderAll(){
   if (can('dishes'))   renderDishes();
   if (can('prod'))     renderProd();
   if (can('req'))      renderReq();
-  try{ updateBell(); uwAttach(); botShow(); pushInit(); }catch(e){}
+  try{ updateBell(); uwAttach(); botShow(); pushInit(); dlSchedule(); }catch(e){}
 }
 
 /* ============ HOME ============ */
@@ -1545,10 +1554,10 @@ function renderMasters(){
   const el = $('p-masters');
   if (el.querySelector('input:focus, select:focus')) return;
   el.innerHTML = `
-    <div class="chips">${[['items','Items'],['recipes','Recipes'],['sites','Counters'],['basins','Basins'],['contacts','Contacts'],['settings','Settings']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
+    <div class="chips">${[['items','Items'],['recipes','Recipes'],['sites','Counters'],['basins','Basins'],['contacts','Contacts'],['alarms','⏰ Alarms'],['settings','Settings']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
     <div id="mBody"></div>`;
   el.querySelectorAll('[data-m]').forEach(c=>c.onclick=()=>{ mTab=c.dataset.m; renderMasters(); });
-  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else if (mTab==='basins') mBasins(); else if (mTab==='recipes') mRecipes(); else if (mTab==='contacts') mContacts(); else mSettings();
+  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else if (mTab==='basins') mBasins(); else if (mTab==='recipes') mRecipes(); else if (mTab==='contacts') mContacts(); else if (mTab==='alarms') mAlarms(); else mSettings();
 }
 function formShell(title, body, saveId){
   return `<div class="card" id="mForm"><b>${title}</b>${body}${saveId?`<button class="btn save" id="${saveId}">Save</button>`:""}</div>`;
@@ -1903,10 +1912,11 @@ function bellSheet(){
   openSheet('<h3>🔔 Alerts &amp; updates</h3>'+
     (ev.length ? ev.slice(0,40).map(e=>`<div class="feed ${e.lvl||''}"><i>${e.icon}</i><div class="grow"><b>${esc(e.title)}</b>${e.ts>seen?' <span class="badge amber">new</span>':''}<div class="sub">${esc(e.text||'')}</div><div class="sub">${evRef(e)?'Ref '+esc(evRef(e))+' · ':''}${ago(e.ts)}</div></div></div>`).join('') : '<div class="empty">No updates yet today. Vehicle, wastage, quality and escalation updates appear here.</div>')+
     '<h2>Choose what to be alerted about</h2>'+ALERT_PREFS.map(([k,l])=>`<label style="display:flex;gap:10px;align-items:center;font-size:14px;color:var(--ink);margin:6px 0"><input type="checkbox" data-pf="${k}" ${pr[k]!==0?'checked':''} style="width:auto"> ${l}</label>`).join('')+
-    (window.Notification && Notification.permission!=='granted' ? '<button class="btn gold save" id="notifOn">🔔 Allow phone notifications</button><div class="sub">Phone pop-ups work while the app is open. Alerts always appear here.</div>' : ''));
+    '<div class="sub" style="margin-top:8px">'+esc(pushText())+'</div><div class="two"><button class="btn gold save" id="notifOn">🔔 Enable phone alerts</button><button class="btn sec save" id="notifTest">🔊 Test alarm</button></div>');
   try{ store.setItem('prod_seen_'+me.id, String(Date.now())); }catch(e){}
   $('sheet').querySelectorAll('[data-pf]').forEach(c=>c.onchange=()=>{ const p = alertPrefs(); p[c.dataset.pf] = c.checked?1:0; try{ store.setItem('prod_alertprefs', JSON.stringify(p)); }catch(e){} updateBell(); });
-  const no = $('notifOn'); if (no) no.onclick = ()=>{ try{ Notification.requestPermission().then(()=>{ closeSheet(); toast('Notifications '+(Notification.permission==='granted'?'on':'blocked')); }); }catch(e){ toast('Not supported on this device'); } };
+  const no = $('notifOn'); if (no) no.onclick = async ()=>{ const m = await enableAlerts(); if (/blocked/i.test(m)) alert(m); };
+  const nt = $('notifTest'); if (nt) nt.onclick = testAlarm;
   updateBell();
 }
 $('bell').onclick = bellSheet;
@@ -2982,6 +2992,145 @@ function retBind(el){
     addLedger({ date:retDay, itemId:id, type:'return', qty:delta, note:'returned from kitchen' }).then(()=>{ toast('↩ Return saved — stock updated'); });
   });
 }
+
+/* ============ v7: TIMED DEADLINE ALARMS (admin sets the times) + phone-alert enabling ============ */
+const DL_STEPS = [
+  { k:'issue',  ic:'📤', l:'Raw material issued',          owners:['store'],                             f:'issueBy', lead:15, go:'issue', done:w=>w.iss.n>0 },
+  { k:'plan',   ic:'🗓️', l:'Plan sent to kitchen',         owners:['prodmanager'],                       f:'planBy',  lead:10, go:'prod',  done:w=>!!(w.pl&&w.pl.ts) },
+  { k:'cook',   ic:'🍳', l:'Cooking complete',             owners:['kitchen','cook'],                    f:'cookBy',  lead:10, go:'prod',  done:w=>!!(w.pd&&w.pd.ts) },
+  { k:'pack',   ic:'📦', l:'Packed, loaded & dispatched',  owners:['prodmanager'],                       f:'packBy',  lead:10, go:'prod',  done:w=>!!(T(w.s,'loaded')&&T(w.s,'loaded').ts) },
+  { k:'depart', ic:'🚚', l:'Driver starts the trip',       owners:['driver'],                            f:'depart',  lead:0,  go:'meals', sched:1, done:w=>!!(T(w.s,'departed')&&T(w.s,'departed').ts) },
+  { k:'arrive', ic:'📍', l:'Vehicle reaches the counter',  owners:['driver','supervisor','counter'],     f:'arrive',  lead:0,  go:'meals', sched:1, done:w=>!!(T(w.s,'arrived')&&T(w.s,'arrived').ts) }
+];
+const dlCfg = () => settings.alarm || {};
+const dlLead = st => { const v = (dlCfg().lead||{})[st.k]; return v!=null && isFinite(+v) ? +v : st.lead; };
+function dlTime(site, meal, st){ const o = st.sched ? (site.sched||{})[meal] : (site.alarms||{})[meal]; return (o||{})[st.f] || ''; }
+function dlAt(dateKey, hhmm){ const [h,m] = hhmm.split(':').map(Number); const d = new Date(dateKey+'T00:00:00'); d.setHours(h, m, 0, 0); return d.getTime(); }
+function dlList(dateKey, roleOnly){
+  if (!me || dlCfg().off) return [];
+  const out = [], now = Date.now();
+  Object.entries(sites).forEach(([siteId,site])=>{
+    if (ROLES[me.role] && ROLES[me.role].site && me.siteId && me.siteId!=='all' && me.siteId!==siteId) return;
+    (site.meals||[]).forEach(meal=>{
+      const sid = sidOf(dateKey,siteId,meal), w = wfState(sid, sessions[sid]);
+      DL_STEPS.forEach(st=>{
+        const hh = dlTime(site,meal,st); if (!hh) return;
+        const due = dlAt(dateKey,hh), start = due - dlLead(st)*60000, over = Math.floor((now-due)/60000);
+        const owner = st.owners.includes(me.role), esc2 = !roleOnly && over>=10 && ['prodmanager','admin'].includes(me.role);
+        if (!owner && !esc2) return;
+        out.push({ key:dateKey+'|'+siteId+'|'+meal+'|'+st.k, sid, st, site:site.name||siteId, meal, hh, due, start, over, done:st.done(w), owner, esc:!owner });
+      });
+    });
+  });
+  return out;
+}
+function dlActive(){
+  const now = Date.now();
+  return dlList(todayKey()).filter(a=>!a.done && now>=a.start && now<=a.due+6*3600000).map(a=>{ const since = (now-a.start)/60000; a.level = Math.min(5, 1+Math.floor(since/4)); return a; });
+}
+/* escalating siren: louder, faster, longer as the deadline slips */
+function sirenLevel(lv){
+  const c = audioCtx(); try{ if (navigator.vibrate) navigator.vibrate(Array.from({length:3+lv*2},()=>[500+lv*120,120]).flat()); }catch(e){}
+  if (!c) return; const t0 = c.currentTime, len = 1.6+lv*0.7, vol = Math.min(1, 0.35+lv*0.15);
+  const g = c.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(vol,t0+0.05); g.gain.setValueAtTime(vol,t0+len-0.2); g.gain.exponentialRampToValueAtTime(0.0001,t0+len);
+  const comp = c.createDynamicsCompressor(); g.connect(comp); comp.connect(c.destination);
+  const step = Math.max(0.16, 0.45-lv*0.06), types = lv>=4 ? ['square','sawtooth','triangle'] : lv>=2 ? ['square','sawtooth'] : ['square'];
+  types.forEach((type,ti)=>{ const o = c.createOscillator(); o.type = type; for (let i=0;i*step<len;i++) o.frequency.setValueAtTime((i%2?700:1100)*(1+ti*0.01), t0+i*step); o.connect(g); o.start(t0); o.stop(t0+len); });
+}
+let dlSnooze = {}, dlLastRing = 0;
+function dlBox(){ let b = document.getElementById('dlBox'); if (!b){ b = document.createElement('div'); b.id = 'dlBox'; document.body.appendChild(b); } return b; }
+function dlPaint(list, lv){
+  const b = dlBox(), sig = list.map(a=>a.key+a.level+Math.floor(a.over/1)).join(',');
+  if (b._sig === sig) return; b._sig = sig;
+  b.innerHTML = `<div class="ab-card dl"><div class="ab-ic">⏰</div><h3>${list.some(a=>a.over>0)?'OVERDUE — act now':'Deadline coming up'}</h3><div class="sub" style="text-align:center;margin-bottom:6px">This alarm keeps ringing, louder every few minutes, until the step is done in the app.</div>
+    ${list.slice(0,4).map(a=>`<div class="ab-row"><b>${a.st.ic} ${esc(a.st.l)}</b><div>${esc(a.site)} · ${esc(a.meal)} · due <b>${esc(a.hh)}</b> — ${a.over>0?'<span style="color:#b3261e;font-weight:800">'+a.over+' min overdue</span>':'in '+Math.max(0,-a.over)+' min'}${a.esc?' <i>(escalated to you)</i>':''}</div></div>`).join('')}
+    ${list.length>4?`<div class="sub">+${list.length-4} more</div>`:''}
+    <div class="two" style="margin-top:12px"><button class="btn" id="dlOpen">Do it now</button><button class="btn sec" id="dlSnz">Snooze 2 min</button></div></div>`;
+  b.classList.add('show');
+  $('dlOpen').onclick = ()=>{ const a = list[0]; if (a.st.go==='meals'){ openSid = a.sid; } if (a.st.go==='issue' || a.st.go==='prod' || a.st.go==='meals'){ if (can(a.st.go)) go(a.st.go); } b.classList.remove('show'); b._sig=''; list.forEach(x=>dlSnooze[x.key] = Date.now()+90*1000); };
+  $('dlSnz').onclick = ()=>{ list.forEach(x=>dlSnooze[x.key] = Date.now()+120000); b.classList.remove('show'); b._sig=''; try{ if (navigator.vibrate) navigator.vibrate(0); }catch(e){} };
+}
+function dlTick(){
+  if (!me) return;
+  const b = document.getElementById('dlBox');
+  const act = dlActive().filter(a=>!(dlSnooze[a.key] > Date.now()));
+  if (!act.length){ if (b){ b.classList.remove('show'); b._sig = ''; } return; }
+  const lv = Math.max(...act.map(a=>a.level)); dlPaint(act, lv);
+  const gap = Math.max(2500, 9000 - lv*1500);
+  if (Date.now()-dlLastRing >= gap){ dlLastRing = Date.now(); sirenLevel(lv); }
+}
+setInterval(()=>{ try{ dlTick(); }catch(e){} }, 1000);
+
+/* closed-app: schedule phone alarms (no Firebase needed); they are rebuilt whenever the app is open */
+let dlSchedAt = 0;
+async function dlSchedule(force){
+  const LN = CAP().LocalNotifications; if (!LN || !me || !LN.schedule) return;
+  if (!force && Date.now()-dlSchedAt < 60000) return; dlSchedAt = Date.now();
+  try{
+    let old = []; try{ old = JSON.parse(store.getItem('prod_dlids_'+me.id)||'[]'); }catch(e){}
+    if (old.length) await LN.cancel({ notifications: old.map(id=>({id})) });
+    const now = Date.now(), ids = [], notes = [];
+    [todayKey(), dayKey(1)].forEach(dk=>dlList(dk,true).forEach(a=>{
+      if (a.done || !a.owner) return;
+      for (let i=0;i<8;i++){ const at = a.start + i*3*60000; if (at < now+4000 || at > now+36*3600000) continue;
+        let h = 0; const key = a.key+'#'+i; for (let c=0;c<key.length;c++) h = (h*31+key.charCodeAt(c))>>>0; const id = 100000000 + (h % 1800000000);
+        ids.push(id); notes.push({ id, title:(i?'⏰ OVERDUE — ':'⏰ Deadline — ')+a.st.l, body:a.site+' · '+a.meal+' · due '+a.hh+(i?' · open the app and complete it':''), schedule:{ at:new Date(at), allowWhileIdle:true }, channelId:'urgent', extra:{ dl:a.key } }); }
+    }));
+    if (notes.length) await LN.schedule({ notifications:notes.slice(0,60) });
+    store.setItem('prod_dlids_'+me.id, JSON.stringify(ids.slice(0,60)));
+  }catch(e){}
+}
+setInterval(()=>{ try{ dlSchedule(); }catch(e){} }, 60000);
+document.addEventListener('visibilitychange', ()=>{ try{ dlSchedule(true); }catch(e){} });
+
+/* ---------- admin: Masters → Alarms ---------- */
+function mAlarms(){
+  const adm = me.role==='admin', ro = adm ? '' : 'disabled', cfg = dlCfg();
+  $('mBody').innerHTML = `<div class="card"><b>⏰ Production timing alarms</b>
+    <div class="sub">Set the time each step must be finished. The responsible person's phone rings loudly — louder every few minutes — starting a little before the time, and keeps ringing until they complete that step in the app. If it is 10 minutes late, the Production Manager and Admin ring too.</div>
+    ${adm?'':'<div class="notice note" style="margin:8px 0">Only Admin can change these times.</div>'}
+    <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="al_on" ${cfg.off?'':'checked'} ${ro} style="width:auto"> Timing alarms are ON</label>
+    <label style="margin-top:10px">Start ringing this many minutes BEFORE the time</label>
+    <div class="two" style="gap:6px">${DL_STEPS.map(st=>`<div><label style="font-size:11.5px">${st.ic} ${esc(st.l)}</label><input type="number" min="0" max="120" class="al_lead" data-k="${st.k}" value="${dlLead(st)}" ${ro}></div>`).join('')}</div>
+    ${adm?'<button class="btn sec save" id="al_testbtn">🔊 Test the alarm on this phone</button>':''}</div>
+    ${Object.entries(sites).map(([id,s])=>`<div class="card"><b>${esc(s.name)}</b>
+      ${(s.meals||[]).map(m=>`<div style="margin-top:10px"><b>${MEAL_ICON[m]} ${m}</b><div class="two" style="gap:6px;margin-top:4px">${DL_STEPS.map(st=>`<div><label style="font-size:11.5px">${st.ic} ${esc(st.l)} by</label><input type="time" class="al_t" data-s="${id}" data-m="${m}" data-k="${st.k}" value="${esc(dlTime(s,m,st))}" ${ro}></div>`).join('')}</div></div>`).join('') || '<div class="sub">No meals set for this counter.</div>'}</div>`).join('') || '<div class="empty">Add counters first.</div>'}
+    ${adm?'<button class="btn save" id="al_save">Save alarm times</button>':''}`;
+  if (!adm) return;
+  $('al_testbtn').onclick = ()=>{ audioCtx(); sirenLevel(1); setTimeout(()=>sirenLevel(3),2200); setTimeout(()=>sirenLevel(5),5200); toast('Playing level 1 → 3 → 5'); };
+  $('al_save').onclick = ()=>{
+    const lead = {}; document.querySelectorAll('.al_lead').forEach(i=>{ const v = parseInt(i.value,10); if (isFinite(v) && v>=0) lead[i.dataset.k] = v; });
+    const ups = {}; Object.entries(sites).forEach(([id,s])=>(s.meals||[]).forEach(m=>DL_STEPS.forEach(st=>{
+      const i = document.querySelector('.al_t[data-s="'+id+'"][data-m="'+m+'"][data-k="'+st.k+'"]'); const v = i && i.value ? i.value : null;
+      if (st.sched) ups[id+'/sched/'+m+'/'+st.f] = v; else ups[id+'/alarms/'+m+'/'+st.f] = v;
+    })));
+    Promise.all([ db.ref(P+'settings/alarm').set({ off:$('al_on').checked?null:1, lead }), ...Object.entries(sites).map(([id])=>{ const u = {}; Object.entries(ups).filter(([k])=>k.startsWith(id+'/')).forEach(([k,v])=>u[k.slice(id.length+1)] = v); return db.ref(P+'sites/'+id).update(u); }) ])
+      .then(()=>{ toast('⏰ Alarm times saved'); dlSchedule(true); }).catch(()=>alert('Could not save. Check the internet and try again.'));
+  };
+}
+
+/* ---------- phone alerts: enable + test (works without Firebase) ---------- */
+async function enableAlerts(){
+  const C = CAP(), LN = C.LocalNotifications; let msg = '';
+  try{
+    if (LN){ const r = await LN.requestPermissions(); try{ if (LN.createChannel) await LN.createChannel({ id:'urgent', name:'Urgent kitchen & production alerts', description:'Loud alarms', importance:5, visibility:1, vibration:true, lights:true }); }catch(e){}
+      msg = r && r.display==='granted' ? 'Phone alerts are ON.' : 'Alerts are blocked — open phone Settings → Apps → OneByte Production → Notifications and switch them on.'; dlSchedule(true); }
+    else if (window.Notification){ const r = await Notification.requestPermission(); msg = r==='granted' ? 'Alerts are ON.' : 'Alerts are blocked in this browser.'; }
+    else msg = 'This device cannot show phone alerts. Install the Android app.';
+  }catch(e){ msg = 'Could not turn on alerts.'; }
+  toast(msg); return msg;
+}
+function testAlarm(){ audioCtx(); notify('🔔 Test alert','If you can hear this and feel the vibration, alerts are working.','',{urgent:true}); alarmRing([{icon:'🔔', title:'Test alert', text:'Alarm sound and vibration are working on this phone.', go:'home'}]); }
+async function permState(){ try{ const LN = CAP().LocalNotifications; if (LN && LN.checkPermissions){ const r = await LN.checkPermissions(); return r.display; } if (window.Notification) return Notification.permission; }catch(e){} return 'unknown'; }
+let permAsked = false;
+function permAskOnce(){
+  if (permAsked || !me) return; permAsked = true;
+  permState().then(s=>{ if (s==='granted' || s==='unknown') return;
+    openSheet(`<h3>🔔 Turn on phone alerts</h3><div class="sub" style="font-size:14px;margin-bottom:10px">Kitchen alarms, deadline alarms and updates need notifications switched on for this app.</div><button class="btn save" id="pa_on">Turn on alerts</button><button class="btn sec save" id="pa_later">Later</button>`);
+    $('pa_on').onclick = async ()=>{ const m = await enableAlerts(); closeSheet(); if (/blocked/i.test(m)) alert(m); };
+    $('pa_later').onclick = closeSheet; });
+}
+setTimeout(()=>{ setInterval(()=>{ try{ if (me && !permAsked) permAskOnce(); }catch(e){} }, 5000); }, 3000);
 
 const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
 if (saved && ROLES[saved.role]){ me = saved; enter(); }
