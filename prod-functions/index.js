@@ -10,7 +10,7 @@ admin.initializeApp();
 const REGION = 'asia-southeast1', INSTANCE = 'evp-crm-default-rtdb';
 const opt = ref => ({ ref, region: REGION, instance: INSTANCE });
 const pad3 = n => String(n || 0).padStart(3, '0');
-const STAFF = ['admin', 'prodmanager', 'supervisor'];
+const STAFF = ['admin', 'prodmanager', 'opsmanager', 'supervisor'];
 
 async function tokensFor(pred) {
   const snap = await admin.database().ref('prod_push').once('value');
@@ -77,12 +77,12 @@ exports.onSessionTimes = onValueWritten(opt('/prod_sessions/{sid}'), async ev =>
 /* ---- Production hand-offs: loud alerts to the people above & below each step ---- */
 const roleIn = (roles, loudRoles, site) => v => roles.includes(v.role) && (!['supervisor', 'counter'].includes(v.role) || v.siteId === 'all' || !site || v.siteId === site);
 const HAND = {
-  planned: ['🗓️ Plan sent to kitchen', ['kitchen', 'cook', 'store', 'prodmanager', 'admin'], ['kitchen', 'cook']],
-  cookStart: ['🍳 Cooking started', ['prodmanager', 'store', 'admin', 'driver', 'supervisor', 'counter'], []],
-  prodDone: ['✅ Cooking complete — ready for QC', ['prodmanager', 'driver', 'supervisor', 'counter', 'admin', 'kitchen', 'cook'], ['prodmanager', 'driver']],
-  packed: ['📦 Packed', ['driver', 'prodmanager', 'kitchen', 'cook', 'admin'], ['driver']],
-  loaded: ['🚛 Loaded in vehicle', ['driver', 'prodmanager', 'supervisor', 'counter', 'admin', 'kitchen', 'cook'], ['driver']],
-  counterLoaded: ['🍽️ Loaded into food counter', ['prodmanager', 'kitchen', 'cook', 'admin', 'supervisor', 'counter', 'store'], []]
+  planned: ['🗓️ Plan sent to kitchen', ['kitchen', 'cook', 'store', 'prodmanager', 'opsmanager', 'admin'], ['kitchen', 'cook']],
+  cookStart: ['🍳 Cooking started', ['prodmanager', 'opsmanager', 'store', 'admin', 'driver', 'supervisor', 'counter'], []],
+  prodDone: ['✅ Cooking complete — ready for QC', ['prodmanager', 'opsmanager', 'driver', 'supervisor', 'counter', 'admin', 'kitchen', 'cook'], ['prodmanager', 'opsmanager', 'driver']],
+  packed: ['📦 Packed', ['driver', 'prodmanager', 'opsmanager', 'kitchen', 'cook', 'admin'], ['driver']],
+  loaded: ['🚛 Loaded in vehicle', ['driver', 'prodmanager', 'opsmanager', 'supervisor', 'counter', 'admin', 'kitchen', 'cook'], ['driver']],
+  counterLoaded: ['🍽️ Loaded into food counter', ['prodmanager', 'opsmanager', 'kitchen', 'cook', 'admin', 'supervisor', 'counter', 'store'], []]
 };
 exports.onHandOffs = onValueWritten(opt('/prod_sessions/{sid}'), async ev => {
   const a = ev.data.before.val() || {}, b = ev.data.after.val(); if (!b) return;
@@ -91,11 +91,25 @@ exports.onHandOffs = onValueWritten(opt('/prod_sessions/{sid}'), async ev => {
   for (const [k, [title, roles, loud]] of Object.entries(HAND)) {
     const ts = at(b, k); if (!ts || ts === at(a, k)) continue;
     const by = b.times[k].by || '';
+    if (k === 'planned') {
+      /* one alert for the whole day's plan (batch), cook is told to send the requirement */
+      const batch = b.times[k].batch || (sid + ts);
+      const lock = await admin.database().ref('prod_pushlock/' + String(batch).replace(/[.#$\[\]\/]/g, '_')).transaction(c => c ? undefined : Date.now());
+      if (!lock.committed) continue;
+      const cookT = await tokensFor(v => v.role === 'cook');
+      await send(cookT, '🗓️ Meal plan sent — now send your requirement', `by ${by} · ${d}`, '', { type: 'handoff', loud: '1', tab: 'req', date: d });
+      const kT = await tokensFor(v => v.role === 'kitchen');
+      await send(kT, '🗓️ Meal plan sent to kitchen — ' + d, `by ${by}`, '', { type: 'handoff', loud: '1', tab: 'prod', date: d });
+      const oT = await tokensFor(v => ['store', 'prodmanager', 'opsmanager', 'admin'].includes(v.role));
+      await send(oT, '🗓️ Meal plan sent to kitchen — ' + d, `by ${by}`, '', { type: 'handoff', tab: 'prod', date: d });
+      continue;
+    }
     const all = await tokensFor(roleIn(roles, loud, site));
     const isLoud = v => loud.includes(v.role);
     const lt = (await tokensFor(v => roleIn(roles, loud, site)(v) && isLoud(v))), st = all.filter(t => !lt.some(x => x.token === t.token));
-    await send(lt, title + ' — ' + tag, 'by ' + by, '', { type: 'handoff', loud: '1', tab: 'prod' });
-    await send(st, title + ' — ' + tag, 'by ' + by, '', { type: 'handoff' });
+    const tab = k === 'cookStart' ? 'prod' : 'prod';
+    await send(lt, title + ' — ' + tag, 'by ' + by, '', { type: 'handoff', loud: '1', tab, sid, date: d });
+    await send(st, title + ' — ' + tag, 'by ' + by, '', { type: 'handoff', tab, sid, date: d });
   }
 });
 exports.onKitchenIssue = onValueCreated(opt('/prod_ledger/{id}'), async ev => {
@@ -104,14 +118,30 @@ exports.onKitchenIssue = onValueCreated(opt('/prod_ledger/{id}'), async ev => {
     const snap = await admin.database().ref('prod_ledger').orderByChild('batch').equalTo(e.batch).once('value');
     const keys = Object.keys(snap.val() || {}).sort(); if (keys[0] !== ev.params.id) return;
   }
-  const tgt = e.siteId ? `${String(e.siteId).toUpperCase()} · ${e.meal}` : 'general kitchen use';
-  await send(await tokensFor(v => ['kitchen', 'cook', 'prodmanager', 'admin'].includes(v.role)), `📤 Raw material issued — ${tgt}`, `by ${e.by || 'Store Keeper'} · check the Production tab`, '', { type: 'issue', loud: '1', tab: 'prod' });
+  const tgt = e.allDay ? 'entire production' : e.siteId ? `${String(e.siteId).toUpperCase()} · ${e.meal}` : 'general kitchen use';
+  const date = e.forDate || e.date;
+  await send(await tokensFor(v => ['kitchen', 'cook'].includes(v.role)), `📤 Raw material issued — ${tgt}`, `by ${e.by || 'Store Keeper'} · start production`, '', { type: 'issue', loud: '1', tab: 'prod', date });
+  await send(await tokensFor(v => ['prodmanager', 'opsmanager', 'admin'].includes(v.role)), `📤 Raw material issued — ${tgt}`, `by ${e.by || 'Store Keeper'}`, '', { type: 'issue', tab: 'prod', date });
 });
-/* ---- Cook's daily vegetable & provision requirement -> Store Keeper, Production Manager (loud), Kitchen, Admin ---- */
+/* ---- Cook's daily requirement: ONLY Store Keeper, Production / Operations Manager (approve) and Admin ---- */
+const reqTxt = x => { const n = Object.keys(x.items || {}).length; return `by ${x.by || 'Cook'}${n ? ' · ' + n + ' items' : ''}${x.photoKey ? ' · photo' : ''}`; };
 exports.onRequirement = onValueCreated(opt('/prod_settings/reqs/{date}/{id}'), async ev => {
   const x = ev.data.val(); if (!x) return;
-  const n = Object.keys(x.items || {}).length, txt = `by ${x.by || 'Cook'}${x.photoKey ? ' · photo' : ''}${n ? ' · ' + n + ' items' : ''}`;
-  const title = `📝 Requirement list for ${ev.params.date}`;
-  await send(await tokensFor(v => ['store', 'prodmanager'].includes(v.role)), title, txt, '', { type: 'req', loud: '1', tab: 'req' });
-  await send(await tokensFor(v => ['kitchen', 'admin'].includes(v.role)), title, txt, '', { type: 'req' });
+  const date = ev.params.date, txt = reqTxt(x);
+  if (x.approved) { /* sent by a manager: already approved → store issues */
+    await send(await tokensFor(v => v.role === 'store'), `✅ Approved requirement — issue the material (${date})`, txt, '', { type: 'req', loud: '1', tab: 'issue', date });
+    await send(await tokensFor(v => v.role === 'admin'), `📝 Requirement ${date}`, txt, '', { type: 'req', tab: 'req', date });
+    return;
+  }
+  await send(await tokensFor(v => ['prodmanager', 'opsmanager'].includes(v.role)), `📝 Approve cook requirement (${date})`, txt, '', { type: 'req', loud: '1', tab: 'req', date });
+  await send(await tokensFor(v => ['store', 'admin'].includes(v.role)), `📝 Cook requirement sent (${date})`, txt + ' · waiting for approval', '', { type: 'req', tab: 'req', date });
+});
+exports.onRequirementUpdated = onValueUpdated(opt('/prod_settings/reqs/{date}/{id}'), async ev => {
+  const a = ev.data.before.val() || {}, b = ev.data.after.val(); if (!b) return;
+  const date = ev.params.date, txt = reqTxt(b);
+  if (!a.approved && b.approved && !b.issuedTs) {
+    await send(await tokensFor(v => v.role === 'store'), `✅ Approved requirement — issue the material (${date})`, txt + ' · approved by ' + (b.appBy || 'manager'), '', { type: 'req', loud: '1', tab: 'issue', date });
+    await send(await tokensFor(v => v.role === 'cook' && v.name === b.by), `✅ Requirement approved (${date})`, 'Store will issue the material', '', { type: 'req', tab: 'req', date });
+  }
+  if (!a.rejected && b.rejected) await send(await tokensFor(v => v.role === 'cook' && v.name === b.by), `↩ Requirement sent back (${date})`, b.rejNote || 'Please check and send again', '', { type: 'req', loud: '1', tab: 'req', date });
 });

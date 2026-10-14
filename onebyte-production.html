@@ -87,6 +87,23 @@
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style id="v2">
+/* v8 flow, next task, clickable tiles */
+.kpi .card.tap,.feed.tap,.fstep.tap,.nextcard.tap{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.kpi .card.tap:active,.feed.tap:active,.fstep.tap:active{transform:scale(.98)}
+.kgo{color:var(--brand,#04915f);font-weight:800;font-size:11.5px;margin-top:4px}
+.nextcard{border:2px solid var(--amber,#f59e0b);background:linear-gradient(135deg,var(--card,#fff),var(--ok-soft,#e8f6ee))}
+.nextcard small{font-weight:800;letter-spacing:.06em;color:var(--amber,#b7791f);display:block}
+.nextcard b{font-size:17px;display:block;margin-top:2px}
+.flow5 .fstep{display:flex;gap:10px;align-items:flex-start;padding:9px 6px;border-top:1px solid var(--line);border-radius:10px}
+.flow5 .fstep:first-of-type{border-top:0}
+.flow5 .fdot{width:26px;height:26px;border-radius:99px;flex:none;background:var(--line);color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px}
+.flow5 .fstep.done .fdot{background:var(--green);color:#fff}
+.flow5 .fstep.now{background:var(--ok-soft)}
+.flow5 .fstep.now .fdot{background:var(--amber,#f59e0b);color:#fff}
+.flow5 .who{font-size:11px;opacity:.8}
+.flow5 .yours{background:var(--amber,#f59e0b);color:#fff;border-radius:99px;padding:2px 8px;font-size:11px;font-weight:800}
+.flow5 .chev,.feed .chev{align-self:center;font-size:22px;color:var(--muted);flex:none}
+
 #dlBox{position:fixed;inset:0;z-index:99997;background:rgba(150,10,10,.78);display:none;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(3px)}
 #dlBox.show{display:flex;animation:abFlash .8s infinite}
 #dlBox .ab-card{background:#fff;color:#1a1a1a;border-radius:20px;padding:18px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
@@ -419,16 +436,18 @@ const SETUP_PIN = "1234"; // works only until the first Admin user is created
 const P = 'prod_'; // all data of this module lives under prod_* in Firebase, separate from the old sales data
 
 const ROLES = {
-  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','prod','req','plan','meals','dishes','client','reports','trends','masters','users'] },
-  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','prod','req','plan','issue','meals','stock','purchase','dishes','client','masters'] },
-  store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','issue','req','stock','purchase','prod','plan'] },
-  kitchen:     { label:'Kitchen',            desc:'Production, cooking & dishes',         tabs:['home','prod','req','meals','issue','stock','plan','dishes'] },
-  cook:        { label:'Cook / Chef',        desc:'Production & cooking',          tabs:['home','prod','req','issue','meals','dishes'] },
+  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','prod','req','issue','plan','stock','purchase','meals','dishes','client','reports','trends','masters','users'] },
+  opsmanager:  { label:'Operations Manager', desc:'Meal plan, approvals, production & dispatch',  tabs:['home','prod','req','plan','issue','meals','stock','purchase','dishes','client','masters'] },
+  prodmanager: { label:'Production Manager', desc:'Meal plan, approvals, stock, QC',  tabs:['home','prod','req','plan','issue','meals','stock','purchase','dishes','client','masters'] },
+  store:       { label:'Store Keeper',       desc:'Purchase, kitchen issue & stock', tabs:['home','req','issue','stock','purchase','prod','plan'] },
+  kitchen:     { label:'Kitchen',            desc:'Production, cooking & dishes',         tabs:['home','prod','issue','meals','stock','plan','dishes'] },
+  cook:        { label:'Cook / Chef',        desc:'Requirement & cooking',          tabs:['home','req','prod','issue','meals','dishes'] },
   driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals'] },
   supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter, client escalations',tabs:['home','meals','dishes','client'], site:true },
   aggregator:  { label:'Aggregator / Client', desc:'Live view, ratings, feedback, escalation', tabs:['agg','aglive','agrate','agesc','agrep','agcontact'], siteOpt:true },
   counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals','dishes'], site:true }
 };
+const isPMrole = r => r==='prodmanager' || r==='opsmanager';
 const NAV = { req:['📝','Requirement'], prod:['👨‍🍳','Production'], dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
 const MEALS = ['breakfast','lunch','snacks','dinner'];
 const MEAL_ICON = {breakfast:'🌅', lunch:'🍛', snacks:'☕', dinner:'🌙'};
@@ -450,7 +469,8 @@ const db = firebase.database();
 const authReady = (firebase.auth ? firebase.auth().signInAnonymously() : Promise.resolve()).catch(e=>console.warn('anon auth',e&&e.message));
 let me = null;
 let users = {}, sites = {}, items = {}, basins = {}, ledger = {}, notices = {}, sessions = {}, settings = {}, recipes = {};
-let stockFilter = 'all', stockSearch = '', skippedRender = false;
+let stockFilter = 'all', stockSearch = '', skippedRender = false, stockMode = 'all', userNav = false;
+const _ld = {};
 
 function can(tab){
   if (!me || !ROLES[me.role]) return false;
@@ -492,9 +512,10 @@ $('lockBtn').onclick = logout;
 
 function enter(){
   $('lock').style.display='none'; $('app').style.display='block'; $('nav').style.display='flex';
+  userNav = false;
   buildNav();
   listen();
-  go(tabsFor()[0]);
+  go(tabsFor()[0]); landingStart();
   // revoked users get signed out on next open
   if (me.id!=='setup') db.ref(P+'users/'+me.id).once('value').then(s=>{ if(!s.exists()){ toast('Login removed'); setTimeout(logout,800);} });
 }
@@ -507,7 +528,7 @@ function buildNav(active){
   const MAX = 5, main = tabs.length>MAX ? tabs.slice(0,MAX-1) : tabs, more = tabs.length>MAX ? tabs.slice(MAX-1) : [];
   $('nav').innerHTML = main.map(t=>`<button data-t="${t}" class="${t===cur?'active':''}"><span class="i">${NAV[t][0]}</span>${NAV[t][1]}</button>`).join('')
     + (more.length ? `<button data-more="1" class="${more.includes(cur)?'active':''}"><span class="i">☰</span>More</button>` : '');
-  $('nav').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>go(b.dataset.t));
+  $('nav').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{ userNav = true; go(b.dataset.t); });
   const mb = $('nav').querySelector('[data-more]'); if (mb) mb.onclick = ()=>moreSheet(more);
 }
 function go(t){
@@ -534,13 +555,13 @@ function listenNow(){
   bind('items',  v=>items=v);
   bind('basins', v=>basins=v);
   bind('notices', v=>notices=v);
-  bind('settings', v=>settings=v);
+  bind('settings', v=>{ settings=v; _ld.c=1; });
   bind('recipes', v=>recipes=v);
   bind('ratings', v=>ratings=v);
   bind('feedback', v=>feedbacks=v);
   bind('escalations', v=>escs=v);
-  db.ref(P+'sessions').limitToLast(600).on('value', s=>{ sessions = s.val()||{}; renderAll(); });
-  db.ref(P+'ledger').limitToLast(30000).on('value', s=>{ ledger = s.val()||{}; renderAll(); });
+  db.ref(P+'sessions').limitToLast(600).on('value', s=>{ sessions = s.val()||{}; _ld.s=1; renderAll(); });
+  db.ref(P+'ledger').limitToLast(30000).on('value', s=>{ ledger = s.val()||{}; _ld.l=1; renderAll(); });
 }
 function stockOf(itemId){
   let t = 0; Object.values(ledger).forEach(e=>{ if (e.itemId===itemId) t += (e.qty||0); });
@@ -620,33 +641,33 @@ function renderHome(){
   // items bought with an expiry that is today/past/within 3 days and still in stock
   const lim = new Date(); lim.setDate(lim.getDate()+3);
   const limK = lim.getFullYear()+'-'+String(lim.getMonth()+1).padStart(2,'0')+'-'+String(lim.getDate()).padStart(2,'0');
-  const exp = ent.filter(e=>e.type==='purchase' && e.expiry && e.expiry<=limK && items[e.itemId] && stockOf(e.itemId)>0).sort((a,b)=>a.expiry.localeCompare(b.expiry)).slice(0,6);
+  const expAll = ent.filter(e=>e.type==='purchase' && e.expiry && e.expiry<=limK && items[e.itemId] && stockOf(e.itemId)>0).sort((a,b)=>a.expiry.localeCompare(b.expiry));
+  const exp = expAll.slice(0,6);
   const used = {}; ent.forEach(e=>{ if(e.date===t&&e.type==='issue'&&!e.reversed){ used[e.itemId]=(used[e.itemId]||0)-e.qty; } });
   const usedList = Object.entries(used).filter(([id,v])=>v>0 && items[id]);
   const nts = Object.entries(notices).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0)).slice(0,5);
-  const canPost = isAdmin() || me.role==='prodmanager';
+  const canPost = isAdmin() || isPMrole(me.role);
   const ico = {alert:'🚨', note:'📝', info:'ℹ️'};
   const hr = new Date().getHours(), gr = hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
   const qa = tabsFor().filter(x=>x!=='home').slice(0,8);
   el.innerHTML = `
     <div class="greet"><div class="crest"></div><small>${gr}</small><b>${esc(me.name)}</b><small>${new Date().toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'})} · ${esc(ROLES[me.role].label)}</small>
       <div class="pillrow"><span class="pill">🍽️ ${Object.keys(sites).length} counters</span><span class="pill">📦 ${list.length} items</span>${low.length?`<span class="pill">⚠️ ${low.length} low stock</span>`:''}</div></div>
+    ${typeof nextCardHtml==='function'?nextCardHtml():''}
     <div class="qa">${qa.map(x=>`<button data-qa="${x}"><i>${NAV[x][0]}</i>${NAV[x][1]}</button>`).join('')}</div>
     <div class="hero scene">${sceneSvg({seed:5})}<div class="cap"><span>Kitchen → vehicle → counter</span><span>${new Date().toLocaleDateString([], {weekday:'short', day:'numeric', month:'short'})}</span></div></div>
     ${nts.map(([id,n])=>`<div class="notice ${esc(n.level||'note')}"><span>${ico[n.level]||'📝'}</span><div><div>${esc(n.text)}</div>${n.photoKey?photoBox(n.photoKey,'',{ro:true}):''}<div class="sub">${esc(n.by||'')} · ${new Date(n.ts||0).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div></div>${canPost?`<button class="x" data-nd="${id}" aria-label="Remove">✕</button>`:''}</div>`).join('')}
     ${can('meals')?roadHtml():''}
     ${can('meals')?journeysHtml(false):''}
     <div class="kpi">
-      <div class="card"><div class="sub">Below minimum</div><div class="n" style="${low.length?'color:var(--amber)':''}">${low.length}</div></div>
-      <div class="card"><div class="sub">Expiring ≤ 3 days</div><div class="n" style="${exp.length?'color:var(--red)':''}">${exp.length}</div></div>
-      <div class="card"><div class="sub">Purchases today</div><div class="n">${purToday.length}</div>${purValue>0?`<div class="sub">₹${fmt(purValue)}</div>`:''}</div>
-      <div class="card"><div class="sub">Issued to kitchen today</div><div class="n">${issToday}</div><div class="sub">entries</div></div>
+      <div class="card kpi-a ${can('stock')?'tap':''}" data-kpi="low"><div class="sub">Below minimum</div><div class="n" style="${low.length?'color:var(--amber)':''}">${low.length}</div>${can('stock')?'<div class="sub kgo">View items ›</div>':''}</div>
+      <div class="card kpi-a ${can('stock')?'tap':''}" data-kpi="exp"><div class="sub">Expiring ≤ 3 days</div><div class="n" style="${expAll.length?'color:var(--red)':''}">${expAll.length}</div>${can('stock')?'<div class="sub kgo">View items ›</div>':''}</div>
+      <div class="card kpi-a ${can('purchase')?'tap':''}" data-kpi="pur"><div class="sub">Purchases today</div><div class="n">${purToday.length}</div>${purValue>0?`<div class="sub">₹${fmt(purValue)}</div>`:''}${can('purchase')?'<div class="sub kgo">Open purchases ›</div>':''}</div>
+      <div class="card kpi-a ${can('issue')?'tap':''}" data-kpi="iss"><div class="sub">Issued to kitchen today</div><div class="n">${issToday}</div><div class="sub">entries</div>${can('issue')?'<div class="sub kgo">Open kitchen issue ›</div>':''}</div>
     </div>
-    ${low.length ? `<h2>Re-order now</h2>` + low.map(([id,i])=>`<div class="card low row"><div class="grow"><b>${esc(i.name)}</b><div class="sub">Minimum ${fmt(i.minStock)} ${esc(i.unit)}</div></div><div class="qty">${fmt(stockOf(id))} <small>${esc(i.unit)}</small></div></div>`).join('') : ''}
+    ${low.length ? `<h2>Re-order now</h2>` + low.map(([id,i])=>`<div class="card low row"><div class="grow"><b>${esc(i.name)}</b><div class="sub">Minimum ${fmt(i.minStock)} ${esc(i.unit)}${vendorLine(i)}</div></div><div class="qty">${fmt(stockOf(id))} <small>${esc(i.unit)}</small></div></div>`).join('') : ''}
     ${exp.length ? `<h2>Check expiry</h2>` + exp.map(e=>`<div class="card row" style="border-color:#EBB9B2"><div class="grow"><b>${esc(items[e.itemId].name)}</b><div class="sub">${e.expiry<t?'EXPIRED ':'Expires '}${esc(e.expiry)}${e.lot?' · lot '+esc(e.lot):''}${e.supplier?' · '+esc(e.supplier):''}</div></div><div class="qty">${fmt(e.qty)} <small>${esc(items[e.itemId].unit)} bought</small></div></div>`).join('') : ''}
     ${usedList.length ? `<h2>Used today</h2><div class="card">${usedList.map(([id,v])=>esc(items[id].name)+' <b>'+fmt(v)+' '+esc(items[id].unit)+'</b>').join(' · ')}</div>` : ''}
-    <h2>Production lifecycle</h2>
-    <div class="flow">${STAGES.map(([i,n,l])=>`<div class="stg ${l?'live':''}"><i>${i}</i>${n}${l?'':'<br><span style="font-size:9.5px">coming</span>'}</div>`).join('')}</div>
     <h2>Counters</h2>
     <div class="card">${Object.values(sites).map(s=>`<b>${esc(s.name)}</b> <span class="sub">${(s.meals||[]).map(esc).join(' · ')}</span>`).join('<br>') || '<span class="sub">No counters yet — add them in Masters.</span>'}</div>
     <h2>Recent activity</h2>${recentLedger(6)}
@@ -655,7 +676,12 @@ function renderHome(){
       <select id="n_level"><option value="note">📝 Note</option><option value="alert">🚨 Alert</option><option value="info">ℹ️ Info</option></select>
       <input id="n_text" placeholder="e.g. Chicken delivery delayed — use frozen stock" style="margin-top:8px">${photoBox(draftCtx('notice'),'Attach photo',{draft:'notice'})}
       <button class="btn save" id="n_post">Post</button></div>` : ''}`;
-  el.querySelectorAll('[data-qa]').forEach(b=>b.onclick=()=>go(b.dataset.qa));
+  el.querySelectorAll('[data-qa]').forEach(b=>b.onclick=()=>{ userNav = true; go(b.dataset.qa); });
+  el.querySelectorAll('[data-kpi]').forEach(c=>c.onclick=()=>{ userNav = true; const k = c.dataset.kpi;
+    if (k==='low' && can('stock')){ stockMode = 'low'; go('stock'); }
+    else if (k==='exp' && can('stock')){ stockMode = 'exp'; go('stock'); }
+    else if (k==='pur' && can('purchase')) go('purchase');
+    else if (k==='iss' && can('issue')) go('issue'); });
   const np=$('n_post'); if (np) np.onclick=postNotice;
   el.querySelectorAll('[data-trip]').forEach(c=>c.onclick=()=>{ openSid = c.dataset.trip; mDate = openSid.split('_')[0]; go('meals'); });
   el.querySelectorAll('[data-nd]').forEach(b=>b.onclick=()=>db.ref(P+'notices/'+b.dataset.nd).remove());
@@ -672,7 +698,7 @@ function recentLedger(n){
   return e.map(([,x])=>{
     const it = items[x.itemId]||{name:'(deleted item)',unit:''};
     const d = new Date(x.ts||0);
-    return `<div class="card row"><div class="grow"><b>${esc(it.name)}</b><div class="sub">${esc(x.type)}${x.photoKey?' <span class="phtag" data-phv="'+esc(x.photoKey)+'">📷</span>':''}${x.supplier?' · '+esc(x.supplier):''}${x.expiry?' · exp '+esc(x.expiry):''}${x.lot?' · lot '+esc(x.lot):''} · ${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · ${esc(x.by||'')}</div></div><div class="qty" style="color:${x.qty<0?'var(--red)':'var(--green)'}">${x.qty>0?'+':''}${fmt(x.qty)} <small>${esc(it.unit)}</small></div></div>`;
+    return `<div class="card row"><div class="grow"><b>${esc(it.name)}</b><div class="sub">${esc(x.type)}${x.photoKey?' <span class="phtag" data-phv="'+esc(x.photoKey)+'">📷</span>':''}${x.supplier?' · '+esc(x.supplier)+(x.supplierPhone?' <a href="tel:'+esc(x.supplierPhone)+'">📞 '+esc(x.supplierPhone)+'</a>':''):''}${x.expiry?' · exp '+esc(x.expiry):''}${x.lot?' · lot '+esc(x.lot):''} · ${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · ${esc(x.by||'')}</div></div><div class="qty" style="color:${x.qty<0?'var(--red)':'var(--green)'}">${x.qty>0?'+':''}${fmt(x.qty)} <small>${esc(it.unit)}</small></div></div>`;
   }).join('');
 }
 
@@ -690,7 +716,7 @@ function renderPurchase(){
       <label>Date of purchase</label><input id="pu_date" type="date" value="${purDate||t0()}" max="${t0()}">
       <div class="two"><div><label>Quantity</label><input id="pu_qty" type="number" inputmode="decimal" step="any" placeholder="0"></div>
       <div><label>Rate per unit ₹ (optional)</label><input id="pu_rate" type="number" inputmode="decimal" step="any" placeholder="0"></div></div>
-      <label>Supplier (optional)</label><input id="pu_sup" list="supList" placeholder="e.g. Koyambedu vegetable vendor"><datalist id="supList">${[...new Set(Object.values(ledger).map(e=>e.supplier).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+      <div class="two"><div><label>Supplier / vendor (optional)</label><input id="pu_sup" list="supList" placeholder="e.g. Koyambedu vendor"></div><div><label>Vendor phone</label><input id="pu_sph" type="tel" inputmode="tel" placeholder="98xxxxxx"></div></div><datalist id="supList">${[...new Set(Object.values(ledger).map(e=>e.supplier).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
       <div class="two"><div><label>Expiry / best before (optional)</label><input id="pu_exp" type="date"></div><div><label>Batch / lot (optional)</label><input id="pu_batch" placeholder="e.g. L-2310"></div></div>
       <label>Bill / note (optional)</label><input id="pu_note" placeholder="Bill no.">
       ${photoBox(draftCtx('purchase'),'Bill / stock photo',{draft:'purchase'})}
@@ -706,6 +732,8 @@ function renderPurchase(){
       <button class="btn sec save" id="ad_save">Set to counted quantity</button></div>` : ''}`;
   if (keep.item && el.querySelector('#pu_item')) el.querySelector('#pu_item').value = keep.item;
   const ps = $('pu_save'); if (ps) ps.onclick = savePurchase;
+  const fillV = ()=>{ const it = items[$('pu_item').value]||{}, sup = $('pu_sup'), ph = $('pu_sph'); if (!sup||!ph) return; if (!sup.value && it.vendor) sup.value = it.vendor; if (!ph.value) ph.value = supPhone(sup.value) || it.vendorPhone || ''; };
+  const pi = $('pu_item'), psu = $('pu_sup'); if (pi) pi.addEventListener('change', ()=>{ $('pu_sup').value=''; $('pu_sph').value=''; fillV(); }); if (psu) psu.addEventListener('change', ()=>{ $('pu_sph').value=''; fillV(); }); if (pi) fillV();
   const as = $('ad_save'); if (as) as.onclick = saveAdjust;
 }
 function addLedger(e){
@@ -718,8 +746,10 @@ function savePurchase(){
   const itemId = $('pu_item').value, qty = num($('pu_qty').value), rate = num($('pu_rate').value);
   if (!(qty>0)) { alert('Enter a quantity greater than 0.'); return; }
   const pd = $('pu_date').value || todayKey(); if (pd>todayKey()){ alert('Purchase date cannot be in the future.'); return; } purDate = pd;
-  addLedger({ date:pd, itemId, type:'purchase', qty, rate: isFinite(rate)?rate:null, supplier:$('pu_sup').value.trim(), expiry:$('pu_exp').value||null, lot:$('pu_batch').value.trim()||null, note:$('pu_note').value.trim(), photoKey:usePh('purchase') })
-    .then(()=>{ toast('Added to stock'); $('pu_qty').value=''; $('pu_rate').value=''; $('pu_note').value=''; });
+  addLedger({ date:pd, itemId, type:'purchase', qty, rate: isFinite(rate)?rate:null, supplier:$('pu_sup').value.trim(), supplierPhone:$('pu_sph').value.trim()||null, expiry:$('pu_exp').value||null, lot:$('pu_batch').value.trim()||null, note:$('pu_note').value.trim(), photoKey:usePh('purchase') })
+    .then(()=>{ toast('Added to stock'); $('pu_qty').value=''; $('pu_rate').value=''; $('pu_note').value='';
+      const vn = $('pu_sup').value.trim(), vp = $('pu_sph').value.trim(), it = items[itemId];
+      if (it && vn && vp && !it.vendorPhone) db.ref(P+'items/'+itemId).update({ vendor:vn, vendorPhone:vp }); });
 }
 function saveAdjust(){
   const itemId = $('ad_item').value, counted = num($('ad_qty').value);
@@ -732,14 +762,14 @@ function saveAdjust(){
 
 /* ============ DAILY ISSUE (raw material used by the kitchen) ============ */
 let issueRows = [{ itemId:'', qty:'' }];
-let issueFor = '__', issueNote = '', issueDay = 0;
+let issueFor = 'ALL', issueNote = '', issueDay = 0, issueReq = null;
 function issueTargets(){
-  const out = [['__','— Select counter & meal —']];
+  const out = [['ALL','⭐ Entire production — all meals of the day']];
   Object.entries(sites).forEach(([k,s])=>(s.meals||[]).forEach(m=>out.push([k+'|'+m, s.name+' — '+m])));
   out.push(['','General kitchen use (no meal)']);
   return out;
 }
-function canIssueRole(){ return me && ['admin','store','prodmanager'].includes(me.role); }
+function canIssueRole(){ return me && ['admin','store','prodmanager','opsmanager'].includes(me.role); }
 function renderIssue(){
   const el = $('p-issue');
   if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { skippedRender = true; return; }
@@ -750,7 +780,9 @@ function renderIssue(){
   el.innerHTML = `
     <h2>Issue to kitchen — ${t}</h2>
     ${!canIssueRole() ? '<div class="notice info" style="margin-bottom:10px">ℹ️ <div>Raw material is issued by the Store Keeper. You will get a loud alert when it is issued for your meal.</div></div>' : ''}
-    ${raws.length && canIssueRole() ? `<div class="card">
+    ${canIssueRole() ? reqWaitHtml() : ''}
+    ${raws.length && canIssueRole() ? `<div class="card" id="isForm">
+      ${issueReq?`<div class="notice info" style="margin:0 0 8px"><span>📝</span><div class="grow"><b>From cook requirement</b><div class="sub">${esc(issueReq.by||'Cook')} · for ${esc(issueReq.date)} — change quantities if needed, then issue.</div></div><button class="btn sec" id="is_unreq" style="padding:6px 10px;font-size:12px">Clear</button></div>`:''}
       <label>Issued for</label>
       <select id="is_for">${issueTargets().map(([v,l])=>`<option value="${esc(v)}" ${v===issueFor?'selected':''}>${esc(l)}</option>`).join('')}</select>
       <label>For which day</label><select id="is_day"><option value="0" ${issueDay===0?'selected':''}>Today (${t})</option><option value="1" ${issueDay===1?'selected':''}>Tomorrow</option></select>
@@ -766,7 +798,7 @@ function renderIssue(){
     </div>` : (canIssueRole() ? `<div class="empty">Add raw materials and vegetables in Masters first.</div>` : '')}
     <h2>Issued today</h2>
     ${todays.length ? todays.map(([id,e])=>{ const it=items[e.itemId]||{name:'(deleted)',unit:''}; const d=new Date(e.ts||0);
-      const tgt = e.siteId && sites[e.siteId] ? sites[e.siteId].name+' '+e.meal : 'General';
+      const tgt = e.allDay ? 'Entire production' : e.siteId && sites[e.siteId] ? sites[e.siteId].name+' '+e.meal : 'General';
       return `<div class="card row"><div class="grow"><b>${esc(it.name)}</b><div class="sub">${esc(tgt)} · ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · ${esc(e.by||'')}${e.note?' · '+esc(e.note):''}</div></div>
       <div class="qty">${fmt(-e.qty)} <small>${esc(it.unit)}</small></div>${e.reversed?'<span class="tag" style="background:#eee;color:#777">reversed</span>':(can('masters')||me.role==='store')?`<button class="btn danger" data-rev="${id}" style="padding:7px 10px;font-size:12px">Undo</button>`:''}</div>`;
     }).join('') : '<div class="empty">Nothing issued yet today.</div>'}
@@ -779,11 +811,13 @@ function renderIssue(){
   sel('[data-rev]', b=>b.onclick=()=>reverseIssue(b.dataset.rev));
   const add=$('is_add'); if (add) add.onclick=()=>{ issueFor=$('is_for').value; issueDay=+$('is_day').value; issueNote=$('is_note').value; issueRows.push({itemId:'',qty:''}); renderIssue(); };
   const sv=$('is_save'); if (sv) sv.onclick=saveIssue;
+  const ur=$('is_unreq'); if (ur) ur.onclick=()=>{ issueReq=null; issueRows=[{itemId:'',qty:''}]; issueNote=''; renderIssue(); };
+  reqWaitBind(el);
 }
 function saveIssue(){
   issueFor = $('is_for').value; issueNote = $('is_note').value.trim(); issueDay = +$('is_day').value;
   if (!canIssueRole()) return;
-  if (issueFor==='__'){ alert('Choose which counter and meal this issue is for (or General kitchen use). This is how the kitchen sees it on the meal.'); return; }
+  if (issueFor==='__'){ issueFor = 'ALL'; }
   const lines = issueRows.filter(r=>r.itemId || r.qty!=='');
   if (!lines.length){ alert('Add at least one item.'); return; }
   const need = {};
@@ -794,11 +828,14 @@ function saveIssue(){
   }
   const short = Object.entries(need).filter(([id,q])=>q > stockOf(id)+0.0005);
   if (short.length && !confirm('Not enough stock for: ' + short.map(([id,q])=>items[id].name+' (have '+fmt(stockOf(id))+' '+items[id].unit+', issuing '+fmt(q)+')').join(', ') + '.\n\nIssue anyway?')) return;
-  const [siteId, meal] = issueFor ? issueFor.split('|') : ['',''];
+  const allDay = issueFor==='ALL';
+  const [siteId, meal] = issueFor && !allDay ? issueFor.split('|') : ['',''];
   const batch = db.ref(P+'ledger').push().key, phk = usePh('issue');
   Promise.all(Object.entries(need).map(([itemId,q])=>
-    addLedger({ itemId, type:'issue', qty:-q, siteId:siteId||null, meal:meal||null, forDate:issueDay? (function(){ const d=new Date(); d.setDate(d.getDate()+1); return keyOf(d); })() : todayKey(), note:issueNote, batch, photoKey:phk })
-  )).then(()=>{ toast('📤 Issued — kitchen alerted'); issueRows=[{itemId:'',qty:''}]; issueNote=''; issueFor='__'; renderIssue(); });
+    addLedger({ itemId, type:'issue', qty:-q, siteId:siteId||null, meal:meal||null, allDay:allDay||null, forDate:issueDay? (function(){ const d=new Date(); d.setDate(d.getDate()+1); return keyOf(d); })() : todayKey(), note:issueNote, batch, photoKey:phk })
+  )).then(()=>{ toast('📤 Issued — cook & kitchen alerted'); const rq = issueReq; issueReq = null; issueRows=[{itemId:'',qty:''}]; issueNote=''; issueFor='ALL';
+    if (rq && rq.id) db.ref(P+'settings/reqs/'+rq.date+'/'+rq.id).update({ issuedTs:Date.now(), issuedBy:me.name });
+    renderIssue(); });
 }
 function reverseIssue(id){
   const e = ledger[id]; if (!e || e.reversed) return;
@@ -810,11 +847,11 @@ function reverseIssue(id){
 /* ============ MEAL SESSIONS (production → dispatch → arrival → counter → sales/waste) ============ */
 const REASONS = ['Unsold leftover','Spoilage','Spill / damage','Quality reject','Over-production','Other'];
 const STEP_ROLES = {
-  prod:['admin','prodmanager','kitchen','cook'], plan:['admin','prodmanager'], cookstart:['admin','prodmanager','kitchen','cook'], qc1:['admin','prodmanager'],
-  dispatch:['admin','prodmanager','kitchen','cook'], depart:['admin','prodmanager','kitchen','driver'],
-  arrive:['admin','prodmanager','driver','supervisor','counter'],
-  qc2:['admin','prodmanager','supervisor','counter'], weigh:['admin','prodmanager','supervisor','counter'],
-  close:['admin','prodmanager','supervisor','counter'], send:['admin','prodmanager','kitchen','cook','driver','supervisor','counter']
+  prod:['admin','prodmanager','opsmanager','kitchen','cook'], plan:['admin','prodmanager','opsmanager'], cookstart:['admin','prodmanager','opsmanager','kitchen','cook'], qc1:['admin','prodmanager','opsmanager'],
+  dispatch:['admin','prodmanager','opsmanager','kitchen','cook'], depart:['admin','prodmanager','opsmanager','kitchen','driver'],
+  arrive:['admin','prodmanager','opsmanager','driver','supervisor','counter'],
+  qc2:['admin','prodmanager','opsmanager','supervisor','counter'], weigh:['admin','prodmanager','opsmanager','supervisor','counter'],
+  close:['admin','prodmanager','opsmanager','supervisor','counter'], send:['admin','prodmanager','opsmanager','kitchen','cook','driver','supervisor','counter']
 };
 const canStep = k => me && STEP_ROLES[k].includes(me.role);
 let mDate = todayKey(), openSid = null, tracker = null;
@@ -1682,6 +1719,7 @@ function basinForm(id){
 const STARTER_USERS = [
   {name:'Director (Admin)',      username:'admin',         password:'EVP@admin26',   role:'admin'},
   {name:'Production Manager', username:'manager',       password:'Mgr@2026',      role:'prodmanager', rep:true},
+  {name:'Operations Manager', username:'ops',           password:'Ops@2026',      role:'opsmanager', rep:true},
   {name:'Store Keeper',       username:'store',         password:'Store@2026',    role:'store'},
   {name:'Purchase',           username:'purchase',      password:'Buy@2026',      role:'store'},
   {name:'Kitchen Head',       username:'kitchen',       password:'Cook@2026',     role:'kitchen'},
@@ -1793,7 +1831,7 @@ const ownerPhone = () => (settings.waNumber || OWNER_PHONE_DEFAULT).replace(/\D/
 const telHref = p => 'tel:' + String(p||'').replace(/[^\d+]/g,'');
 const waHref = (p,t) => 'https://wa.me/' + (String(p||'').replace(/\D/g,'').length===10 ? '91' : '') + String(p||'').replace(/\D/g,'') + (t?'?text='+encodeURIComponent(t):'');
 const isAgg = () => me && me.role==='aggregator';
-const isStaffClient = () => me && (me.role==='admin' || me.role==='prodmanager' || me.role==='supervisor');
+const isStaffClient = () => me && (me.role==='admin' || isPMrole(me.role) || me.role==='supervisor');
 const ago = ts => { const m = Math.round((Date.now()-ts)/60000); return m<1?'just now': m<60? m+' min ago' : m<1440? Math.floor(m/60)+' h ago' : Math.floor(m/1440)+' d ago'; };
 const dayShort = k => { const d = new Date(k+'T00:00:00'); return d.toLocaleDateString([], {weekday:'short', day:'numeric'}); };
 const ownDay = n => { const o=[]; for(let i=n-1;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); o.push(keyOf(d)); } return o; };
@@ -1888,7 +1926,7 @@ function feedEvents(){
     else if (isStaffClient()) ev.push({id:'fn:'+id, ts:f.ts, k:'esc', icon:f.type==='complaint'?'😞':'💬', lvl:f.type==='complaint'?'amber':'', title:'Client '+f.type+(f.siteId&&sites[f.siteId]?' — '+sites[f.siteId].name:''), text:(f.text||'').slice(0,90)}); });
   try{ wfEvents().forEach(x=>ev.push(x)); }catch(e){}
   const pr = alertPrefs();
-  return ev.filter(e=>pr[e.k]!==0).sort((a,b)=>b.ts-a.ts);
+  return ev.filter(e=>pr[e.k]!==0).map(evLink).sort((a,b)=>b.ts-a.ts);
 }
 let notifiedSize = -1;
 function notifiedSet(){ try{ const a = JSON.parse(store.getItem('prod_notified_'+me.id)||'[]'); notifiedSize = a.length; return new Set(a); }catch(e){ return new Set(); } }
@@ -1902,18 +1940,22 @@ function updateBell(){
   const done = notifiedSet(), now = Date.now(), loud = [], soft = [];
   ev.forEach(e=>{ if (done.has(e.id)) return; done.add(e.id); if (e.ts < now-30*60000 || e.by===me.name) return; (e.loud?loud:soft).push(e); });
   if (loud.length || soft.length) saveNotified(done);
-  if (loud.length){ loud.forEach(f=>notify(f.icon+' '+f.title, f.text, evRef(f), {urgent:true})); alarmRing(loud); }
-  soft.slice(0,3).forEach(f=>notify(f.icon+' '+f.title, f.text, evRef(f)));
+  const lk = f => ({ go:f.go, sid:f.sid, date:f.date });
+  if (loud.length){ loud.forEach(f=>notify(f.icon+' '+f.title, f.text, evRef(f), {urgent:true, link:lk(f)})); alarmRing(loud); }
+  soft.slice(0,3).forEach(f=>notify(f.icon+' '+f.title, f.text, evRef(f), {link:lk(f)}));
   if (soft.length>3) notify('🔔 '+(soft.length-3)+' more updates', 'Open the bell to read them');
   if (!loud.length && !soft.length && done.size!==notifiedSize) saveNotified(done);
 }
+let bellList = [];
 function bellSheet(){
   const ev = feedEvents(), seen = seenTs(), pr = alertPrefs();
-  openSheet('<h3>🔔 Alerts &amp; updates</h3>'+
-    (ev.length ? ev.slice(0,40).map(e=>`<div class="feed ${e.lvl||''}"><i>${e.icon}</i><div class="grow"><b>${esc(e.title)}</b>${e.ts>seen?' <span class="badge amber">new</span>':''}<div class="sub">${esc(e.text||'')}</div><div class="sub">${evRef(e)?'Ref '+esc(evRef(e))+' · ':''}${ago(e.ts)}</div></div></div>`).join('') : '<div class="empty">No updates yet today. Vehicle, wastage, quality and escalation updates appear here.</div>')+
+  bellList = ev.slice(0,40);
+  openSheet('<h3>🔔 Alerts &amp; updates</h3><div class="sub" style="margin-bottom:6px">Tap an update to open it.</div>'+
+    (ev.length ? ev.slice(0,40).map((e,ix)=>`<div class="feed tap ${e.lvl||''}" data-bev="${ix}"><i>${e.icon}</i><div class="grow"><b>${esc(e.title)}</b>${e.ts>seen?' <span class="badge amber">new</span>':''}<div class="sub">${esc(e.text||'')}</div><div class="sub">${evRef(e)?'Ref '+esc(evRef(e))+' · ':''}${ago(e.ts)}</div></div><span class="chev">›</span></div>`).join('') : '<div class="empty">No updates yet today. Vehicle, wastage, quality and escalation updates appear here.</div>')+
     '<h2>Choose what to be alerted about</h2>'+ALERT_PREFS.map(([k,l])=>`<label style="display:flex;gap:10px;align-items:center;font-size:14px;color:var(--ink);margin:6px 0"><input type="checkbox" data-pf="${k}" ${pr[k]!==0?'checked':''} style="width:auto"> ${l}</label>`).join('')+
     '<div class="sub" style="margin-top:8px">'+esc(pushText())+'</div><div class="two"><button class="btn gold save" id="notifOn">🔔 Enable phone alerts</button><button class="btn sec save" id="notifTest">🔊 Test alarm</button></div>');
   try{ store.setItem('prod_seen_'+me.id, String(Date.now())); }catch(e){}
+  $('sheet').querySelectorAll('[data-bev]').forEach(r=>r.onclick=()=>{ const e = bellList[+r.dataset.bev]; if (e) openLink(e); });
   $('sheet').querySelectorAll('[data-pf]').forEach(c=>c.onchange=()=>{ const p = alertPrefs(); p[c.dataset.pf] = c.checked?1:0; try{ store.setItem('prod_alertprefs', JSON.stringify(p)); }catch(e){} updateBell(); });
   const no = $('notifOn'); if (no) no.onclick = async ()=>{ const m = await enableAlerts(); if (/blocked/i.test(m)) alert(m); };
   const nt = $('notifTest'); if (nt) nt.onclick = testAlarm;
@@ -2352,9 +2394,9 @@ document.addEventListener('change', e=>{
 /* ---------- notifications ---------- */
 const CAP = () => window.Capacitor && window.Capacitor.Plugins || {};
 async function notify(title, body, ref, o){
-  const text = (ref ? ref+' · ' : '')+(body||'');
+  const text = (ref ? ref+' · ' : '')+(body||''), link = o && o.link || null;
   toast(title);
-  try{ const LN = CAP().LocalNotifications; if (LN){ await LN.schedule({ notifications:[Object.assign({ id: Math.floor(Math.random()*2000000000), title, body:text, extra:{ref:ref||''} }, o&&o.urgent?{channelId:'urgent'}:{})] }); return; } }catch(e){}
+  try{ const LN = CAP().LocalNotifications; if (LN){ await LN.schedule({ notifications:[Object.assign({ id: Math.floor(Math.random()*2000000000), title, body:text, extra:{ref:ref||'', link} }, o&&o.urgent?{channelId:'urgent'}:{})] }); return; } }catch(e){}
   try{ if (window.Notification && Notification.permission==='granted') new Notification(title, { body:text, tag:ref||undefined }); }catch(e){}
 }
 let pushDone = null, pushState = 'off';
@@ -2372,7 +2414,7 @@ function pushInit(){
       PN.addListener('registration', t=>savePushToken(t.value,'android'));
       PN.addListener('registrationError', ()=>{ pushState = 'error'; });
       PN.addListener('pushNotificationReceived', n=>{ notify((n&&n.title)||'OneByte', (n&&n.body)||'', n&&n.data&&n.data.ref, {urgent:!!(n&&n.data&&n.data.loud)}); if (n&&n.data&&n.data.loud){ try{ alarmRing([{icon:'🔔', title:(n.title||'Urgent update'), text:(n.body||''), go:n.data.tab||'prod'}]); }catch(e){} } });
-      PN.addListener('pushNotificationActionPerformed', ()=>{ try{ bellSheet(); }catch(e){} });
+      PN.addListener('pushNotificationActionPerformed', a=>{ try{ const d = (a&&a.notification&&a.notification.data)||{}; if (d.tab||d.date||d.sid) openLink({ go:d.tab, date:d.date, sid:d.sid }); else bellSheet(); }catch(e){} });
       PN.requestPermissions().then(r=>{ if (r.receive==='granted') PN.register(); else pushState = 'denied'; }).catch(()=>{ pushState = 'error'; });
     }catch(e){ pushState = 'error'; }
   } else if (window.Notification && Notification.permission==='default'){
@@ -2493,8 +2535,8 @@ function botBrain(q){
 let miF = 'all', stockGroup = 'prov', stockCat = '';
 const VEG_CATS = /vegetable|veg\b|greens|herb|leaf|leaves/i;
 const rawGroup = i => VEG_CATS.test(i.category||'') ? 'veg' : 'prov';
-const canEditRaw = () => me && ['admin','prodmanager','store'].includes(me.role);
-const canEditDish = () => me && ['admin','prodmanager','kitchen','cook'].includes(me.role);
+const canEditRaw = () => me && ['admin','prodmanager','opsmanager','store'].includes(me.role);
+const canEditDish = () => me && ['admin','prodmanager','opsmanager','kitchen','cook'].includes(me.role);
 
 /* ---------- STOCK (raw materials only) ---------- */
 function renderStock(){
@@ -2504,23 +2546,27 @@ function renderStock(){
   const cats = [...new Set(inGroup.map(([,i])=>i.category||'Other'))].sort();
   if (stockCat && !cats.includes(stockCat)) stockCat = '';
   const q = stockSearch.toLowerCase();
-  const rows = inGroup.filter(([,i])=>(!stockCat || (i.category||'Other')===stockCat) && (!q || i.name.toLowerCase().includes(q) || (i.ta||'').toLowerCase().includes(q))).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const expMap = stockMode==='exp' ? expiringMap() : {};
+  const rows = (stockMode==='all' ? inGroup.filter(([,i])=>(!stockCat || (i.category||'Other')===stockCat)) : raws.filter(([id,i])=>stockMode==='low' ? (i.minStock>0 && stockOf(id)<=i.minStock) : !!expMap[id]))
+    .filter(([,i])=>(!q || i.name.toLowerCase().includes(q) || (i.ta||'').toLowerCase().includes(q))).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const cnt = g => raws.filter(([,i])=>g==='all' || rawGroup(i)===g).length;
   const lowN = rows.filter(([id,i])=>i.minStock>0 && stockOf(id)<=i.minStock).length;
   el.innerHTML = `
-    <div class="seg">${[['prov','🛒 Provisions'],['veg','🥬 Vegetables'],['all','All raw']].map(([k,l])=>`<button data-sg="${k}" class="${stockGroup===k?'on':''}">${l}<small>${cnt(k)}</small></button>`).join('')}</div>
-    <div class="chips"><div class="chip ${!stockCat?'active':''}" data-sc="">All</div>${cats.map(c=>`<div class="chip ${stockCat===c?'active':''}" data-sc="${esc(c)}">${esc(c)}</div>`).join('')}</div>
+    ${stockMode!=='all'?`<div class="notice amber" style="margin:0 0 10px"><span>${stockMode==='low'?'⚠️':'⏳'}</span><div class="grow"><b>${stockMode==='low'?'Below minimum — time to re-order':'Expiring within 3 days (or expired)'}</b><div class="sub">${rows.length} item${rows.length===1?'':'s'}${stockMode==='low'?' · call the vendor from the card':''}</div></div><button class="btn sec" id="stAll" style="padding:7px 12px;font-size:12.5px">Show all</button></div>`:''}
+    <div class="seg" ${stockMode!=='all'?'style="display:none"':''}>${[['prov','🛒 Provisions'],['veg','🥬 Vegetables'],['all','All raw']].map(([k,l])=>`<button data-sg="${k}" class="${stockGroup===k?'on':''}">${l}<small>${cnt(k)}</small></button>`).join('')}</div>
+    <div class="chips" ${stockMode!=='all'?'style="display:none"':''}><div class="chip ${!stockCat?'active':''}" data-sc="">All</div>${cats.map(c=>`<div class="chip ${stockCat===c?'active':''}" data-sc="${esc(c)}">${esc(c)}</div>`).join('')}</div>
     <div class="row" style="gap:8px;margin-bottom:10px"><input id="stockSearch" class="grow" placeholder="Search item (English / தமிழ்)…" value="${esc(stockSearch)}" style="margin:0">${canEditRaw()?'<button class="btn" id="stAdd" style="padding:11px 14px;white-space:nowrap">+ Item</button>':''}</div>
     ${lowN?`<div class="notice amber" style="margin:0 0 10px"><span>⚠️</span><div>${lowN} item${lowN>1?'s':''} at or below minimum stock</div></div>`:''}
     ${rows.length ? rows.map(([id,i])=>{
       const s = stockOf(id), low = i.minStock>0 && s<=i.minStock, neg = s<0, used = usedOn(id, todayKey());
-      return `<div class="card row ${neg?'neg':low?'low':''}"><div class="grow"><b>${esc(i.name)}</b>${i.ta?` <span class="sub" style="display:inline">${esc(i.ta)}</span>`:''}<div class="sub">${esc(i.category||'')}${KGL(i.unit)&&s>0?' · '+altText(i,s):''}${used>0?' · used today '+fmt(used)+' '+esc(i.unit):''}${low?' · below minimum':''}${neg?' · negative — check entries':''}</div></div><div class="qty">${fmt(s)} <small>${esc(i.unit)}</small></div>${canEditRaw()?`<button class="ico" data-re="${id}" aria-label="Edit item">✏️</button>`:''}</div>`;
+      return `<div class="card row ${neg?'neg':low?'low':''}"><div class="grow"><b>${esc(i.name)}</b>${i.ta?` <span class="sub" style="display:inline">${esc(i.ta)}</span>`:''}<div class="sub">${esc(i.category||'')}${KGL(i.unit)&&s>0?' · '+altText(i,s):''}${used>0?' · used today '+fmt(used)+' '+esc(i.unit):''}${low?' · below minimum':''}${expMap[id]?' · '+(expMap[id]<todayKey()?'EXPIRED ':'expires ')+esc(expMap[id]):''}${neg?' · negative — check entries':''}${vendorLine(i)}</div></div><div class="qty">${fmt(s)} <small>${esc(i.unit)}</small></div>${canEditRaw()?`<button class="ico" data-re="${id}" aria-label="Edit item">✏️</button>`:''}</div>`;
     }).join('') : `<div class="empty">No items here. ${canEditRaw()?'Tap “+ Item” to add one.':'Ask the Production Manager or Store Keeper to add items.'}</div>`}
     ${can('reports') ? `<div class="two" style="margin-top:6px"><button class="btn" id="stShare">Share stock on WhatsApp</button><button class="btn sec" id="stRep">Open reports</button></div>` : ''}
     ${can('purchase') ? `<h2>Recent stock movements</h2>` + recentLedger() : ''}`;
+  const sa=$('stAll'); if (sa) sa.onclick=()=>{ stockMode='all'; renderStock(); };
   const sh=$('stShare'); if (sh) sh.onclick=()=>{ const r=buildReport(Object.assign({}, rep0(), {type:'stock', from:todayKey(), to:todayKey()})); shareWhatsApp(r.text); };
   const sr=$('stRep'); if (sr) sr.onclick=()=>go('reports');
-  el.querySelectorAll('[data-sg]').forEach(c=>c.onclick=()=>{ stockGroup=c.dataset.sg; stockCat=''; renderStock(); });
+  el.querySelectorAll('[data-sg]').forEach(c=>c.onclick=()=>{ stockMode='all'; stockGroup=c.dataset.sg; stockCat=''; renderStock(); });
   el.querySelectorAll('[data-sc]').forEach(c=>c.onclick=()=>{ stockCat=c.dataset.sc; renderStock(); });
   el.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>rawForm(b.dataset.re));
   const ad = $('stAdd'); if (ad) ad.onclick = ()=>rawForm(null);
@@ -2534,12 +2580,13 @@ function rawForm(id){
     <div class="two"><div><label>Tamil name</label><input id="rf_ta" value="${esc(i.ta||'')}"></div><div><label>Unit</label><select id="rf_unit">${unitOpts(i.unit)}</select></div></div>
     <label>Category <span class="sub" style="display:inline">(Vegetables / Fresh herbs go under Vegetables; everything else is Provisions)</span></label>
     <input id="rf_cat" list="rf_cats" value="${esc(i.category||'')}" placeholder="Rice / Dals / Flours, Oil / Ghee, Vegetables…"><datalist id="rf_cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+    <div class="two"><div><label>Usual vendor</label><input id="rf_vendor" value="${esc(i.vendor||'')}" placeholder="e.g. Koyambedu Ravi"></div><div><label>Vendor phone</label><input id="rf_vphone" type="tel" inputmode="tel" value="${esc(i.vendorPhone||'')}" placeholder="98xxxxxx"></div></div>
     <div class="two"><div><label>Minimum stock</label><input id="rf_min" type="number" inputmode="decimal" step="any" value="${i.minStock||0}"></div><div><label>Density (kg per L)</label><input id="rf_dens" type="number" inputmode="decimal" step="any" value="${i.density||1}"></div></div>
     <button class="btn save" id="rf_save">Save</button>${id?`<button class="btn sec save" id="rf_hide" style="margin-top:8px">${i.active===false?'Show again':'Hide this item'}</button>`:''}`);
   $('rf_save').onclick = ()=>{
     const name = $('rf_name').value.trim(); if (!name){ alert('Enter a name.'); return; }
     if (Object.entries(items).some(([k,x])=>k!==id && x.name.toLowerCase()===name.toLowerCase())){ alert('An item with this name already exists.'); return; }
-    const rec = { name, type:'raw', unit:$('rf_unit').value, category:$('rf_cat').value.trim(), ta:$('rf_ta').value.trim()||null, minStock:Math.max(0,num($('rf_min').value)||0), density:num($('rf_dens').value)>0?num($('rf_dens').value):1, active:true };
+    const rec = { name, type:'raw', unit:$('rf_unit').value, category:$('rf_cat').value.trim(), ta:$('rf_ta').value.trim()||null, minStock:Math.max(0,num($('rf_min').value)||0), density:num($('rf_dens').value)>0?num($('rf_dens').value):1, vendor:$('rf_vendor').value.trim()||null, vendorPhone:$('rf_vphone').value.trim()||null, active:true };
     (id ? db.ref(P+'items/'+id) : db.ref(P+'items').push()).update(rec).then(()=>{ closeSheet(); toast('Saved'); });
   };
   const h = $('rf_hide'); if (h) h.onclick = ()=>db.ref(P+'items/'+id+'/active').set(items[id].active===false).then(()=>{ closeSheet(); toast('Updated'); });
@@ -2706,15 +2753,15 @@ function stampT(sid, k, extra){
   return db.ref(P+'sessions/'+sid).update({ date, siteId, meal, ['times/'+k]: Object.assign({ ts:Date.now(), by:wfBy() }, extra||{}) });
 }
 function issuedFor(date, siteId, meal){
-  const agg = {}; let by = '', ts = 0, n = 0;
+  const agg = {}; let by = '', ts = 0, n = 0, all = 0;
   Object.entries(ledger).forEach(([id,e])=>{
-    if (e.type!=='issue' || e.reversed || (e.forDate||e.date)!==date || e.siteId!==siteId || e.meal!==meal) return;
-    const a = agg[e.itemId] = agg[e.itemId] || { itemId:e.itemId, qty:0 }; a.qty += -e.qty; n++; if ((e.ts||0)>ts){ ts = e.ts; by = e.by||''; }
+    if (e.type!=='issue' || e.reversed || (e.forDate||e.date)!==date || !(e.allDay || (e.siteId===siteId && e.meal===meal))) return;
+    const a = agg[e.itemId] = agg[e.itemId] || { itemId:e.itemId, qty:0 }; a.qty += -e.qty; n++; if (e.allDay) all++; if ((e.ts||0)>ts){ ts = e.ts; by = e.by||''; }
   });
-  return { lines:Object.values(agg), by, ts, n };
+  return { lines:Object.values(agg), by, ts, n, all: all>0 };
 }
 function generalIssued(date){
-  let n = 0, ts = 0; Object.values(ledger).forEach(e=>{ if (e.type==='issue' && !e.reversed && !e.siteId && (e.forDate||e.date)===date){ n++; if ((e.ts||0)>ts) ts = e.ts; } });
+  let n = 0, ts = 0; Object.values(ledger).forEach(e=>{ if (e.type==='issue' && !e.reversed && !e.siteId && !e.allDay && (e.forDate||e.date)===date){ n++; if ((e.ts||0)>ts) ts = e.ts; } });
   return { n, ts };
 }
 const issueTxt = lines => lines.map(l=>{ const it = items[l.itemId]||{name:'(deleted)',unit:''}; return esc(it.name)+' '+fmt(Math.round(l.qty*1000)/1000)+' '+esc(it.unit); }).join(' · ');
@@ -2748,7 +2795,7 @@ function wfCardHtml(sid, s){
   const w = wfState(sid, s), step = (n,t,ok,det)=>`<div class="row" style="margin-bottom:6px;align-items:flex-start"><div style="width:24px;height:24px;border-radius:99px;flex:none;background:${ok?'var(--green)':'var(--line)'};color:${ok?'#fff':'var(--muted)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px">${ok?'✓':n}</div><div class="grow"><b>${t}</b><div class="sub" style="margin:0">${det}</div></div></div>`;
   const edit = canStep('plan') && !(w.pd&&w.pd.ts);
   return `<div class="card" style="border-left:4px solid var(--amber)"><b>Before cooking — hand-offs</b>
-    ${step(1,'Raw material issued (Store Keeper)', w.iss.n>0, w.iss.n>0 ? issueTxt(w.iss.lines)+'<br>by '+esc(w.iss.by)+' · '+hm(w.iss.ts) : (w.gen.n? 'Only a <b>general</b> kitchen issue was made today ('+hm(w.gen.ts)+') — not linked to this meal.' : 'Waiting for the Store Keeper'))}
+    ${step(1,'Raw material issued (Store Keeper)', w.iss.n>0, w.iss.n>0 ? (w.iss.all?'<b>Entire production:</b> ':'')+issueTxt(w.iss.lines)+'<br>by '+esc(w.iss.by)+' · '+hm(w.iss.ts) : (w.gen.n? 'Only a <b>general</b> kitchen issue was made today ('+hm(w.gen.ts)+') — not linked to this meal.' : 'Waiting for the Store Keeper'))}
     ${step(2,'Plan sent to kitchen (Production Manager)', !!(w.pl&&w.pl.ts), w.pl&&w.pl.ts ? 'by '+esc(w.pl.by||'')+' · '+hm(w.pl.ts)+' · '+w.planned.length+' dish'+(w.planned.length===1?'':'es') : 'Waiting for the Production Manager')}
     ${step(3,'Cooking started (Kitchen / Cook)', !!(w.cs&&w.cs.ts), w.cs&&w.cs.ts ? 'by '+esc(w.cs.by||'')+' · '+hm(w.cs.ts) : 'Not started')}
     ${wfActions(sid,w)}</div>`;
@@ -2779,26 +2826,31 @@ function renderProd(){
     const done = w.pd && w.pd.ts, started = w.cs && w.cs.ts;
     const status = st.n ? st.label : (started?'Cooking':(w.pl&&w.pl.ts?'Plan received':(w.iss.n?'Material issued':'Waiting')));
     const edit = canStep('plan') && !done;
-    const kEdit = canStep('prod') && !done;
+    const kEdit = canStep('prod') && !done && !!started;
     cards.push(`<div class="card"><div class="row"><div style="font-size:26px">${MEAL_ICON[meal]}</div><div class="grow"><b>${esc(site.name)} — ${meal}</b><div class="sub">${esc(status)}</div></div><button class="btn sec" data-wf="open" data-sid="${sid}" style="padding:7px 11px;font-size:12.5px">Full sheet ›</button></div>
       ${wfLine(sid,s)}
-      <div style="margin-top:8px"><div class="sub" style="font-weight:700;color:var(--ink)">📤 Raw material issued</div><div class="sub">${w.iss.n? issueTxt(w.iss.lines)+' · '+esc(w.iss.by)+' '+hm(w.iss.ts) : (w.gen.n?'General issue only ('+w.gen.n+' lines today) — ask Store Keeper to link it to this meal':'Not issued yet')}</div></div>
+      <div style="margin-top:8px"><div class="sub" style="font-weight:700;color:var(--ink)">📤 Raw material issued</div><div class="sub">${w.iss.n? (w.iss.all?'Entire production: ':'')+issueTxt(w.iss.lines)+' · '+esc(w.iss.by)+' '+hm(w.iss.ts) : (w.gen.n?'General issue only ('+w.gen.n+' lines today) — ask Store Keeper to link it to this meal':'Not issued yet')}</div></div>
       <div style="margin-top:8px"><div class="sub" style="font-weight:700;color:var(--ink)">🍛 Dishes</div>
         ${edit ? wfDishEdit(sid,w,true) : Object.entries(s.items||{}).map(([id,it])=>{ const d = items[id]||{name:'(deleted)',unit:''}; return `<div class="row" style="margin-bottom:6px"><div class="grow"><b>${esc(d.name)}</b><div class="sub">Planned ${it.planned?fmt(it.planned)+' '+esc(d.unit):'—'}</div></div>
           ${kEdit?`<input class="wfmade" data-sid="${sid}" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.prepared||''}" placeholder="made" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span>`:`<div class="qty">${fmt(it.prepared||0)} <small>${esc(d.unit)} made</small></div>`}</div>`; }).join('') || '<div class="sub">No dishes planned yet.</div>'}
-        ${edit && kEdit && Object.keys(s.items||{}).length ? '<div class="sub" style="margin-top:4px">Made quantities are entered by the kitchen after the plan is sent.</div>' : ''}
+        
       </div>
-      ${edit && Object.keys(s.items||{}).length && canStep('prod') ? Object.entries(s.items||{}).map(([id,it])=>{ const d=items[id]||{name:'',unit:''}; return `<div class="row" style="margin-top:4px"><div class="grow sub" style="margin:0">Made: <b>${esc(d.name)}</b></div><input class="wfmade" data-sid="${sid}" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.prepared||''}" placeholder="made" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span></div>`; }).join('') : ''}
+      ${edit && started && Object.keys(s.items||{}).length && canStep('prod') ? Object.entries(s.items||{}).map(([id,it])=>{ const d=items[id]||{name:'',unit:''}; return `<div class="row" style="margin-top:4px"><div class="grow sub" style="margin:0">Made: <b>${esc(d.name)}</b></div><input class="wfmade" data-sid="${sid}" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.prepared||''}" placeholder="made" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span></div>`; }).join('') : ''}
       ${wfActions(sid,w)}
       ${started && !done && canStep('prod') ? `<button class="btn save" data-wf="done" data-sid="${sid}">✅ Cooking complete — pass to QC & dispatch</button>` : ''}
       ${done ? `<div class="sub" style="margin-top:8px;color:var(--green)">✅ Cooked ${hm(w.pd.ts)} by ${esc(w.pd.by||'')}</div>${wfNext(sid,s)}`:''}
     </div>`);
   }));
-  const hello = { store:'You issue the raw material. The kitchen is alerted with a loud alarm the moment you save an issue.', prodmanager:'Plan each meal and press <b>Send plan to kitchen</b> — the kitchen is alerted with a loud alarm.', kitchen:'Wait for the alarm, check material and plan, press <b>Start cooking</b>, enter quantities made, then <b>Cooking complete</b>.', cook:'Wait for the alarm, check material and plan, press <b>Start cooking</b>, enter quantities made, then <b>Cooking complete</b>.', admin:'Process: Store issues → Production Manager sends plan → Kitchen/Cook starts → cooking complete → QC → dispatch.' }[me.role] || '';
+  const hello = { store:'<b>Your step (3):</b> when the cook\'s requirement is approved, press <b>Prepare issue</b> in Kitchen issue. The cook and kitchen are alerted.', opsmanager:'<b>Your step (1):</b> add dishes with quantities for each meal, then press <b>Send entire plan</b>. Also approve the cook\'s requirement (step 2).', prodmanager:'<b>Your step (1):</b> add dishes with quantities for each meal, then press <b>Send entire plan</b>. Also approve the cook\'s requirement (step 2).', kitchen:'<b>Your step (4):</b> when material is issued you get an alarm. Press <b>Start cooking</b>, enter quantities made, then <b>Cooking complete</b>.', cook:'<b>Your steps:</b> send your <b>requirement</b> (step 2) once the plan arrives, then <b>Start cooking</b> (step 4) after the store issues material.', admin:'Flow: Plan → Cook requirement (approved) → Store issue → Production → Dispatch.' }[me.role] || '';
+  const planN = dayMeals(date).filter(m=>wfState(m.sid).planned.length).length;
   el.innerHTML = `<h2>👨‍🍳 Production</h2>
+    <div class="chips" style="margin-bottom:6px"><div class="chip ${date===todayKey()?'active':''}" data-prd="${todayKey()}">Today</div><div class="chip ${date===dayKey(1)?'active':''}" data-prd="${dayKey(1)}">Tomorrow</div></div>
     <div class="row" style="margin-bottom:10px"><button class="btn sec" id="prPrev" style="padding:9px 14px">‹</button><input type="date" id="prPick" value="${date}" style="text-align:center"><button class="btn sec" id="prNext" style="padding:9px 14px">›</button></div>
+    ${canStep('plan') && planN ? `<button class="btn save" data-wf="planall" data-date="${date}" style="margin-bottom:10px">📣 Send entire plan to kitchen (${planN} meal${planN>1?'s':''})</button>` : ''}
+    ${flowCardHtml(date,'Flow')}
     ${hello?`<div class="notice info" style="margin-bottom:10px">ℹ️ <div>${hello}</div></div>`:''}
     ${cards.join('') || '<div class="empty">No counters/meals set up yet. Admin: Masters → Counters.</div>'}`;
+  el.querySelectorAll('[data-prd]').forEach(c=>c.onclick=()=>{ mDate = c.dataset.prd; renderProd(); });
   const shift = n => { const d = new Date(mDate+'T00:00:00'); d.setDate(d.getDate()+n); mDate = keyOf(d); renderProd(); };
   $('prPrev').onclick = ()=>shift(-1); $('prNext').onclick = ()=>shift(1); $('prPick').onchange = ()=>{ if ($('prPick').value){ mDate = $('prPick').value; renderProd(); } };
 }
@@ -2817,6 +2869,7 @@ document.addEventListener('click', e=>{
   const rm = e.target.closest && e.target.closest('[data-wfrm]');
   if (rm){ const [sid,id] = rm.dataset.wfrm.split('|'); db.ref(P+'sessions/'+sid+'/items/'+id).remove().then(()=>renderAll()); return; }
   const b = e.target.closest && e.target.closest('[data-wf]'); if (!b || !me) return;
+  if (b.dataset.wf==='planall') return;
   const sid = b.dataset.sid, act = b.dataset.wf, w = wfState(sid);
   if (act==='open'){ openSid = sid; go('meals'); return; }
   if (act==='suggest'){
@@ -2846,32 +2899,57 @@ document.addEventListener('click', e=>{
 
 /* ---------- hand-off alerts to the people above & below ---------- */
 const WF_DEF = {
-  planned:{ ic:'🗓️', t:'Plan sent to kitchen', to:['kitchen','cook','store','prodmanager','admin'], loud:['kitchen','cook'] },
-  cookStart:{ ic:'🍳', t:'Cooking started', to:['prodmanager','store','admin','driver','supervisor','counter'], loud:[] },
-  prodDone:{ ic:'✅', t:'Cooking complete — ready for QC', to:['prodmanager','driver','supervisor','counter','admin','kitchen','cook'], loud:['prodmanager','driver'] },
-  packed:{ ic:'📦', t:'Packed', to:['driver','prodmanager','kitchen','cook','admin'], loud:['driver'] },
-  loaded:{ ic:'🚛', t:'Loaded in vehicle', to:['driver','prodmanager','supervisor','counter','admin','kitchen','cook'], loud:['driver'] },
-  counterLoaded:{ ic:'🍽️', t:'Loaded into food counter', to:['prodmanager','kitchen','cook','admin','supervisor','counter','store'], loud:[] }
+  planned:{ ic:'🗓️', t:'Plan sent to kitchen', to:['kitchen','cook','store','prodmanager','opsmanager','admin'], loud:['kitchen','cook'] },
+  cookStart:{ ic:'🍳', t:'Cooking started', to:['prodmanager','opsmanager','store','admin','driver','supervisor','counter'], loud:[] },
+  prodDone:{ ic:'✅', t:'Cooking complete — ready for QC', to:['prodmanager','opsmanager','driver','supervisor','counter','admin','kitchen','cook'], loud:['prodmanager','opsmanager','driver'] },
+  packed:{ ic:'📦', t:'Packed', to:['driver','prodmanager','opsmanager','kitchen','cook','admin'], loud:['driver'] },
+  loaded:{ ic:'🚛', t:'Loaded in vehicle', to:['driver','prodmanager','opsmanager','supervisor','counter','admin','kitchen','cook'], loud:['driver'] },
+  counterLoaded:{ ic:'🍽️', t:'Loaded into food counter', to:['prodmanager','opsmanager','kitchen','cook','admin','supervisor','counter','store'], loud:[] }
 };
 function wfEvents(){
-  const out = [], days = [todayKey(), keyOf(new Date(Date.now()-864e5)), keyOf(new Date(Date.now()+864e5))], vs = new Set(visibleSites().map(([k])=>k)), role = me.role;
+  const out = [], days = [todayKey(), keyOf(new Date(Date.now()-864e5)), keyOf(new Date(Date.now()+864e5))], vs = new Set(visibleSites().map(([k])=>k)), role = me.role, PM = isPMrole(role);
+  const lnk = (sid,date) => can('prod') ? { go:'prod', date } : { go:'meals', sid, date };
+  const groups = {};
   Object.entries(sessions).forEach(([sid,x])=>{
     if (!x.date || !days.includes(x.date) || !vs.has(x.siteId)) return;
     const nm = (sites[x.siteId]||{}).name || x.siteId, tag = nm+' · '+x.meal;
-    Object.entries(WF_DEF).forEach(([k,d])=>{ const t = T(x,k); if (t && t.ts && d.to.includes(role)) out.push({ id:'wf:'+k+':'+sid+':'+t.ts, ts:t.ts, k:'wf', icon:d.ic, lvl:d.loud.includes(role)?'amber':'', loud:d.loud.includes(role), by:t.by, title:d.t+' — '+tag, text:'by '+(t.by||'—'), go:'prod' }); });
-    [['qc1','Production QC',['kitchen','cook','driver','prodmanager','admin']],['qc2','Arrival QC',['prodmanager','kitchen','cook','admin','driver','supervisor','counter']]].forEach(([k,l,to])=>{ const q = x[k]; if (q && q.ts && q.ok!==false && to.includes(role)) out.push({ id:'wf:'+k+':'+sid+':'+q.ts, ts:q.ts, k:'wf', icon:'🧪', by:q.by, title:l+' passed — '+tag, text:(q.temp!=null?q.temp+'°C · ':'')+'by '+(q.by||'—'), go:'meals' }); });
+    Object.entries(WF_DEF).forEach(([k,d])=>{ const t = T(x,k); if (!t || !t.ts || !d.to.includes(role)) return;
+      if (k==='planned'){ const gk = t.batch || sid+t.ts, g = groups[gk] = groups[gk] || { ts:t.ts, by:t.by, tags:[], dishes:[], date:x.date }; g.tags.push(tag); g.ts = Math.max(g.ts,t.ts);
+        Object.entries(x.items||{}).forEach(([id,i])=>{ if (i.planned>0 && items[id]) g.dishes.push(items[id].name); }); g.gk = gk; return; }
+      out.push(Object.assign({ id:'wf:'+k+':'+sid+':'+t.ts, ts:t.ts, k:'wf', icon:d.ic, lvl:d.loud.includes(role)?'amber':'', loud:d.loud.includes(role), by:t.by, title:d.t+' — '+tag, text:'by '+(t.by||'—') }, lnk(sid,x.date), { sid: can('prod')?undefined:sid })); });
+    [['qc1','Production QC',['kitchen','cook','driver','prodmanager','opsmanager','admin']],['qc2','Arrival QC',['prodmanager','opsmanager','kitchen','cook','admin','driver','supervisor','counter']]].forEach(([k,l,to])=>{ const q = x[k]; if (q && q.ts && q.ok!==false && to.includes(role)) out.push({ id:'wf:'+k+':'+sid+':'+q.ts, ts:q.ts, k:'wf', icon:'🧪', by:q.by, title:l+' passed — '+tag, text:(q.temp!=null?q.temp+'°C · ':'')+'by '+(q.by||'—'), go:'meals', sid }); });
   });
-  if (['kitchen','cook','prodmanager','admin'].includes(role)){
+  /* Step 1 → meal plan sent (one notification for the whole day's plan) */
+  Object.values(groups).forEach(g=>{
+    const cook = role==='cook', loud = ['kitchen','cook'].includes(role), uniq = [...new Set(g.tags)], dn = [...new Set(g.dishes)];
+    out.push({ id:'wf:planned:'+g.gk, ts:g.ts, k:'wf', icon:'🗓️', lvl:loud?'amber':'', loud, by:g.by, go:cook?'req':(can('prod')?'prod':'home'), date:g.date,
+      title: cook ? 'Meal plan sent — now send your requirement' : 'Meal plan sent to kitchen — '+g.date,
+      text: 'by '+(g.by||'—')+' · '+uniq.slice(0,3).join(', ')+(uniq.length>3?' +'+(uniq.length-3)+' more':'')+(dn.length?' · '+dn.slice(0,4).join(', ')+(dn.length>4?'…':''):'') });
+  });
+  /* Step 3 → material issued (cook & kitchen ring) */
+  if (['kitchen','cook','prodmanager','opsmanager','admin'].includes(role)){
     const batches = {};
-    Object.entries(ledger).forEach(([id,e])=>{ if (e.type!=='issue' || e.reversed) return; const k = e.batch || id; const b = batches[k] = batches[k] || { ts:0, by:'', n:0, siteId:e.siteId, meal:e.meal, d:e.forDate||e.date }; b.n++; if ((e.ts||0)>b.ts){ b.ts = e.ts; b.by = e.by||''; } });
-    Object.entries(batches).forEach(([k,b])=>{ if (!b.ts || !days.includes(b.d) || (b.siteId && !vs.has(b.siteId))) return; const tgt = b.siteId && sites[b.siteId] ? sites[b.siteId].name+' · '+b.meal : 'general kitchen use';
-      out.push({ id:'wf:issue:'+k, ts:b.ts, k:'wf', icon:'📤', lvl:'amber', loud:true, by:b.by, title:'Raw material issued — '+tgt, text:b.n+' item'+(b.n>1?'s':'')+' by '+(b.by||'Store Keeper')+' · check the Production tab', go:'prod' }); });
+    Object.entries(ledger).forEach(([id,e])=>{ if (e.type!=='issue' || e.reversed) return; const k = e.batch || id; const b = batches[k] = batches[k] || { ts:0, by:'', n:0, siteId:e.siteId, meal:e.meal, all:!!e.allDay, d:e.forDate||e.date }; b.n++; if ((e.ts||0)>b.ts){ b.ts = e.ts; b.by = e.by||''; } });
+    Object.entries(batches).forEach(([k,b])=>{ if (!b.ts || !days.includes(b.d) || (b.siteId && !vs.has(b.siteId))) return; const tgt = b.all ? 'entire production' : b.siteId && sites[b.siteId] ? sites[b.siteId].name+' · '+b.meal : 'general kitchen use'; const lo = ['kitchen','cook'].includes(role);
+      out.push({ id:'wf:issue:'+k, ts:b.ts, k:'wf', icon:'📤', lvl:lo?'amber':'', loud:lo, by:b.by, title:'Raw material issued — '+tgt, text:b.n+' item'+(b.n>1?'s':'')+' by '+(b.by||'Store Keeper')+(lo?' · start production':''), go:can('prod')?'prod':'home', date:b.d }); });
   }
+  /* Step 2 → cook requirement: ONLY store, production / operations manager, admin (and the cook who sent it) */
   const rq = (settings.reqs)||{};
-  if (['store','prodmanager','kitchen','admin'].includes(role)) Object.entries(rq).forEach(([dt,m])=>{ Object.entries(m||{}).forEach(([id,x])=>{ if (!x || !x.ts || !days.includes(dt)) return; const n = Object.keys(x.items||{}).length; const lo = ['store','prodmanager'].includes(role);
-    out.push({ id:'wf:req:'+dt+':'+id, ts:x.ts, k:'wf', icon:'📝', lvl:lo?'amber':'', loud:lo, by:x.by, title:'Requirement list for '+dt, text:'by '+(x.by||'Cook')+(x.photoKey?' · photo':'')+(n?' · '+n+' item'+(n>1?'s':''):''), go:'req' }); }); });
-  if (['store','prodmanager','admin'].includes(role)) Object.entries(ledger).forEach(([id,e])=>{ if (e.type!=='return' || !(e.qty>0) || !days.includes(e.date) || !items[e.itemId]) return; out.push({ id:'wf:ret:'+id, ts:e.ts||0, k:'wf', icon:'↩', by:e.by, title:'Returned to store — '+items[e.itemId].name, text:fmt(e.qty)+' '+items[e.itemId].unit+' by '+(e.by||''), go:'issue' }); });
-  return out.filter(e=>e.by!==me.name || false);
+  Object.entries(rq).forEach(([dt,m])=>{ if (!days.includes(dt)) return; Object.entries(m||{}).forEach(([id,x])=>{ if (!x || !x.ts) return;
+    const n = Object.keys(x.items||{}).length, what = (n?n+' item'+(n>1?'s':''):'')+(x.photoKey?(n?' · ':'')+'photo':''), fl = reqForLabel(x.forMeal);
+    if (role==='cook'){
+      if (x.byId!==me.id) return;
+      if (x.approved && x.appTs && x.appBy!==me.name) out.push({ id:'wf:reqok:'+id+':'+x.appTs, ts:x.appTs, k:'wf', icon:'✅', by:x.appBy, title:'Requirement approved — '+dt, text:'by '+x.appBy+' · store will issue the material', go:'req', date:dt });
+      if (x.rejected && x.appTs) out.push({ id:'wf:reqno:'+id+':'+x.appTs, ts:x.appTs, k:'wf', icon:'↩', lvl:'amber', loud:true, by:x.appBy, title:'Requirement sent back — '+dt, text:(x.rejNote||'Please check and send again'), go:'req', date:dt });
+      return; }
+    if (!['store','prodmanager','opsmanager','admin'].includes(role)) return;
+    if (x.approved){ const lo = role==='store' && !x.issuedTs;
+      out.push({ id:'wf:reqok:'+id+':'+(x.appTs||x.ts), ts:x.appTs||x.ts, k:'wf', icon:'✅', lvl:lo?'amber':'', loud:lo, by:x.appBy||x.by, title:(role==='store'?'Approved requirement — issue the material':'Requirement approved')+' · '+dt, text:(x.by||'Cook')+' · '+fl+(what?' · '+what:''), go:role==='store'?'issue':'req', date:dt }); }
+    else if (!x.rejected){ const lo = isPMrole(role);
+      out.push({ id:'wf:req:'+dt+':'+id, ts:x.ts, k:'wf', icon:'📝', lvl:lo?'amber':'', loud:lo, by:x.by, title:(lo?'Approve cook requirement':'Cook requirement sent')+' · '+dt, text:(x.by||'Cook')+' · '+fl+(what?' · '+what:''), go:'req', date:dt }); }
+  }); });
+  if (['store','prodmanager','opsmanager','admin'].includes(role)) Object.entries(ledger).forEach(([id,e])=>{ if (e.type!=='return' || !(e.qty>0) || !days.includes(e.date) || !items[e.itemId]) return; out.push({ id:'wf:ret:'+id, ts:e.ts||0, k:'wf', icon:'↩', by:e.by, title:'Returned to store — '+items[e.itemId].name, text:fmt(e.qty)+' '+items[e.itemId].unit+' by '+(e.by||''), go:'issue' }); });
+  return out.filter(e=>e.by!==me.name);
 }
 
 /* ---------- loud alarm: siren + vibration + "Got it" screen ---------- */
@@ -2894,7 +2972,7 @@ function alarmPaint(){
     <div class="two" style="margin-top:12px"><button class="btn" id="abOpen">Open</button><button class="btn sec" id="abOk">✔ Got it</button></div></div>`;
   b.classList.add('show');
   $('abOk').onclick = alarmStop;
-  $('abOpen').onclick = ()=>{ const g = alarmItems[0] && alarmItems[0].go; alarmStop(); if (g && can(g)) go(g); };
+  $('abOpen').onclick = ()=>{ const g = alarmItems[0]; alarmStop(); if (g) openLink(g); };
 }
 function alarmRing(items){
   alarmItems = items.concat(alarmItems).slice(0,10); alarmPaint(); sirenOnce(); alarmStart = Date.now();
@@ -2917,54 +2995,104 @@ setInterval(()=>{ if (me && skippedRender && !ptrDown){ const a = document.activ
 let reqRows = [{ itemId:'', qty:'' }], reqDay = 0, reqNote = '', reqView = todayKey();
 const dayKey = n => { const d = new Date(); d.setDate(d.getDate()+n); return keyOf(d); };
 function reqList(date){ const r = (settings.reqs||{})[date]||{}; return Object.entries(r).map(([id,x])=>Object.assign({id},x)).sort((a,b)=>(b.ts||0)-(a.ts||0)); }
-const canReq = () => me && ['cook','kitchen','prodmanager','admin'].includes(me.role);
+/* ---- requirement: who may see / send / approve ---- */
+let reqFor = 'all';
+const canReq = () => me && ['cook','prodmanager','opsmanager','admin'].includes(me.role);
+const canApprove = () => me && ['prodmanager','opsmanager','admin'].includes(me.role);
+const canSeeAllReq = () => me && ['store','prodmanager','opsmanager','admin'].includes(me.role);
+const reqVisible = x => canSeeAllReq() || (me && me.role==='cook' && x.byId===me.id);
+function reqStatus(x){
+  if (x.issuedTs) return ['Issued by store','green'];
+  if (x.rejected) return ['Sent back','red'];
+  if (x.approved) return ['Approved — waiting for store','blue'];
+  return ['Waiting for approval','amber'];
+}
+function reqForLabel(v){ if (!v || v==='all') return 'Entire production (all meals)'; const [sid,m] = v.split('|'); return ((sites[sid]||{}).name||sid)+' — '+m; }
+function planSummary(date){
+  const out = [];
+  dayMeals(date).forEach(m=>{ const w = wfState(m.sid); if (!w.planned.length) return;
+    out.push({ tag:m.site.name+' · '+m.meal, sent:!!(w.pl&&w.pl.ts), dishes:w.planned.map(([id,it])=>(items[id]||{name:'?'}).name+' '+fmt(it.planned)+' '+((items[id]||{}).unit||'')) }); });
+  return out;
+}
+function planSummaryHtml(date){
+  const ps = planSummary(date);
+  if (!ps.length) return `<div class="notice amber" style="margin:8px 0"><span>🗓️</span><div>No meal plan has been made for <b>${date}</b> yet. You can still send your requirement.</div></div>`;
+  return `<div class="card" style="background:var(--ok-soft);margin:8px 0"><b>🗓️ Meal plan for ${date}</b>${ps.map(p=>`<div class="sub" style="margin-top:5px"><b style="color:var(--ink)">${esc(p.tag)}</b> ${p.sent?'':'<span class="badge amber">draft</span>'}<br>${p.dishes.map(esc).join(' · ')}</div>`).join('')}</div>`;
+}
 function reqItemOptions(sel){
   const raws = Object.entries(items).filter(([,i])=>i.type==='raw' && i.active!==false).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const g = k => raws.filter(([,i])=>rawGroup(i)===k).map(([id,i])=>`<option value="${id}" ${id===sel?'selected':''}>${esc(i.name)}${i.ta?' · '+esc(i.ta):''} (${esc(i.unit)})</option>`).join('');
   return '<option value="">Select item…</option><optgroup label="🥬 Vegetables">'+g('veg')+'</optgroup><optgroup label="🛒 Provisions">'+g('prov')+'</optgroup>';
 }
-function reqGrab(){ document.querySelectorAll('#p-req .rq_item').forEach(s=>{ if (reqRows[+s.dataset.n]) reqRows[+s.dataset.n].itemId = s.value; }); document.querySelectorAll('#p-req .rq_qty').forEach(s=>{ if (reqRows[+s.dataset.n]) reqRows[+s.dataset.n].qty = s.value; }); const n = $('rq_note'); if (n) reqNote = n.value; const d = $('rq_day'); if (d) reqDay = +d.value; }
+function reqGrab(){ document.querySelectorAll('#p-req .rq_item').forEach(s=>{ if (reqRows[+s.dataset.n]) reqRows[+s.dataset.n].itemId = s.value; }); document.querySelectorAll('#p-req .rq_qty').forEach(s=>{ if (reqRows[+s.dataset.n]) reqRows[+s.dataset.n].qty = s.value; }); const n = $('rq_note'); if (n) reqNote = n.value; const d = $('rq_day'); if (d) reqDay = +d.value; const f = $('rq_for'); if (f) reqFor = f.value; }
 function renderReq(){
   const el = $('p-req'); if (!el) return;
   if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){ skippedRender = true; return; }
-  const list = reqList(reqView), canStore = ['store','prodmanager','admin'].includes(me.role);
-  el.innerHTML = `<h2>📝 Daily requirement</h2>
-    ${canReq() ? `<div class="card"><b>Send today's vegetables &amp; provisions requirement</b>
-      <div class="sub">Take a photo of the handwritten list, select items, or both — either one is enough. It reaches the Store Keeper, Production Manager and Kitchen instantly.</div>
+  const list = reqList(reqView).filter(reqVisible), canStore = ['store','prodmanager','opsmanager','admin'].includes(me.role), formDate = dayKey(reqDay);
+  const meals = []; Object.entries(sites).forEach(([k,s])=>(s.meals||[]).forEach(m=>meals.push([k+'|'+m, s.name+' — '+m])));
+  el.innerHTML = `<h2>📝 Cook requirement</h2>
+    <div class="sub" style="margin-bottom:8px">Only the Store Keeper and the Production / Operations Manager can see requirements.</div>
+    ${canReq() ? `<div class="card"><b>Step 2 — Send vegetables &amp; provisions needed</b>
+      <div class="sub">Based on the meal plan. Take a photo of the handwritten list, select items, or both — either one is enough.</div>
       <label>For which day</label><select id="rq_day"><option value="0" ${reqDay===0?'selected':''}>Today (${dayKey(0)})</option><option value="1" ${reqDay===1?'selected':''}>Tomorrow (${dayKey(1)})</option></select>
+      ${planSummaryHtml(formDate)}
+      <label>For which production</label><select id="rq_for"><option value="all" ${reqFor==='all'?'selected':''}>⭐ Entire production — all meals</option>${meals.map(([v,l])=>`<option value="${esc(v)}" ${reqFor===v?'selected':''}>${esc(l)} only</option>`).join('')}</select>
       ${photoBox(draftCtx('req'),'Photo of written list',{draft:'req'})}
       <label style="margin-top:10px">Select items (optional)</label>
       ${reqRows.map((r,n)=>{ const u = r.itemId && items[r.itemId] ? items[r.itemId].unit : ''; return `<div class="row" style="margin-top:8px;align-items:flex-end;gap:8px"><div class="grow"><select data-n="${n}" class="rq_item">${reqItemOptions(r.itemId)}</select></div><div style="width:92px"><input data-n="${n}" class="rq_qty" type="number" inputmode="decimal" step="any" placeholder="${esc(u||'qty')}" value="${esc(r.qty)}"></div>${reqRows.length>1?`<button class="btn danger" data-rqrm="${n}" style="padding:9px 12px">✕</button>`:''}</div>`; }).join('')}
       <button class="btn sec" id="rq_add" style="margin-top:8px;width:100%;padding:10px">+ Add another item</button>
       <label>Note (optional)</label><input id="rq_note" value="${esc(reqNote)}" placeholder="e.g. need extra onion for biryani">
-      <button class="btn save" id="rq_send">📨 Send requirement</button></div>` : ''}
+      <button class="btn save" id="rq_send">📨 Send requirement</button>
+      <div class="sub" style="margin-top:4px">${isPMrole(me.role)||me.role==='admin'?'Sent by you — approved automatically.':'The Production / Operations Manager approves it, then the Store Keeper issues the material.'}</div></div>` : ''}
     <div class="row" style="margin:10px 0"><button class="btn sec" id="rqPrev" style="padding:9px 14px">‹</button><input type="date" id="rqPick" value="${reqView}" style="text-align:center"><button class="btn sec" id="rqNext" style="padding:9px 14px">›</button></div>
-    ${list.length ? list.map(x=>{ const ln = Object.entries(x.items||{}); return `<div class="card"><div class="row"><div class="grow"><b>${esc(x.by||'Cook')}</b><div class="sub">${new Date(x.ts||0).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · for ${esc(x.for||reqView)}</div></div>${(me.role==='admin'||x.byId===me.id)?`<button class="btn danger" data-rqdel="${x.id}" style="padding:7px 10px;font-size:12px">Delete</button>`:''}</div>
+    ${list.length ? list.map(x=>{ const ln = Object.entries(x.items||{}), [stt,col] = reqStatus(x); return `<div class="card" id="rq_${x.id}"><div class="row"><div class="grow"><b>${esc(x.by||'Cook')}</b> <span class="badge ${col==='green'?'':col}" style="${col==='green'?'background:var(--ok-soft);color:var(--green)':col==='red'?'background:#fde4e1;color:#b3261e':''}">${stt}</span><div class="sub">${new Date(x.ts||0).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · for ${esc(x.for||reqView)} · <b>${esc(reqForLabel(x.forMeal))}</b></div></div>${(me.role==='admin'||x.byId===me.id)&&!x.issuedTs?`<button class="btn danger" data-rqdel="${x.id}" style="padding:7px 10px;font-size:12px">Delete</button>`:''}</div>
       ${x.photoKey?photoBox(x.photoKey,'',{ro:true}):''}
       ${ln.length?`<div style="margin-top:6px">${ln.map(([id,q])=>{ const it = items[id]||{name:'(deleted)',unit:''}; return `<div class="row" style="padding:4px 0;border-bottom:1px solid var(--line)"><div class="grow">${esc(it.name)}</div><b>${fmt(q)} ${esc(it.unit)}</b><span class="sub" style="margin:0 0 0 8px;min-width:70px;text-align:right">stock ${fmt(Math.round(stockOf(id)*100)/100)}</span></div>`; }).join('')}</div>`:''}
       ${x.note?`<div class="sub" style="margin-top:6px">📝 ${esc(x.note)}</div>`:''}
-      ${canStore && ln.length?`<button class="btn sec save" data-rqissue="${x.id}">📤 Prepare kitchen issue from this list</button>`:''}</div>`; }).join('') : '<div class="empty">No requirement sent for this day yet.</div>'}`;
+      ${x.rejected&&x.rejNote?`<div class="sub" style="margin-top:6px;color:#b3261e">↩ ${esc(x.appBy||'Manager')}: ${esc(x.rejNote)}</div>`:''}
+      ${x.approved?`<div class="sub" style="margin-top:6px">✅ Approved by ${esc(x.appBy||'')} · ${hm(x.appTs)}</div>`:''}
+      ${canApprove() && !x.approved && !x.issuedTs?`<div class="two" style="margin-top:8px"><button class="btn save" data-rqok="${x.id}">✅ Approve</button><button class="btn danger" data-rqno="${x.id}">↩ Send back</button></div>`:''}
+      ${canStore && !x.issuedTs && (ln.length||x.photoKey||x.note) && (x.approved || me.role!=='store') ?`<button class="btn sec save" data-rqissue="${x.id}">📤 Step 3 — Prepare kitchen issue</button>`:''}
+      ${canStore && !x.issuedTs && !x.approved && me.role==='store' ?`<div class="sub" style="margin-top:6px">Wait for the manager's approval, then issue.</div>`:''}</div>`; }).join('') : '<div class="empty">No requirement for this day yet.</div>'}`;
   const shift = n => { const d = new Date(reqView+'T00:00:00'); d.setDate(d.getDate()+n); reqView = keyOf(d); renderReq(); };
   $('rqPrev').onclick = ()=>shift(-1); $('rqNext').onclick = ()=>shift(1); $('rqPick').onchange = ()=>{ if ($('rqPick').value){ reqView = $('rqPick').value; renderReq(); } };
+  const dsel = $('rq_day'); if (dsel) dsel.onchange = ()=>{ reqGrab(); renderReq(); };
   const add = $('rq_add'); if (add) add.onclick = ()=>{ reqGrab(); reqRows.push({itemId:'',qty:''}); renderReq(); };
   el.querySelectorAll('[data-rqrm]').forEach(b=>b.onclick=()=>{ reqGrab(); reqRows.splice(+b.dataset.rqrm,1); if (!reqRows.length) reqRows.push({itemId:'',qty:''}); renderReq(); });
   el.querySelectorAll('[data-rqdel]').forEach(b=>b.onclick=()=>{ if (confirm('Delete this requirement?')) db.ref(P+'settings/reqs/'+reqView+'/'+b.dataset.rqdel).remove(); });
-  el.querySelectorAll('[data-rqissue]').forEach(b=>b.onclick=()=>{ const x = list.find(y=>y.id===b.dataset.rqissue); if (!x) return; issueRows = Object.entries(x.items||{}).map(([id,q])=>({ itemId:id, qty:String(q) })); issueFor = '__'; issueDay = reqView>todayKey()?1:0; issueNote = 'Cook requirement '+reqView; go('issue'); });
+  el.querySelectorAll('[data-rqok]').forEach(b=>b.onclick=()=>{ b.disabled = true; db.ref(P+'settings/reqs/'+reqView+'/'+b.dataset.rqok).update({ approved:true, rejected:null, rejNote:null, appBy:me.name, appTs:Date.now() }).then(()=>{ toast('✅ Approved — Store Keeper alerted'); }); });
+  el.querySelectorAll('[data-rqno]').forEach(b=>b.onclick=()=>{ const why = prompt('Why is it sent back? (the cook will see this)'); if (why===null) return; db.ref(P+'settings/reqs/'+reqView+'/'+b.dataset.rqno).update({ approved:null, rejected:true, rejNote:why||'Please check and send again', appBy:me.name, appTs:Date.now() }).then(()=>toast('↩ Sent back to the cook')); });
+  el.querySelectorAll('[data-rqissue]').forEach(b=>b.onclick=()=>startIssueFromReq(reqView, b.dataset.rqissue));
   const sd = $('rq_send'); if (sd) sd.onclick = ()=>{
     reqGrab(); const its = {}; let bad = false;
     reqRows.forEach(r=>{ if (!r.itemId && r.qty==='') return; const q = num(r.qty); if (!r.itemId || !(q>0)) bad = true; else its[r.itemId] = (its[r.itemId]||0)+q; });
     if (bad){ alert('Each selected item needs a quantity above 0 (or remove the empty line).'); return; }
     const hasPh = !!(PHD.req && phCount(PHD.req));
     if (!Object.keys(its).length && !hasPh && !reqNote.trim()){ alert('Add a photo of the written list, select some items, or write a note.'); return; }
-    const day = dayKey(reqDay), pk = usePh('req');
+    const day = dayKey(reqDay), pk = usePh('req'), auto = canApprove();
     sd.disabled = true;
-    db.ref(P+'settings/reqs/'+day).push({ items:its, note:reqNote.trim()||null, photoKey:pk||null, for:day, by:me.name, byId:me.id, ts:Date.now() }).then(()=>{ toast('📨 Requirement sent'); reqRows = [{itemId:'',qty:''}]; reqNote=''; reqView = day; renderAll(); }).catch(()=>{ sd.disabled = false; alert('Could not send. Check the internet and try again.'); });
+    db.ref(P+'settings/reqs/'+day).push({ items:its, note:reqNote.trim()||null, photoKey:pk||null, for:day, forMeal:reqFor||'all', by:me.name, byId:me.id, ts:Date.now(), approved:auto||null, appBy:auto?me.name:null, appTs:auto?Date.now():null }).then(()=>{ toast(auto?'📨 Requirement sent & approved':'📨 Requirement sent for approval'); reqRows = [{itemId:'',qty:''}]; reqNote=''; reqView = day; renderAll(); }).catch(()=>{ sd.disabled = false; alert('Could not send. Check the internet and try again.'); });
   };
 }
+function startIssueFromReq(date, id){
+  const x = reqList(date).find(y=>y.id===id); if (!x) return;
+  if (!x.approved && me.role!=='admin' && !isPMrole(me.role) && !confirm('This requirement has not been approved yet.\nPrepare the issue anyway?')) return;
+  issueRows = Object.entries(x.items||{}).map(([iid,q])=>({ itemId:iid, qty:String(q) })); if (!issueRows.length) issueRows = [{itemId:'',qty:''}];
+  issueFor = !x.forMeal || x.forMeal==='all' ? 'ALL' : x.forMeal; issueDay = date>todayKey()?1:0; issueNote = 'Cook requirement '+date+(x.note?' · '+x.note:''); issueReq = { id, date, by:x.by };
+  go('issue');
+}
+/* approved requirements waiting for the store keeper — shown at the top of Kitchen issue */
+function reqWaitList(){ const out = []; [todayKey(), dayKey(1)].forEach(d=>reqList(d).forEach(x=>{ if (!x.issuedTs && !x.rejected && (Object.keys(x.items||{}).length||x.photoKey||x.note)) out.push(Object.assign({date:d},x)); })); return out; }
+function reqWaitHtml(){
+  if (!['store','prodmanager','opsmanager','admin'].includes(me.role)) return '';
+  const l = reqWaitList(); if (!l.length) return `<div class="notice info" style="margin-bottom:10px"><span>📝</span><div>No cook requirement is waiting. When the cook sends one and it is approved, it appears here.</div></div>`;
+  return `<div class="card" style="border-left:4px solid var(--amber)"><b>📝 Cook requirements waiting for issue</b>${l.map(x=>{ const [stt] = reqStatus(x); const n = Object.keys(x.items||{}).length; return `<div class="row" style="margin-top:8px"><div class="grow"><b>${esc(x.by||'Cook')}</b> · for ${esc(x.date)}<div class="sub">${esc(reqForLabel(x.forMeal))} · ${n} item${n===1?'':'s'}${x.photoKey?' · photo':''} · <b>${stt}</b></div></div><button class="btn save" data-rwi="${x.date}|${x.id}" style="padding:9px 12px">Prepare issue</button></div>`; }).join('')}</div>`;
+}
+function reqWaitBind(el){ el.querySelectorAll('[data-rwi]').forEach(b=>b.onclick=()=>{ const [d,id] = b.dataset.rwi.split('|'); startIssueFromReq(d,id); }); }
 
 /* ---------- issued vs returned, per item per day ---------- */
 let retDay = todayKey(), retExtra = {};
-const canReturn = () => me && ['store','prodmanager','cook','admin'].includes(me.role);
+const canReturn = () => me && ['store','prodmanager','opsmanager','cook','admin'].includes(me.role);
 function retTable(){
   const day = retDay, iss = {}, ret = {};
   Object.values(ledger).forEach(e=>{ if (e.date!==day) return; if (e.type==='issue' || e.type==='issue-reversal') iss[e.itemId] = (iss[e.itemId]||0) + -e.qty; else if (e.type==='return') ret[e.itemId] = (ret[e.itemId]||0) + e.qty; });
@@ -2996,9 +3124,9 @@ function retBind(el){
 /* ============ v7: TIMED DEADLINE ALARMS (admin sets the times) + phone-alert enabling ============ */
 const DL_STEPS = [
   { k:'issue',  ic:'📤', l:'Raw material issued',          owners:['store'],                             f:'issueBy', lead:15, go:'issue', done:w=>w.iss.n>0 },
-  { k:'plan',   ic:'🗓️', l:'Plan sent to kitchen',         owners:['prodmanager'],                       f:'planBy',  lead:10, go:'prod',  done:w=>!!(w.pl&&w.pl.ts) },
+  { k:'plan',   ic:'🗓️', l:'Plan sent to kitchen',         owners:['prodmanager','opsmanager'],                       f:'planBy',  lead:10, go:'prod',  done:w=>!!(w.pl&&w.pl.ts) },
   { k:'cook',   ic:'🍳', l:'Cooking complete',             owners:['kitchen','cook'],                    f:'cookBy',  lead:10, go:'prod',  done:w=>!!(w.pd&&w.pd.ts) },
-  { k:'pack',   ic:'📦', l:'Packed, loaded & dispatched',  owners:['prodmanager'],                       f:'packBy',  lead:10, go:'prod',  done:w=>!!(T(w.s,'loaded')&&T(w.s,'loaded').ts) },
+  { k:'pack',   ic:'📦', l:'Packed, loaded & dispatched',  owners:['prodmanager','opsmanager'],                       f:'packBy',  lead:10, go:'prod',  done:w=>!!(T(w.s,'loaded')&&T(w.s,'loaded').ts) },
   { k:'depart', ic:'🚚', l:'Driver starts the trip',       owners:['driver'],                            f:'depart',  lead:0,  go:'meals', sched:1, done:w=>!!(T(w.s,'departed')&&T(w.s,'departed').ts) },
   { k:'arrive', ic:'📍', l:'Vehicle reaches the counter',  owners:['driver','supervisor','counter'],     f:'arrive',  lead:0,  go:'meals', sched:1, done:w=>!!(T(w.s,'arrived')&&T(w.s,'arrived').ts) }
 ];
@@ -3016,7 +3144,7 @@ function dlList(dateKey, roleOnly){
       DL_STEPS.forEach(st=>{
         const hh = dlTime(site,meal,st); if (!hh) return;
         const due = dlAt(dateKey,hh), start = due - dlLead(st)*60000, over = Math.floor((now-due)/60000);
-        const owner = st.owners.includes(me.role), esc2 = !roleOnly && over>=10 && ['prodmanager','admin'].includes(me.role);
+        const owner = st.owners.includes(me.role), esc2 = !roleOnly && over>=10 && ['prodmanager','opsmanager','admin'].includes(me.role);
         if (!owner && !esc2) return;
         out.push({ key:dateKey+'|'+siteId+'|'+meal+'|'+st.k, sid, st, site:site.name||siteId, meal, hh, due, start, over, done:st.done(w), owner, esc:!owner });
       });
@@ -3131,6 +3259,160 @@ function permAskOnce(){
     $('pa_later').onclick = closeSheet; });
 }
 setTimeout(()=>{ setInterval(()=>{ try{ if (me && !permAsked) permAskOnce(); }catch(e){} }, 5000); }, 3000);
+
+/* ============ v8: SIMPLE 5-STEP FLOW · approvals · deep links · landing screen · vendors ============ */
+/* Step 1 Meal plan (Ops/Production Mgr) → 2 Cook requirement (+approval) → 3 Kitchen issue (Store) → 4 Production (Kitchen/Cook) → 5 Dispatch & delivery */
+function vendorLine(i){
+  if (!i || (!i.vendor && !i.vendorPhone)) return '';
+  const ph = (i.vendorPhone||'').replace(/[^\d+]/g,''), wa = ph.replace(/^\+/,'').replace(/^(\d{10})$/,'91$1');
+  return ' · 🏪 '+esc(i.vendor||'Vendor')+(ph?` <a href="tel:${ph}" onclick="event.stopPropagation()" style="font-weight:700">📞 ${esc(i.vendorPhone)}</a> <a href="https://wa.me/${wa}" target="_blank" onclick="event.stopPropagation()" style="font-weight:700">💬</a>`:'');
+}
+function supPhone(name){
+  if (!name) return ''; let ts = 0, ph = '';
+  Object.values(ledger).forEach(e=>{ if (e.supplier===name && e.supplierPhone && (e.ts||0)>=ts){ ts = e.ts||0; ph = e.supplierPhone; } });
+  if (ph) return ph; const it = Object.values(items).find(i=>i.vendor===name && i.vendorPhone); return it ? it.vendorPhone : '';
+}
+function expiringMap(){
+  const lim = new Date(); lim.setDate(lim.getDate()+3); const limK = keyOf(lim), m = {};
+  Object.values(ledger).forEach(e=>{ if (e.type==='purchase' && e.expiry && e.expiry<=limK && items[e.itemId] && stockOf(e.itemId)>0 && (!m[e.itemId] || e.expiry<m[e.itemId])) m[e.itemId] = e.expiry; });
+  return m;
+}
+
+function dayMeals(date){
+  const out = []; visibleSites().forEach(([siteId,site])=>MEALS.filter(m=>(site.meals||[]).includes(m)).forEach(meal=>out.push({ sid:sidOf(date,siteId,meal), siteId, site, meal })));
+  return out;
+}
+const tOk = (s,k) => !!(T(s,k) && T(s,k).ts);
+function dayFlow(date){
+  const ms = dayMeals(date).map(m=>Object.assign({ w:wfState(m.sid) }, m));
+  const planned = ms.filter(m=>m.w.planned.length), sent = ms.filter(m=>m.w.pl&&m.w.pl.ts), rq = reqList(date);
+  const base = sent.length ? sent : planned;
+  const issued = ms.some(m=>m.w.iss.n>0) || rq.some(x=>x.issuedTs);
+  const started = base.filter(m=>m.w.cs&&m.w.cs.ts).length, cooked = base.filter(m=>m.w.pd&&m.w.pd.ts).length;
+  const loaded = base.filter(m=>tOk(m.w.s,'loaded')).length, dep = base.filter(m=>tOk(m.w.s,'departed')).length, arr = base.filter(m=>tOk(m.w.s,'arrived')).length;
+  const appr = rq.filter(x=>x.approved||x.issuedTs).length, back = rq.filter(x=>x.rejected).length;
+  const steps = [
+    { n:1, ic:'🗓️', t:'Meal plan', who:'Operations / Production Manager', roles:['opsmanager','prodmanager','admin'], go:'prod',
+      done: planned.length>0 && sent.length>=planned.length, txt: planned.length ? sent.length+' of '+planned.length+' meals sent to kitchen' : 'Not made yet' },
+    { n:2, ic:'📝', t:'Cook requirement', who:'Cook sends · Manager approves', roles:['cook','opsmanager','prodmanager','admin'], go:'req',
+      done: rq.length>0 && !back && rq.every(x=>x.approved||x.issuedTs), txt: rq.length ? rq.length+' sent · '+appr+' approved'+(back?' · '+back+' sent back':'') : 'Waiting for the cook' },
+    { n:3, ic:'📤', t:'Kitchen issue', who:'Store Keeper', roles:['store','admin'], go:'issue',
+      done: issued, txt: issued ? 'Material issued' : (appr ? 'Approved — waiting for the Store Keeper' : 'Waiting for approved requirement') },
+    { n:4, ic:'👨‍🍳', t:'Production', who:'Kitchen / Cook', roles:['kitchen','cook','admin'], go:'prod',
+      done: base.length>0 && cooked>=base.length, txt: base.length ? (started?started+' cooking · ':'')+cooked+' of '+base.length+' meals cooked' : 'Starts after the plan is sent' },
+    { n:5, ic:'🚚', t:'Pack · load · drive · deliver', who:'Production Mgr · Driver · Counter', roles:['opsmanager','prodmanager','driver','supervisor','counter','admin'], go:'prod',
+      done: base.length>0 && arr>=base.length, txt: base.length ? loaded+' loaded · '+dep+' on road/left · '+arr+' arrived (of '+base.length+')' : '—' }
+  ];
+  let cur = steps.findIndex(s=>!s.done); if (cur<0) cur = steps.length;
+  return { date, steps, cur, ms, base };
+}
+function flowCardHtml(date, title){
+  const f = dayFlow(date), isTomorrow = date===dayKey(1);
+  return `<div class="card flow5"><div class="row"><b class="grow">${title||'Production flow'} — ${date===todayKey()?'today':isTomorrow?'tomorrow':esc(date)}</b></div>
+    ${f.steps.map((s,i)=>{ const mine = s.roles.includes(me.role), now = i===f.cur;
+      const tab = s.n===5 && !can('prod') ? 'meals' : s.go, ok = can(tab);
+      return `<div class="fstep ${s.done?'done':''} ${now?'now':''} ${ok?'tap':''}" ${ok?`data-flowgo="${tab}" data-flowdate="${esc(date)}"`:''}><div class="fdot">${s.done?'✓':s.n}</div><div class="grow"><b>${s.ic} ${s.t}</b>${now&&mine?' <span class="yours">👉 Your turn</span>':''}<div class="sub">${esc(s.txt)}</div><div class="sub who">${esc(s.who)}</div></div>${ok?'<span class="chev">›</span>':''}</div>`; }).join('')}</div>`;
+}
+
+/* what should THIS person do next? */
+function nextTask(){
+  if (!me || !ROLES[me.role]) return null;
+  const role = me.role, today = todayKey(), days = [today, dayKey(1)], lab = d => d===today?'today':'tomorrow';
+  const mk = (go,title,sub,o) => Object.assign({ go, title, sub:sub||'' }, o||{});
+  const mealTag = m => m.site.name+' · '+m.meal;
+  if (role==='aggregator') return null;
+  const ms = dayMeals(today).map(m=>Object.assign({ w:wfState(m.sid) }, m));
+  if (role==='driver'){
+    let m = ms.find(m=>tOk(m.w.s,'loaded') && !tOk(m.w.s,'departed')); if (m) return mk('meals','🚚 Start the trip',mealTag(m)+' — food is loaded. Enter the meter reading and start.',{ sid:m.sid });
+    m = ms.find(m=>tOk(m.w.s,'departed') && !tOk(m.w.s,'arrived')); if (m) return mk('meals','📍 Trip in progress',mealTag(m)+' — tap Arrived when you reach the counter.',{ sid:m.sid });
+    m = ms.find(m=>tOk(m.w.s,'prodDone') && !tOk(m.w.s,'loaded')); if (m) return mk('meals','⏳ Food is being packed',mealTag(m)+' — you will get an alarm when it is loaded.',{ sid:m.sid });
+    return mk('meals','No trip to start yet','You will be alerted when the food is ready.');
+  }
+  if (role==='supervisor' || role==='counter'){
+    let m = ms.find(m=>tOk(m.w.s,'arrived') && !tOk(m.w.s,'closed')); if (m) return mk('meals','📍 Food has arrived',mealTag(m)+' — arrival QC, weighing and sales.',{ sid:m.sid });
+    m = ms.find(m=>tOk(m.w.s,'departed') && !tOk(m.w.s,'arrived')); if (m) return mk('meals','🚚 Vehicle on the way',mealTag(m),{ sid:m.sid });
+    return mk('meals','No food on the way yet','');
+  }
+  if (role==='store'){
+    const w = reqWaitList().find(x=>x.approved); if (w) return mk('issue','📤 Issue material',(w.by||'Cook')+' requirement for '+w.date+' is approved.',{ date:w.date });
+    const p = reqWaitList().find(x=>!x.approved); if (p) return mk('req','📝 Requirement sent',(p.by||'Cook')+' — waiting for the manager to approve; you can prepare the issue.',{ date:p.date });
+    return mk('issue','Kitchen issue','No requirement is waiting. You can still issue material.');
+  }
+  if (role==='cook' || role==='kitchen'){
+    for (const d of days){ const f = dayFlow(d), mine = reqList(d).filter(x=>x.byId===me.id);
+      if (role==='cook' && f.base.length && !mine.length && f.steps[0].done) return mk('req','📝 Send your requirement','Meal plan for '+lab(d)+' is ready. Send vegetables & provisions needed.',{ date:d });
+      if (role==='cook' && mine.some(x=>x.rejected)) return mk('req','↩ Requirement sent back','Check the manager\'s note and send again.',{ date:d });
+      const toStart = f.base.find(m=>m.w.iss.n>0 && !(m.w.cs&&m.w.cs.ts) && !(m.w.pd&&m.w.pd.ts)); if (toStart) return mk('prod','🍳 Start cooking',mealTag(toStart)+' — material is issued.',{ date:d });
+      const cooking = f.base.find(m=>m.w.cs&&m.w.cs.ts&&!(m.w.pd&&m.w.pd.ts)); if (cooking) return mk('prod','✅ Finish cooking',mealTag(cooking)+' — enter quantities made, then Cooking complete.',{ date:d });
+    }
+    return mk(role==='cook'?'req':'prod', role==='cook'?'Cook requirement':'Production','Waiting for the meal plan.');
+  }
+  if (isPMrole(role) || role==='admin'){
+    for (const d of days){ const f = dayFlow(d);
+      if (!f.steps[0].done && (isPMrole(role))) return mk('prod','🗓️ Make & send the meal plan',lab(d)+' — add dishes and press Send entire plan.',{ date:d });
+      const pend = reqList(d).find(x=>!x.approved && !x.rejected && !x.issuedTs); if (pend && canApprove()) return mk('req','✅ Approve cook requirement',(pend.by||'Cook')+' — for '+d,{ date:d });
+    }
+    const m = ms.find(m=>tOk(m.w.s,'prodDone') && !tOk(m.w.s,'loaded')); if (m && isPMrole(role)) return mk('prod','📦 Pack & load',mealTag(m)+' — QC, packed, loaded.',{ date:today });
+    return null;
+  }
+  return null;
+}
+function nextCardHtml(){
+  if (!me || me.role==='aggregator') return '';
+  const t = nextTask(), flow = ['driver','supervisor','counter'].includes(me.role) ? '' : flowCardHtml(todayKey(),'Production flow');
+  const card = t ? `<div class="card nextcard tap" data-next="1"><small>👉 YOUR NEXT TASK</small><b>${esc(t.title)}</b>${t.sub?`<div class="sub">${esc(t.sub)}</div>`:''}<button class="btn save" style="margin-top:8px">Open ›</button></div>` : '';
+  return card + flow;
+}
+document.addEventListener('click', e=>{
+  if (!me) return;
+  const n = e.target.closest && e.target.closest('[data-next]'); if (n){ const t = nextTask(); if (t) openLink(t); return; }
+  const f = e.target.closest && e.target.closest('[data-flowgo]'); if (f){ openLink({ go:f.dataset.flowgo, date:f.dataset.flowdate }); }
+});
+
+/* open the exact screen a notification is about */
+function openLink(l){
+  if (!l || !me) return; userNav = true; try{ closeSheet(); }catch(e){}
+  if (l.date){ mDate = l.date; reqView = l.date; }
+  if (l.sid && can('meals')){ openSid = l.sid; mDate = l.sid.split('_')[0]; go('meals'); return; }
+  if (l.go && can(l.go)){ go(l.go); return; }
+  go(tabsFor()[0]);
+}
+function evLink(e){
+  if (e.go || e.sid) return e;
+  const q = String(e.id).split(':'), k = q[0], a = q[1];
+  if (['dep','arr','ld','la','qc1','qc2','ws','gps'].includes(k) && a){ e.sid = a; e.go = 'meals'; }
+  else if (['es','en','fn','fr'].includes(k)) e.go = isAgg() ? 'agesc' : 'client';
+  return e;
+}
+
+/* landing screen: straight to the screen where this person acts */
+function landingStart(){
+  let tries = 0; const iv = setInterval(()=>{ tries++; if (!me){ clearInterval(iv); return; }
+    if ((_ld.s && _ld.l && _ld.c) || tries>20){ clearInterval(iv); if (!userNav) landingGo(); } }, 400);
+}
+function landingGo(){
+  if (!me || me.role==='admin' || me.role==='aggregator') return;
+  const t = nextTask(); if (t) openLink(t); userNav = false;
+}
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', ()=>{ if (document.hidden){ hiddenAt = Date.now(); return; } if (me && hiddenAt && Date.now()-hiddenAt > 5*60000 && !document.querySelector('#sheet.show')){ landingGo(); } });
+
+/* notification tap → exact screen */
+setTimeout(()=>{ try{ const LN = CAP().LocalNotifications; if (LN && LN.addListener) LN.addListener('localNotificationActionPerformed', n=>{
+  const x = (n && n.notification && n.notification.extra) || {};
+  if (x.link) return openLink(x.link);
+  if (x.dl){ const [d,siteId,meal,k] = String(x.dl).split('|'), st = DL_STEPS.find(s=>s.k===k); if (st) return openLink({ go:st.go, sid:st.go==='meals'?sidOf(d,siteId,meal):null, date:d }); }
+  if (me) bellSheet(); }); }catch(e){} }, 1500);
+
+/* send the whole day's plan in one tap */
+document.addEventListener('click', e=>{
+  const b = e.target.closest && e.target.closest('[data-wf="planall"]'); if (!b || !me) return;
+  const date = b.dataset.date, list = dayMeals(date).map(m=>Object.assign({ w:wfState(m.sid) }, m)).filter(m=>m.w.planned.length);
+  if (!list.length){ alert('Add at least one dish with a planned quantity first.'); return; }
+  if (!list.some(m=>m.w.iss.n>0) && !confirm('Send the entire plan to the kitchen now?\nThe cook will then be asked for the vegetables & provisions requirement.')) return;
+  b.disabled = true; const batch = 'pb'+Date.now().toString(36);
+  Promise.all(list.map(m=>stampT(m.sid,'planned',{ batch }))).then(()=>{ toast('📣 Entire plan sent — cook alerted'); renderAll(); }).catch(()=>{ b.disabled = false; alert('Could not send. Check the internet.'); });
+}, true);
 
 const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
 if (saved && ROLES[saved.role]){ me = saved; enter(); }
