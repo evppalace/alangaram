@@ -288,6 +288,47 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
 .bot-i{display:flex;gap:8px;padding:8px 12px 12px}
 .bot-i input{flex:1;margin:0;border-radius:99px}
 .bot-i button{width:46px;border:0;border-radius:50%;background:var(--g1);color:#fff;font-size:17px}
+/* ===== v4: stock groups, dishes, journey ===== */
+.seg{display:flex;gap:6px;background:#fff;padding:5px;border-radius:18px;box-shadow:var(--shadow);margin-bottom:10px}
+.seg button{flex:1;border:0;background:transparent;border-radius:14px;padding:10px 4px;font-weight:800;font-size:13px;color:var(--muted);font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:1px}
+.seg button small{font-size:10.5px;opacity:.8}
+.seg button.on{background:var(--g1);color:#fff;box-shadow:0 6px 14px rgba(4,112,74,.3)}
+.card .ico{border:0;background:var(--ok-soft);width:38px;height:38px;border-radius:50%;font-size:15px;flex:none}
+.jcard{overflow:hidden}
+.jstrip{position:relative;height:84px;margin:12px 4px 4px}
+.jroad{position:absolute;left:0;right:0;top:34px;height:12px;border-radius:99px;background:repeating-linear-gradient(90deg,#33443b 0 14px,#2a3a32 14px 28px);overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,.35)}
+.jroad i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#04b27a,#ffb703);border-radius:99px;transition:width 1.2s cubic-bezier(.3,.8,.3,1);animation:jgrow 1.4s cubic-bezier(.3,.8,.3,1)}
+.jstrip.moving .jroad{background-size:28px 100%;animation:jdash .6s linear infinite}
+.jst{position:absolute;top:58px;transform:translateX(-50%);text-align:center;font-size:10.5px;color:var(--muted);font-weight:700;width:60px;margin-left:0}
+.jst:first-of-type{transform:none}
+.jst b{display:flex;width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid var(--line);align-items:center;justify-content:center;font-size:13px;margin:-30px auto 3px;position:relative;z-index:1}
+.jst.on b{border-color:var(--green);background:var(--ok-soft)}
+.jst small{display:block;font-size:10.5px}
+.jvan{position:absolute;top:0;left:var(--p);transform:translateX(-50%);z-index:3;animation:jvin 1.4s cubic-bezier(.3,.8,.3,1);transition:left 1.2s cubic-bezier(.3,.8,.3,1)}
+.jvan .vbody{position:relative;width:64px;height:35px;filter:drop-shadow(0 4px 5px rgba(0,0,0,.3))}
+.jstrip.moving .jvan .vbody{animation:jbump .45s ease-in-out infinite}
+.vlogo{position:absolute;left:5px;top:8px;width:30px;height:20px;background:var(--kscrest) center/contain no-repeat}
+.jw{transform-box:fill-box;transform-origin:center}
+.jstrip.moving .jw{animation:jspin .5s linear infinite}
+.jtl{margin-top:14px;position:relative;padding-left:2px}
+.jtl:before{content:"";position:absolute;left:15px;top:6px;bottom:10px;width:3px;border-radius:3px;background:var(--line)}
+.jrow{position:relative;display:flex;gap:12px;padding:0 0 14px;animation:jrin .5s both;animation-delay:calc(var(--i)*70ms)}
+.jdot{flex:none;width:30px;height:30px;border-radius:50%;background:#fff;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:var(--muted);z-index:1}
+.jrow.done .jdot{background:var(--green);border-color:var(--green);color:#fff;animation:jpop .5s both;animation-delay:calc(var(--i)*70ms + 150ms)}
+.jrow.bad .jdot{background:var(--red);border-color:var(--red);color:#fff}
+.jrow.now .jdot{border-color:var(--accent);background:#fff3df;animation:jpulse 1.6s infinite}
+.jrow.todo{opacity:.55}
+.jbody{flex:1;min-width:0}.jl{display:flex;justify-content:space-between;gap:8px;font-size:13.5px}.jl span{font-weight:800;color:var(--brand);white-space:nowrap}
+.jbad{color:var(--red)!important;font-weight:700}
+@keyframes jdash{to{background-position:28px 0}}
+@keyframes jbump{50%{transform:translateY(-2px)}}
+@keyframes jspin{to{transform:rotate(360deg)}}
+@keyframes jgrow{from{width:0}}
+@keyframes jvin{from{left:0}}
+@keyframes jrin{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+@keyframes jpop{0%{transform:scale(.4)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+@keyframes jpulse{0%{box-shadow:0 0 0 0 rgba(255,138,31,.55)}70%{box-shadow:0 0 0 12px rgba(255,138,31,0)}100%{box-shadow:0 0 0 0 rgba(255,138,31,0)}}
+@media (prefers-reduced-motion:reduce){.jroad,.jvan .vbody,.jw,.jrow,.jdot,.jvan,.jroad i{animation:none!important}}
 </style>
 </head>
 <body>
@@ -322,6 +363,8 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
   <div class="page" id="p-meals"></div>
   <div class="page" id="p-plan"></div>
   <div class="page" id="p-reports"></div>
+  <div class="page" id="p-dishes"></div>
+  <div class="page" id="p-agrep"></div>
   <div class="page" id="p-trends"></div>
   <div class="page" id="p-masters"></div>
   <div class="page" id="p-users"></div>
@@ -354,16 +397,16 @@ const SETUP_PIN = "1234"; // works only until the first Admin user is created
 const P = 'prod_'; // all data of this module lives under prod_* in Firebase, separate from the old sales data
 
 const ROLES = {
-  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','plan','meals','client','reports','trends','masters','users'] },
-  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','stock','purchase','issue','plan','meals','client','masters'] },
+  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','plan','meals','dishes','client','reports','trends','masters','users'] },
+  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','stock','purchase','issue','plan','meals','dishes','client','masters'] },
   store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','stock','purchase','issue','plan'] },
-  kitchen:     { label:'Kitchen',            desc:'Daily issue & stock',         tabs:['home','stock','issue','plan','meals'] },
+  kitchen:     { label:'Kitchen',            desc:'Daily issue & stock',         tabs:['home','stock','issue','plan','meals','dishes'] },
   driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals'] },
-  supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter, client escalations',tabs:['home','meals','client'], site:true },
-  aggregator:  { label:'Aggregator / Client', desc:'Live view, ratings, feedback, escalation', tabs:['agg','aglive','agrate','agesc','agcontact'], siteOpt:true },
-  counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals'], site:true }
+  supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter, client escalations',tabs:['home','meals','dishes','client'], site:true },
+  aggregator:  { label:'Aggregator / Client', desc:'Live view, ratings, feedback, escalation', tabs:['agg','aglive','agrate','agesc','agrep','agcontact'], siteOpt:true },
+  counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals','dishes'], site:true }
 };
-const NAV = { agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
+const NAV = { dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
 const MEALS = ['breakfast','lunch','snacks','dinner'];
 const MEAL_ICON = {breakfast:'🌅', lunch:'🍛', snacks:'☕', dinner:'🌙'};
 const UNITS = ['kg','g','L','ml','nos','pack','box','bunch','pkt'];
@@ -499,6 +542,8 @@ function renderAll(){
   if (can('agrate'))   renderAgRate();
   if (can('agesc'))    renderAgEsc();
   if (can('agcontact')) renderAgContact();
+  if (can('agrep'))    renderAgRep();
+  if (can('dishes'))   renderDishes();
   try{ updateBell(); uwAttach(); botShow(); pushInit(); }catch(e){}
 }
 
@@ -565,6 +610,7 @@ function renderHome(){
     <div class="hero scene">${sceneSvg({seed:5})}<div class="cap"><span>Kitchen → vehicle → counter</span><span>${new Date().toLocaleDateString([], {weekday:'short', day:'numeric', month:'short'})}</span></div></div>
     ${nts.map(([id,n])=>`<div class="notice ${esc(n.level||'note')}"><span>${ico[n.level]||'📝'}</span><div><div>${esc(n.text)}</div>${n.photoKey?photoBox(n.photoKey,'',{ro:true}):''}<div class="sub">${esc(n.by||'')} · ${new Date(n.ts||0).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div></div>${canPost?`<button class="x" data-nd="${id}" aria-label="Remove">✕</button>`:''}</div>`).join('')}
     ${can('meals')?roadHtml():''}
+    ${can('meals')?journeysHtml(false):''}
     <div class="kpi">
       <div class="card"><div class="sub">Below minimum</div><div class="n" style="${low.length?'color:var(--amber)':''}">${low.length}</div></div>
       <div class="card"><div class="sub">Expiring ≤ 3 days</div><div class="n" style="${exp.length?'color:var(--red)':''}">${exp.length}</div></div>
@@ -594,27 +640,6 @@ function renderHome(){
 function usedOn(itemId, date){
   let t = 0; Object.values(ledger).forEach(e=>{ if (e.itemId===itemId && e.date===date && e.type==='issue' && !e.reversed) t += -(e.qty||0); });
   return t;
-}
-function renderStock(){
-  const types = [['all','All'],['raw','Raw materials'],['food','Cooked food']];
-  const q = stockSearch.toLowerCase();
-  const rows = Object.entries(items)
-    .filter(([,i])=>i.active!==false && (stockFilter==='all'||i.type===stockFilter) && (!q || i.name.toLowerCase().includes(q)))
-    .sort((a,b)=>a[1].name.localeCompare(b[1].name));
-  $('p-stock').innerHTML = `
-    <div class="chips">${types.map(([k,l])=>`<div class="chip ${stockFilter===k?'active':''}" data-f="${k}">${l}</div>`).join('')}</div>
-    <input id="stockSearch" placeholder="Search item…" value="${esc(stockSearch)}" style="margin-bottom:10px;">
-    ${rows.length ? rows.map(([id,i])=>{
-      const s = stockOf(id), low = i.type==='raw' && i.minStock>0 && s<=i.minStock, neg = s<0;
-      const used = usedOn(id, todayKey());
-      return `<div class="card row ${neg?'neg':low?'low':''}"><div class="grow"><b>${esc(i.name)}</b><div class="sub">${esc(i.category||'')}${KGL(i.unit)&&s>0?' · '+altText(i,s):''}${used>0?' · used today '+fmt(used)+' '+esc(i.unit):''}${low?' · below minimum':''}${neg?' · negative — check entries':''}</div></div><div class="qty">${fmt(s)} <small>${esc(i.unit)}</small></div></div>`;
-    }).join('') : `<div class="empty">No items yet. ${can('masters')?'Add them in Masters.':'Ask the Production Manager to add items.'}</div>`}
-    ${can('reports') ? `<div class="two" style="margin-top:6px"><button class="btn" id="stShare">Share stock on WhatsApp</button><button class="btn sec" id="stRep">Open reports</button></div>` : ''}
-    ${can('purchase') ? `<h2>Recent stock movements</h2>` + recentLedger() : ''}`;
-  const sh=$('stShare'); if (sh) sh.onclick=()=>{ const r=buildReport(Object.assign({}, rep0(), {type:'stock', from:todayKey(), to:todayKey()})); shareWhatsApp(r.text); };
-  const sr=$('stRep'); if (sr) sr.onclick=()=>go('reports');
-  $('p-stock').querySelectorAll('[data-f]').forEach(c=>c.onclick=()=>{ stockFilter=c.dataset.f; renderStock(); });
-  const ss = $('stockSearch'); ss.oninput = ()=>{ stockSearch=ss.value; const pos=ss.selectionStart; renderStock(); const n=$('stockSearch'); n.focus(); n.setSelectionRange(pos,pos); };
 }
 function recentLedger(n){
   const e = Object.entries(ledger).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0)).slice(0,n||15);
@@ -854,6 +879,7 @@ function renderSession(el){
   <div class="row" style="margin-bottom:10px"><button class="btn sec" id="sBack" style="padding:9px 14px">‹ Back</button>
     <div class="grow"><b>${MEAL_ICON[meal]} ${esc(site.name)} — ${meal}</b><div class="sub">${date}</div></div></div>
 
+  ${journeyCard(sid, s, {full:true})}
   <div class="card">${stepHead(1,'Cooking & production',prodDone&&prodDone.ts,' · '+esc((prodDone||{}).by||''))}
     ${sItems.length? sItems.map(([id,it])=>{ const d = items[id]||{name:'(deleted)',unit:''}; return `<div class="row" style="margin-bottom:8px"><div class="grow"><b>${esc(d.name)}</b><div class="sub">Planned ${it.planned?fmt(it.planned)+' '+esc(d.unit):'—'}${it.preparedAt?' · made '+hm(it.preparedAt):''}</div></div>
       ${!(prodDone&&prodDone.ts)&&canStep('prod')?`<input class="pq" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.prepared||''}" placeholder="made" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span><button class="btn danger" data-rmdish="${id}" style="padding:7px 10px">✕</button>`:`<div class="qty">${fmt(it.prepared||0)} <small>${esc(d.unit)}</small></div>`}</div>`; }).join('') : '<div class="sub">No dishes added yet.</div>'}
@@ -1052,7 +1078,7 @@ function roadHtml(){
   return `<h2>🚚 Vehicles on the road</h2>` + r.map(v=>`<div class="card" data-trip="${v.sid}" style="cursor:pointer;${v.alerts.length?'border-color:#EBB9B2;background:#FDF3F1':''}">
     <div class="row"><div class="grow"><b>${esc(v.site)} — ${esc(v.x.meal)}</b><div class="sub">${esc(v.x.vehicle||'vehicle ?')} · ${esc(v.x.driver||'driver ?')} · left ${hm(T(v.x,'departed').ts)} · ${v.en} min on the road</div></div>
     <div style="text-align:right;font-size:12px">${v.x.trackLast?`<a href="https://maps.google.com/?q=${v.x.trackLast.lat},${v.x.trackLast.lng}" target="_blank" onclick="event.stopPropagation()">📍 map</a><div class="sub" style="margin:0">${v.ping} min ago</div>`:'<span class="sub">no GPS yet</span>'}</div></div>
-    ${v.alerts.map(a=>`<div style="color:var(--red);font-size:12.5px;font-weight:700;margin-top:5px">⚠ ${esc(a)}</div>`).join('')}</div>`).join('');
+    ${jStrip(v.x)}${v.alerts.map(a=>`<div style="color:var(--red);font-size:12.5px;font-weight:700;margin-top:5px">⚠ ${esc(a)}</div>`).join('')}</div>`).join('');
 }
 setInterval(()=>{ if (me){ try{ if (can('home')) renderHome(); if (can('meals') && !openSid) renderMeals(); }catch(e){} } }, 60000);
 
@@ -1181,7 +1207,7 @@ function sectionTable(h, cols, rows, note){ return { h, cols, rows, note }; }
 
 function mealSections(R){
   const order = m => MEALS.indexOf(m);
-  const list = Object.entries(sessions).map(([id,x])=>Object.assign({id},x)).filter(x=>x.date && x.date>=R.from && x.date<=R.to && (!R.site||x.siteId===R.site) && (!R.meal||x.meal===R.meal))
+  const list = Object.entries(sessions).map(([id,x])=>Object.assign({id},x)).filter(x=>x.date && x.date>=R.from && x.date<=R.to && (!R.site||x.siteId===R.site) && (!R.meal||x.meal===R.meal) && (!me || visibleSites().some(([k])=>k===x.siteId)))
     .sort((a,b)=>a.date.localeCompare(b.date)||String(a.siteId).localeCompare(String(b.siteId))||order(a.meal)-order(b.meal));
   const sn = x => (sites[x.siteId]||{name:x.siteId}).name;
   const qcs = q => q&&q.ts ? (q.ok?'Pass':'FAIL') : '—';
@@ -1330,7 +1356,7 @@ function renderReports(){
   $('r_print').onclick = ()=>window.print();
 }
 function shareWhatsApp(text){
-  if (!can('reports')) return;
+  if (!can('reports') && !can('agrep')) return;
   const url = 'https://wa.me/?text=' + encodeURIComponent(text);
   const w = window.open(url, '_blank');
   if (!w) location.href = url;
@@ -1496,13 +1522,14 @@ function formShell(title, body, saveId){
 function unitOpts(sel){ return UNITS.map(u=>`<option ${u===sel?'selected':''}>${u}</option>`).join(''); }
 
 function mItems(){
-  const rows = Object.entries(items).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const rows = Object.entries(items).filter(([,i])=>miF==='all' || (miF==='food' ? i.type==='food' : i.type==='raw' && rawGroup(i)===miF)).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const missing = SEED.concat(SEED_DISHES).filter(x=>!Object.values(items).some(i=>i.name.toLowerCase()===x.n.toLowerCase())).length;
-  $('mBody').innerHTML = `<button class="btn save" id="addItem" style="margin:0 0 12px">+ Add item</button>` +
+  $('mBody').innerHTML = `<button class="btn save" id="addItem" style="margin:0 0 12px">+ Add item</button><div class="chips">${[['all','All'],['prov','Provisions'],['veg','Vegetables'],['food','Cooked dishes']].map(([k,l])=>`<div class="chip ${miF===k?'active':''}" data-mf="${k}">${l}</div>`).join('')}</div>` +
     (missing ? `<div class="card" style="background:var(--ok-soft)"><b>Starter items</b><div class="sub">Add the ${missing} items still missing — provisions &amp; vegetables (with Tamil names) and every cooked dish from the Teleperformance veg / non-veg main-meal menu (no prices) — at zero stock. Existing items are skipped.</div><button class="btn save" id="seedBtn" style="margin-top:10px">Import starter items</button></div>` : '') + `<div id="mf"></div>` +
     (rows.length ? rows.map(([id,i])=>`<div class="card" style="${i.active===false?'opacity:.5':''}"><div class="row"><div class="grow"><b>${esc(i.name)}</b><span class="tag">${i.type==='raw'?'Raw':'Cooked'}</span>${i.diet==='nonveg'?' 🔴':i.diet==='veg'?' 🟢':''}<div class="sub">${i.ta?esc(i.ta)+' · ':''}${esc(i.category||'')} · ${esc(i.unit)}${i.portionG?' · plate '+esc(i.portionG)+' g':''}${i.type==='raw'&&i.minStock?' · min '+fmt(i.minStock):''}</div></div></div>
       <div class="actions"><button data-e="${id}">Edit</button><button data-t="${id}">${i.active===false?'Activate':'Hide'}</button></div></div>`).join('') : '<div class="empty">No items yet.</div>');
   $('addItem').onclick = ()=>itemForm(null);
+  $('mBody').querySelectorAll('[data-mf]').forEach(c=>c.onclick=()=>{ miF=c.dataset.mf; mItems(); });
   const sb=$('seedBtn'); if (sb) sb.onclick=importSeed;
   $('mBody').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>itemForm(b.dataset.e));
   $('mBody').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>db.ref(P+'items/'+b.dataset.t+'/active').set(items[b.dataset.t].active===false));
@@ -1917,6 +1944,7 @@ function renderAgg(){
     const dishes = Object.entries((x&&x.items)||{}).map(([id,it])=>{ const d=items[id]; return d ? `<span class="badge">${esc(d.name)}${it.prepared>0?' · '+fmt(it.prepared)+' '+esc(d.unit):''}</span>` : ''; }).join(' ');
     return `<div class="card"><div class="row"><div class="grow"><b>${MEAL_ICON[m]||'🍽️'} ${esc(s.name)} — ${esc(m)}</b><div class="sub">${sc.depart?'Plan: leave '+esc(sc.depart):''}${sc.depart&&sc.arrive?' · ':''}${sc.arrive?'reach '+esc(sc.arrive):''}${!sc.depart&&!sc.arrive?'No planned times set':''}</div></div><span class="badge ${st[1]==='grey'?'grey':st[1]==='amber'?'amber':st[1]==='blue'?'blue':''}">${st[0]}</span></div>
       ${dishes?`<div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap">${dishes}</div>`:''}
+      ${x?jStrip(x):''}
       ${x?`<div class="sub" style="margin-top:8px">${dep?'🚚 Left '+hm(dep.ts)+(x.vehicle?' · '+esc(x.vehicle):''):''}${arr?' · 📍 Arrived '+hm(arr.ts)+(lmA>0?` <b style="color:var(--red)">(+${lmA} min late)</b>`:lmA!=null?' <b style="color:var(--green)">(on time)</b>':''):''}</div>
       ${q1||q2?`<div class="sub">${q1?'Kitchen QC '+(q1.ok?'✅':'❌')+(q1.temp!=null?' '+q1.temp+'°C':''):''}${q1&&q2?' · ':''}${q2?'Arrival QC '+(q2.ok?'✅':'❌')+(q2.temp!=null?' '+q2.temp+'°C':''):''}</div>`:''}
       ${['_s1','_s2','_s4','_s5','_s7'].map(z=>photoBox(sid+z,'',{ro:true})).join('')}
@@ -1944,7 +1972,7 @@ function renderAgLive(){
   const vs = new Set(visibleSites().map(([k])=>k)), road = onRoad().filter(v=>vs.has(v.x.siteId)), t = todayKey();
   const done = Object.entries(sessions).filter(([,x])=>x.date===t && vs.has(x.siteId) && T(x,'arrived')).sort((a,b)=>T(b[1],'arrived').ts-T(a[1],'arrived').ts);
   const ops = contactsList()[0];
-  el.innerHTML = `<h2>🚚 Vehicles on the road</h2>` + (road.length ? road.map(v=>{
+  el.innerHTML = journeysHtml(true) + `<h2>🚚 Vehicles on the road</h2>` + (road.length ? road.map(v=>{
     const sc = (((sites[v.x.siteId]||{}).sched||{})[v.x.meal])||{}; let pct = null, eta = '';
     if (sc.depart && sc.arrive){ const a = new Date(t+'T'+sc.depart).getTime(), b = new Date(t+'T'+sc.arrive).getTime(); if (b>a) pct = Math.max(4, Math.min(100, (Date.now()-a)/(b-a)*100)); const lm = lateMin(t, sc.arrive, Date.now()); eta = lm>0 ? `<b style="color:var(--red)">Running ${lm} min past planned arrival ${esc(sc.arrive)}</b>` : 'Expected by '+esc(sc.arrive); }
     const tl = v.x.trackLast;
@@ -2408,6 +2436,215 @@ function botBrain(q){
   }
   if (/(thank|ok|okay|fine|good|great)/.test(t) && t.length<18) return 'You\'re welcome! 😊';
   return 'I\'m not sure I understood that. Try one of the suggestions below, or talk to a person:'+callBtns(contactsList().find(c=>/care/i.test(c.label))||contactsList()[0]);
+}
+
+/* ================= v4: stock groups, dishes, journey timeline, aggregator reports ================= */
+let miF = 'all', stockGroup = 'prov', stockCat = '';
+const VEG_CATS = /vegetable|veg\b|greens|herb|leaf|leaves/i;
+const rawGroup = i => VEG_CATS.test(i.category||'') ? 'veg' : 'prov';
+const canEditRaw = () => me && ['admin','prodmanager','store'].includes(me.role);
+const canEditDish = () => me && ['admin','prodmanager','kitchen'].includes(me.role);
+
+/* ---------- STOCK (raw materials only) ---------- */
+function renderStock(){
+  const el = $('p-stock'); if (!el) return;
+  const raws = Object.entries(items).filter(([,i])=>i.type==='raw' && i.active!==false);
+  const inGroup = raws.filter(([,i])=>stockGroup==='all' || rawGroup(i)===stockGroup);
+  const cats = [...new Set(inGroup.map(([,i])=>i.category||'Other'))].sort();
+  if (stockCat && !cats.includes(stockCat)) stockCat = '';
+  const q = stockSearch.toLowerCase();
+  const rows = inGroup.filter(([,i])=>(!stockCat || (i.category||'Other')===stockCat) && (!q || i.name.toLowerCase().includes(q) || (i.ta||'').toLowerCase().includes(q))).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const cnt = g => raws.filter(([,i])=>g==='all' || rawGroup(i)===g).length;
+  const lowN = rows.filter(([id,i])=>i.minStock>0 && stockOf(id)<=i.minStock).length;
+  el.innerHTML = `
+    <div class="seg">${[['prov','🛒 Provisions'],['veg','🥬 Vegetables'],['all','All raw']].map(([k,l])=>`<button data-sg="${k}" class="${stockGroup===k?'on':''}">${l}<small>${cnt(k)}</small></button>`).join('')}</div>
+    <div class="chips"><div class="chip ${!stockCat?'active':''}" data-sc="">All</div>${cats.map(c=>`<div class="chip ${stockCat===c?'active':''}" data-sc="${esc(c)}">${esc(c)}</div>`).join('')}</div>
+    <div class="row" style="gap:8px;margin-bottom:10px"><input id="stockSearch" class="grow" placeholder="Search item (English / தமிழ்)…" value="${esc(stockSearch)}" style="margin:0">${canEditRaw()?'<button class="btn" id="stAdd" style="padding:11px 14px;white-space:nowrap">+ Item</button>':''}</div>
+    ${lowN?`<div class="notice amber" style="margin:0 0 10px"><span>⚠️</span><div>${lowN} item${lowN>1?'s':''} at or below minimum stock</div></div>`:''}
+    ${rows.length ? rows.map(([id,i])=>{
+      const s = stockOf(id), low = i.minStock>0 && s<=i.minStock, neg = s<0, used = usedOn(id, todayKey());
+      return `<div class="card row ${neg?'neg':low?'low':''}"><div class="grow"><b>${esc(i.name)}</b>${i.ta?` <span class="sub" style="display:inline">${esc(i.ta)}</span>`:''}<div class="sub">${esc(i.category||'')}${KGL(i.unit)&&s>0?' · '+altText(i,s):''}${used>0?' · used today '+fmt(used)+' '+esc(i.unit):''}${low?' · below minimum':''}${neg?' · negative — check entries':''}</div></div><div class="qty">${fmt(s)} <small>${esc(i.unit)}</small></div>${canEditRaw()?`<button class="ico" data-re="${id}" aria-label="Edit item">✏️</button>`:''}</div>`;
+    }).join('') : `<div class="empty">No items here. ${canEditRaw()?'Tap “+ Item” to add one.':'Ask the Production Manager or Store Keeper to add items.'}</div>`}
+    ${can('reports') ? `<div class="two" style="margin-top:6px"><button class="btn" id="stShare">Share stock on WhatsApp</button><button class="btn sec" id="stRep">Open reports</button></div>` : ''}
+    ${can('purchase') ? `<h2>Recent stock movements</h2>` + recentLedger() : ''}`;
+  const sh=$('stShare'); if (sh) sh.onclick=()=>{ const r=buildReport(Object.assign({}, rep0(), {type:'stock', from:todayKey(), to:todayKey()})); shareWhatsApp(r.text); };
+  const sr=$('stRep'); if (sr) sr.onclick=()=>go('reports');
+  el.querySelectorAll('[data-sg]').forEach(c=>c.onclick=()=>{ stockGroup=c.dataset.sg; stockCat=''; renderStock(); });
+  el.querySelectorAll('[data-sc]').forEach(c=>c.onclick=()=>{ stockCat=c.dataset.sc; renderStock(); });
+  el.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>rawForm(b.dataset.re));
+  const ad = $('stAdd'); if (ad) ad.onclick = ()=>rawForm(null);
+  const ss = $('stockSearch'); ss.oninput = ()=>{ stockSearch=ss.value; const pos=ss.selectionStart; renderStock(); const n=$('stockSearch'); n.focus(); n.setSelectionRange(pos,pos); };
+}
+function rawForm(id){
+  const i = id ? items[id] : { name:'', unit:'kg', category: stockGroup==='veg'?'Vegetables':'', minStock:0 };
+  const cats = [...new Set(Object.values(items).filter(x=>x.type==='raw').map(x=>x.category).filter(Boolean))].sort();
+  openSheet(`<h3>${id?'Edit item':'New raw material'}</h3>
+    <label>Name</label><input id="rf_name" value="${esc(i.name)}" placeholder="e.g. Ponni rice">
+    <div class="two"><div><label>Tamil name</label><input id="rf_ta" value="${esc(i.ta||'')}"></div><div><label>Unit</label><select id="rf_unit">${unitOpts(i.unit)}</select></div></div>
+    <label>Category <span class="sub" style="display:inline">(Vegetables / Fresh herbs go under Vegetables; everything else is Provisions)</span></label>
+    <input id="rf_cat" list="rf_cats" value="${esc(i.category||'')}" placeholder="Rice / Dals / Flours, Oil / Ghee, Vegetables…"><datalist id="rf_cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+    <div class="two"><div><label>Minimum stock</label><input id="rf_min" type="number" inputmode="decimal" step="any" value="${i.minStock||0}"></div><div><label>Density (kg per L)</label><input id="rf_dens" type="number" inputmode="decimal" step="any" value="${i.density||1}"></div></div>
+    <button class="btn save" id="rf_save">Save</button>${id?`<button class="btn sec save" id="rf_hide" style="margin-top:8px">${i.active===false?'Show again':'Hide this item'}</button>`:''}`);
+  $('rf_save').onclick = ()=>{
+    const name = $('rf_name').value.trim(); if (!name){ alert('Enter a name.'); return; }
+    if (Object.entries(items).some(([k,x])=>k!==id && x.name.toLowerCase()===name.toLowerCase())){ alert('An item with this name already exists.'); return; }
+    const rec = { name, type:'raw', unit:$('rf_unit').value, category:$('rf_cat').value.trim(), ta:$('rf_ta').value.trim()||null, minStock:Math.max(0,num($('rf_min').value)||0), density:num($('rf_dens').value)>0?num($('rf_dens').value):1, active:true };
+    (id ? db.ref(P+'items/'+id) : db.ref(P+'items').push()).update(rec).then(()=>{ closeSheet(); toast('Saved'); });
+  };
+  const h = $('rf_hide'); if (h) h.onclick = ()=>db.ref(P+'items/'+id+'/active').set(items[id].active===false).then(()=>{ closeSheet(); toast('Updated'); });
+}
+
+/* ---------- DISHES (cooked food — kitchen, counters, trips) ---------- */
+let dsMeal = 'all', dsDiet = 'all', dsCat = '', dsQ = '';
+function renderDishes(){
+  const el = $('p-dishes'); if (!el) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const ed = canEditDish(), t = todayKey();
+  const all = Object.entries(items).filter(([,i])=>i.type==='food' && (ed || i.active!==false));
+  const cats = [...new Set(all.map(([,i])=>i.category||'Other'))].sort();
+  const prep = {}; Object.values(sessions).filter(x=>x.date===t).forEach(x=>Object.entries(x.items||{}).forEach(([id,it])=>{ if (it.prepared>0) prep[id] = (prep[id]||0)+it.prepared; }));
+  const rows = all.filter(([,i])=>(dsMeal==='all' || (i.meals||[]).includes(dsMeal)) && (dsDiet==='all' || i.diet===dsDiet) && (!dsCat || (i.category||'Other')===dsCat) && (!dsQ || i.name.toLowerCase().includes(dsQ.toLowerCase()) || (i.ta||'').toLowerCase().includes(dsQ.toLowerCase()))).sort((a,b)=>(a[1].category||'').localeCompare(b[1].category||'')||a[1].name.localeCompare(b[1].name));
+  let last = '';
+  el.innerHTML = `<div class="row" style="margin-bottom:6px"><h2 class="grow" style="margin:0">🍛 Cooked dishes <span class="sub" style="display:inline">${all.length}</span></h2>${ed?'<button class="btn" id="dsAdd" style="padding:10px 14px">+ Dish</button>':''}</div>
+    <div class="sub" style="margin-bottom:8px">${ed?'You can add and edit dishes here.':'View only — ask the kitchen head or production manager to change a dish.'} Raw materials are under <b>Stock</b>.</div>
+    <div class="chips">${[['all','All meals']].concat(MEALS.map(m=>[m,(MEAL_ICON[m]||'')+' '+m])).map(([k,l])=>`<div class="chip ${dsMeal===k?'active':''}" data-dm="${k}">${l}</div>`).join('')}</div>
+    <div class="chips">${[['all','All'],['veg','🟢 Veg'],['nonveg','🔴 Non-veg']].map(([k,l])=>`<div class="chip ${dsDiet===k?'active':''}" data-dd="${k}">${l}</div>`).join('')}${cats.map(c=>`<div class="chip ${dsCat===c?'active':''}" data-dc="${esc(c)}">${esc(c)}</div>`).join('')}${dsCat?'<div class="chip" data-dc="">✕ clear</div>':''}</div>
+    <input id="dsQ" placeholder="Search dish…" value="${esc(dsQ)}" style="margin-bottom:10px">
+    ${rows.length ? rows.map(([id,i])=>{ const hd = (i.category||'Other')!==last ? `<h2>${esc(last = i.category||'Other')}</h2>` : '';
+      return hd+`<div class="card row" style="${i.active===false?'opacity:.5':''}"><div class="grow"><b>${i.diet==='nonveg'?'🔴':i.diet==='veg'?'🟢':'⚪'} ${esc(i.name)}</b>${i.ta?` <span class="sub" style="display:inline">${esc(i.ta)}</span>`:''}
+        <div class="sub">${(i.meals||[]).map(m=>(MEAL_ICON[m]||'')+m).join(' · ')||'no meal set'} · ${esc(i.unit)}${i.portionG?' · plate '+esc(i.portionG)+' g':''}${prep[id]?' · <b>today '+fmt(prep[id])+' '+esc(i.unit)+'</b>':''}${i.active===false?' · hidden':''}</div></div>${ed?`<button class="ico" data-de="${id}" aria-label="Edit dish">✏️</button>`:''}</div>`; }).join('') : '<div class="empty">No dishes match.</div>'}`;
+  el.querySelectorAll('[data-dm]').forEach(c=>c.onclick=()=>{ dsMeal=c.dataset.dm; renderDishes(); });
+  el.querySelectorAll('[data-dd]').forEach(c=>c.onclick=()=>{ dsDiet=c.dataset.dd; renderDishes(); });
+  el.querySelectorAll('[data-dc]').forEach(c=>c.onclick=()=>{ dsCat=c.dataset.dc; renderDishes(); });
+  el.querySelectorAll('[data-de]').forEach(b=>b.onclick=()=>dishForm(b.dataset.de));
+  const a = $('dsAdd'); if (a) a.onclick = ()=>dishForm(null);
+  const q = $('dsQ'); q.oninput = ()=>{ dsQ = q.value; const pos=q.selectionStart; renderDishes(); const n=$('dsQ'); n.focus(); n.setSelectionRange(pos,pos); };
+}
+function dishForm(id){
+  const i = id ? items[id] : { name:'', unit:'kg', category:'', diet:'veg', meals:['lunch'], portionG:'', density:1 };
+  const cats = [...new Set(Object.values(items).filter(x=>x.type==='food').map(x=>x.category).filter(Boolean))].sort();
+  openSheet(`<h3>${id?'Edit dish':'New dish'}</h3>
+    <label>Dish name</label><input id="df_name" value="${esc(i.name)}" placeholder="e.g. Veg biryani">
+    <div class="two"><div><label>Tamil name</label><input id="df_ta" value="${esc(i.ta||'')}"></div><div><label>Veg / Non-veg</label><select id="df_diet"><option value="veg" ${i.diet!=='nonveg'?'selected':''}>🟢 Veg</option><option value="nonveg" ${i.diet==='nonveg'?'selected':''}>🔴 Non-veg</option></select></div></div>
+    <div class="two"><div><label>Category</label><input id="df_cat" list="df_cats" value="${esc(i.category||'')}"><datalist id="df_cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div><div><label>Counted in</label><select id="df_unit">${unitOpts(i.unit)}</select></div></div>
+    <div class="two"><div><label>Plate size (g)</label><input id="df_portion" type="number" inputmode="decimal" step="any" value="${i.portionG||''}"></div><div><label>Density (kg per L)</label><input id="df_dens" type="number" inputmode="decimal" step="any" value="${i.density||1}"></div></div>
+    <label>Served in</label><div class="chips">${MEALS.map(m=>`<label style="margin:0"><input type="checkbox" class="df_meal" value="${m}" ${(i.meals||[]).includes(m)?'checked':''} style="width:auto;margin-right:5px">${m}</label>`).join('')}</div>
+    <button class="btn save" id="df_save">Save dish</button>${id?`<button class="btn sec save" id="df_hide" style="margin-top:8px">${i.active===false?'Show again':'Hide this dish'}</button>`:''}`);
+  $('df_save').onclick = ()=>{
+    const name = $('df_name').value.trim(); if (!name){ alert('Enter a name.'); return; }
+    if (Object.entries(items).some(([k,x])=>k!==id && x.name.toLowerCase()===name.toLowerCase())){ alert('A dish or item with this name already exists.'); return; }
+    const rec = { name, type:'food', ta:$('df_ta').value.trim()||null, diet:$('df_diet').value, category:$('df_cat').value.trim(), unit:$('df_unit').value, portionG:num($('df_portion').value)>0?num($('df_portion').value):null, density:num($('df_dens').value)>0?num($('df_dens').value):1, meals:[...document.querySelectorAll('.df_meal:checked')].map(x=>x.value), minStock:0, active:true };
+    (id ? db.ref(P+'items/'+id) : db.ref(P+'items').push()).update(rec).then(()=>{ closeSheet(); toast('Dish saved'); });
+  };
+  const h = $('df_hide'); if (h) h.onclick = ()=>db.ref(P+'items/'+id+'/active').set(items[id].active===false).then(()=>{ closeSheet(); toast('Updated'); });
+}
+
+/* ---------- JOURNEY: animated kitchen → counter → served timeline ---------- */
+function stagesOf(x, siteId, meal){
+  x = x || {}; const sc = (((sites[siteId||x.siteId]||{}).sched||{})[meal||x.meal])||{}, date = x.date;
+  const t = k => x.times && x.times[k] && x.times[k].ts || 0, q = k => x[k] && x[k].ts ? x[k] : null;
+  const by = k => (x.times && x.times[k] && x.times[k].by) || '';
+  const lateTxt = (ts,pl)=>{ if (!ts||!pl||!date) return ''; const m = lateMin(date,pl,ts); return m>0 ? ' · '+m+' min late' : ' · on time'; };
+  const qn = (o)=>o ? (o.ok?'Passed':'FAILED')+(o.temp!=null?' · '+o.temp+'°C':'')+(o.by?' · '+o.by:'') : '';
+  const km = x.odo && x.odo.start!=null && x.odo.end!=null ? Math.round((x.odo.end-x.odo.start)*10)/10 : null;
+  let w = 0, ld = 0; if (t('closed')){ const c = sessionCalc(x); Object.entries(c).forEach(([id,r])=>{ const it=items[id]; if (it&&it.unit!=='nos'){ ld+=r.loaded; w+=r.waste; } }); }
+  return [
+    { k:'cook',  ico:'🍳', label:'Cooked in central kitchen', ts:t('prodDone'), note:by('prodDone') },
+    { k:'qc1',   ico:'🌡️', label:'Kitchen quality check', ts:q('qc1')&&q('qc1').ts, bad:q('qc1')&&!q('qc1').ok, note:qn(q('qc1')) },
+    { k:'pack',  ico:'📦', label:'Packed & sealed', ts:t('packed'), note:by('packed') },
+    { k:'load',  ico:'🚐', label:'Loaded in vehicle', ts:t('loaded'), note:by('loaded') },
+    { k:'dep',   ico:'🚚', label:'Left the kitchen', ts:t('departed'), note:[x.vehicle,x.driver,(x.odo&&x.odo.start!=null?'meter '+fmt(x.odo.start)+' km':'')].filter(Boolean).join(' · ')+lateTxt(t('departed'),sc.depart), plan:sc.depart },
+    { k:'arr',   ico:'📍', label:'Reached the counter', ts:t('arrived'), note:(t('departed')&&t('arrived')?'trip '+dur(t('departed'),t('arrived')):'')+(km!=null?' · '+fmt(km)+' km':'')+lateTxt(t('arrived'),sc.arrive), plan:sc.arrive, late:t('arrived')&&sc.arrive&&lateMin(date,sc.arrive,t('arrived'))>0 },
+    { k:'qc2',   ico:'✅', label:'Arrival quality check', ts:q('qc2')&&q('qc2').ts, bad:q('qc2')&&!q('qc2').ok, note:qn(q('qc2')) },
+    { k:'xfer',  ico:'🍲', label:'Moved to serving basins', ts:t('counterLoaded'), note:by('counterLoaded') },
+    { k:'serve', ico:'🍽️', label:'Served & meal closed', ts:t('closed'), note:t('closed') ? 'Wastage '+fmt(Math.round(w*10)/10)+(ld>0?' of '+fmt(Math.round(ld*10)/10)+' ('+r1(w/ld*100)+'%)':'') : '' }
+  ];
+}
+function journeyPct(x, st){
+  const done = st.filter(s=>s.ts).length, d = k => st.find(s=>s.k===k).ts;
+  if (!done) return 0;
+  if (d('serve')) return 100;
+  if (d('arr')) return 76 + (st.filter(s=>['qc2','xfer'].includes(s.k)&&s.ts).length)*8;
+  if (d('dep')){ const sc = (((sites[x.siteId]||{}).sched||{})[x.meal])||{}; let f = .5, el = Date.now()-d('dep');
+    if (sc.depart && sc.arrive && x.date){ const a = new Date(x.date+'T'+sc.depart).getTime(), b = new Date(x.date+'T'+sc.arrive).getTime(); f = b>a ? el/(b-a) : .5; }
+    else f = el/(45*60000);
+    return 28 + Math.max(.08, Math.min(.92, f))*44; }
+  return Math.min(24, done*6);
+}
+const VAN_SVG = `<svg viewBox="0 0 92 50" width="64" height="35" aria-hidden="true"><rect x="2" y="6" width="56" height="30" rx="6" fill="#fff" stroke="#04704a" stroke-width="2"/><path d="M58 14h16c3 0 5 1.5 7 4l7 8c1 1.3 1.5 2.5 1.5 4V36H58z" fill="#ffb703" stroke="#b36b00" stroke-width="1.5"/><path d="M63 18h9l6 7H63z" fill="#cfeefa"/><g class="jw"><circle cx="20" cy="38" r="7" fill="#223"/><circle cx="20" cy="38" r="2.6" fill="#ccc"/><path d="M20 31v14M13 38h14" stroke="#777" stroke-width="1.2"/></g><g class="jw"><circle cx="72" cy="38" r="7" fill="#223"/><circle cx="72" cy="38" r="2.6" fill="#ccc"/><path d="M72 31v14M65 38h14" stroke="#777" stroke-width="1.2"/></g></svg>`;
+function jStrip(x){
+  const st = stagesOf(x), pct = journeyPct(x, st), moving = st.find(s=>s.k==='dep').ts && !st.find(s=>s.k==='arr').ts;
+  const stations = [[0,'🍳','Kitchen'],[28,'📦','Loaded'],[50,'🛣️','On road'],[76,'🏢','Counter'],[100,'🍽️','Served']];
+  return `<div class="jstrip ${moving?'moving':''}"><div class="jroad"><i style="width:${pct}%"></i></div>${stations.map(([p,i,l])=>`<div class="jst ${pct>=p?'on':''}" style="left:${p}%"><b>${i}</b><small>${l}</small></div>`).join('')}<div class="jvan" style="--p:${Math.max(3,Math.min(94,pct))}%"><div class="vbody">${VAN_SVG}<span class="vlogo"></span></div></div></div>`;
+}
+function journeyCard(sid, x, o){
+  o = o || {}; const q = String(sid).split('_'), siteId = q[1], meal = q[2], s = sites[siteId]||{name:siteId};
+  x = x || {}; const st = stagesOf(Object.assign({date:q[0],siteId,meal}, x), siteId, meal);
+  const done = st.filter(z=>z.ts).length, cur = done<st.length ? done : -1, started = done>0;
+  const lastTs = Math.max.apply(null, st.map(z=>z.ts||0));
+  const head = `<div class="row"><div class="grow"><b>${MEAL_ICON[meal]||'🍽️'} ${esc(s.name)} — ${esc(meal)}</b><div class="sub">${started?(done===st.length?'Completed':st[cur].label+' next')+' · '+done+'/'+st.length+' steps':'Not started yet'}${lastTs?' · updated '+hm(lastTs):''}</div></div><span class="badge ${done===st.length?'':started?'blue':'grey'}">${done===st.length?'Done':started?'In progress':'Waiting'}</span></div>`;
+  if (!o.full || !started) return `<div class="card jcard">${head}${jStrip(Object.assign({date:q[0],siteId,meal},x))}</div>`;
+  return `<div class="card jcard">${head}${jStrip(Object.assign({date:q[0],siteId,meal},x))}
+    <div class="jtl">${st.map((z,i)=>`<div class="jrow ${z.ts?(z.bad?'bad':'done'):(i===cur&&started?'now':'todo')}" style="--i:${i}"><div class="jdot">${z.ts?(z.bad?'!':'✓'):z.ico}</div><div class="jbody"><div class="jl"><b>${z.ico} ${esc(z.label)}</b><span>${z.ts?hm(z.ts):(z.plan?'plan '+esc(z.plan):'')}</span></div>${z.note?`<div class="sub ${z.late||z.bad?'jbad':''}">${esc(z.note)}</div>`:''}${!z.ts&&z.plan?`<div class="sub">Planned ${esc(z.plan)}</div>`:''}</div></div>`).join('')}</div></div>`;
+}
+function journeysHtml(full){
+  const t = todayKey(), vs = new Set(visibleSites().map(([k])=>k)), list = [];
+  visibleSites().forEach(([k,s])=>(s.meals&&s.meals.length?s.meals:MEALS).forEach(m=>{ const sid = sidOf(t,k,m), x = sessions[sid]; if (x || full) list.push([sid,x]); }));
+  list.sort((a,b)=>MEALS.indexOf(a[0].split('_')[2])-MEALS.indexOf(b[0].split('_')[2]));
+  if (!list.length) return '';
+  return `<h2>🧭 Today's food journey</h2>`+list.map(([sid,x])=>journeyCard(sid,x,{full})).join('');
+}
+
+/* ---------- AGGREGATOR: reports ---------- */
+let arp = { from:todayKey(), to:todayKey(), site:'', sec:'all' }, arpLast = null;
+function aggReport(R){
+  const days = []; for (let d = new Date(R.from+'T00:00:00'); keyOf(d)<=R.to && days.length<62; d.setDate(d.getDate()+1)) days.push(keyOf(d));
+  const vsAll = visibleSites().filter(([k])=>!R.site || k===R.site), vs = new Set(vsAll.map(([k])=>k));
+  const inR = d => d>=R.from && d<=R.to;
+  const sc = [], tl = mealSections(Object.assign({}, R, {type:'meals'}));
+  days.forEach(d=>{ const f = dayFacts(d); const list = f.list.filter(([,x])=>vs.has(x.siteId)); if (!list.length) return;
+    sc.push([d, String(list.length), f.onN?Math.round(f.onT/f.onN*100)+'%':'—', f.qcN?f.qcOk+'/'+f.qcN:'—', f.wpct==null?'—':r1(f.wpct)+'%', f.rating?r1(f.rating)+' ⭐':'—']); });
+  const rt = Object.values(ratings).filter(r=>inR(r.date) && vs.has(r.siteId)).sort((a,b)=>a.date.localeCompare(b.date)).map(r=>[r.date, (sites[r.siteId]||{}).name||'', r.meal, ...['food','qty','hyg','time','serv','overall'].map(k=>r.r&&r.r[k]?String(r.r[k]):'—'), r.comment||'']);
+  const es = Object.values(escs).filter(e=>inR(keyOf(new Date(e.ts))) && (!e.siteId || e.siteId==='all' || vs.has(e.siteId))).sort((a,b)=>a.ts-b.ts).map(e=>[escRef(e), keyOf(new Date(e.ts)), e.cat, e.sev, stLabel(e.status), e.resolution||'—']);
+  const secs = [
+    sectionTable('Daily service scorecard', ['Date','Meals','On-time','QC passed','Wastage','Rating'], sc, 'No meals in this period.'),
+    tl[0] || sectionTable('Meal timeline',[],[],'No meals in this period.'), tl[1] || sectionTable('Dish-wise',[],[],''),
+    sectionTable('Ratings given', ['Date','Counter','Meal','Food','Qty','Hygiene','Time','Service','Overall','Comment'], rt, 'No ratings in this period.'),
+    sectionTable('Escalations', ['Ref','Date','Issue','Severity','Status','Resolution'], es, 'No escalations in this period.')
+  ];
+  const shown = R.sec==='all' ? secs : secs.filter(s=>({score:'Daily service scorecard',time:'Meal timeline',dish:'Dish-wise production, sales & wastage',rate:'Ratings given',esc:'Escalations'})[R.sec]===s.h);
+  const period = R.from===R.to ? R.from : R.from+' to '+R.to;
+  const L = ['*Kalyana Sapadu — Service report*','📅 '+period+(R.site&&sites[R.site]?' · '+sites[R.site].name:'')];
+  shown.forEach(sec=>{ L.push('','*'+sec.h+'*'); if (!sec.rows.length){ L.push('_'+sec.note+'_'); return; } sec.rows.forEach(r=>L.push(sec.line?sec.line(r):'• '+r.filter(v=>v!==''&&v!=null).join(' · '))); });
+  L.push('','_Generated by '+(me?me.name:'')+' · '+new Date().toLocaleString()+'_');
+  return { title:'Service report', period, filt:'', sections:shown, text:L.join('\n') };
+}
+function renderAgRep(){
+  const el = $('p-agrep'); if (!el) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  const o = (arr,sel)=>arr.map(([v,l])=>`<option value="${esc(v)}" ${v===sel?'selected':''}>${esc(l)}</option>`).join('');
+  arpLast = aggReport(arp);
+  const quick = [['Today',0],['Yesterday',1],['Last 7 days',7],['Last 30 days',30],['This month',-1]];
+  el.innerHTML = `<h2>📑 Service reports</h2>
+    <div class="card"><div class="chips" style="margin:0">${quick.map(([l,n])=>`<div class="chip" data-aq="${n}">${l}</div>`).join('')}</div>
+      <div class="two"><div><label>From</label><input type="date" id="ar_from" value="${arp.from}" max="${todayKey()}"></div><div><label>To</label><input type="date" id="ar_to" value="${arp.to}" max="${todayKey()}"></div></div>
+      <div class="two"><div><label>Counter</label><select id="ar_site">${o([['','All counters']].concat(visibleSites().map(([k,s])=>[k,s.name])), arp.site)}</select></div>
+      <div><label>Show</label><select id="ar_sec">${o([['all','Everything'],['score','Daily scorecard'],['time','Meal timeline'],['dish','Dish-wise & wastage'],['rate','Ratings'],['esc','Escalations']], arp.sec)}</select></div></div></div>
+    <div class="two" style="margin-bottom:6px"><button class="btn" id="ar_wa">Share on WhatsApp</button><button class="btn sec" id="ar_mail">Email</button></div>
+    <div class="two" style="margin-bottom:10px"><button class="btn sec" id="ar_copy">Copy text</button><button class="btn sec" id="ar_csv">Download CSV</button></div>
+    <h2>${esc(arpLast.title)} · ${esc(arpLast.period)}</h2>
+    ${arpLast.sections.map(sec=>`<h2>${esc(sec.h)}</h2>${sec.rows.length?`<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>${sec.cols.map(c=>`<th style="text-align:left;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap">${esc(c)}</th>`).join('')}</tr></thead><tbody>${sec.rows.map(r=>`<tr>${r.map(c=>`<td style="padding:7px 8px;border-bottom:1px solid var(--line)">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:`<div class="soon">${esc(sec.note)}</div>`}`).join('')}`;
+  const b = (id,k)=>{ $(id).onchange = ()=>{ arp[k] = $(id).value; if (arp.to<arp.from){ if (k==='from') arp.to = arp.from; else arp.from = arp.to; } renderAgRep(); }; };
+  b('ar_from','from'); b('ar_to','to'); b('ar_site','site'); b('ar_sec','sec');
+  el.querySelectorAll('[data-aq]').forEach(c=>c.onclick=()=>{ const n=+c.dataset.aq, d=new Date(), pad=x=>String(x).padStart(2,'0');
+    if (n===-1){ arp.from = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-01'; arp.to = keyOf(d); }
+    else if (n>=7){ const a=new Date(d); a.setDate(a.getDate()-(n-1)); arp.from = keyOf(a); arp.to = keyOf(d); }
+    else { const a=new Date(d); a.setDate(a.getDate()-n); arp.from = arp.to = keyOf(a); }
+    renderAgRep(); });
+  $('ar_wa').onclick = ()=>shareWhatsApp(arpLast.text);
+  $('ar_mail').onclick = ()=>{ location.href = 'mailto:'+encodeURIComponent(ownerEmail())+'?subject='+encodeURIComponent('Service report '+arpLast.period)+'&body='+encodeURIComponent(arpLast.text.replace(/\*/g,'')); };
+  $('ar_copy').onclick = ()=>copyText(arpLast.text);
+  $('ar_csv').onclick = ()=>{ const keep = rep.from; rep.from = arp.from; downloadCsv(arpLast); rep.from = keep; };
 }
 
 const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
