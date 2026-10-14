@@ -674,6 +674,7 @@ function renderPurchase(){
     ${raws.length ? `<div class="card">
       <label>Item</label>
       <select id="pu_item">${raws.map(([id,i])=>`<option value="${id}">${esc(i.name)} (${esc(i.unit)})</option>`).join('')}</select>
+      <label>Date of purchase</label><input id="pu_date" type="date" value="${purDate||t0()}" max="${t0()}">
       <div class="two"><div><label>Quantity</label><input id="pu_qty" type="number" inputmode="decimal" step="any" placeholder="0"></div>
       <div><label>Rate per unit ₹ (optional)</label><input id="pu_rate" type="number" inputmode="decimal" step="any" placeholder="0"></div></div>
       <label>Supplier (optional)</label><input id="pu_sup" list="supList" placeholder="e.g. Koyambedu vegetable vendor"><datalist id="supList">${[...new Set(Object.values(ledger).map(e=>e.supplier).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
@@ -695,13 +696,16 @@ function renderPurchase(){
   const as = $('ad_save'); if (as) as.onclick = saveAdjust;
 }
 function addLedger(e){
-  e.ts = Date.now(); e.date = todayKey(); e.by = me.name; e.byId = me.id;
+  e.ts = Date.now(); e.date = e.date || todayKey(); e.by = me.name; e.byId = me.id;
   return db.ref(P+'ledger').push(e);
 }
+let purDate = '';
+const t0 = ()=>todayKey();
 function savePurchase(){
   const itemId = $('pu_item').value, qty = num($('pu_qty').value), rate = num($('pu_rate').value);
   if (!(qty>0)) { alert('Enter a quantity greater than 0.'); return; }
-  addLedger({ itemId, type:'purchase', qty, rate: isFinite(rate)?rate:null, supplier:$('pu_sup').value.trim(), expiry:$('pu_exp').value||null, lot:$('pu_batch').value.trim()||null, note:$('pu_note').value.trim(), photoKey:usePh('purchase') })
+  const pd = $('pu_date').value || todayKey(); if (pd>todayKey()){ alert('Purchase date cannot be in the future.'); return; } purDate = pd;
+  addLedger({ date:pd, itemId, type:'purchase', qty, rate: isFinite(rate)?rate:null, supplier:$('pu_sup').value.trim(), expiry:$('pu_exp').value||null, lot:$('pu_batch').value.trim()||null, note:$('pu_note').value.trim(), photoKey:usePh('purchase') })
     .then(()=>{ toast('Added to stock'); $('pu_qty').value=''; $('pu_rate').value=''; $('pu_note').value=''; });
 }
 function saveAdjust(){
@@ -2731,6 +2735,21 @@ function wfCardHtml(sid, s){
     ${wfActions(sid,w)}</div>`;
 }
 
+function wfNext(sid, s){
+  const q1 = s.qc1&&s.qc1.ts, pk = T(s,'packed'), ld = T(s,'loaded'), dp = T(s,'departed'), ar = T(s,'arrived');
+  const chip = (ok,l)=>`<span style="color:${ok?'var(--green)':'var(--muted)'}">${ok?'✓':'○'} ${l}</span>`;
+  let next = '', act = '';
+  if (!q1){ next = 'Production QC (taste, hygiene, temperature)'; }
+  else if (!(pk&&pk.ts)){ next = 'Packing'; if (canStep('dispatch')) act = `<button class="btn save" data-wf="packed" data-sid="${sid}">📦 Mark packed</button>`; }
+  else if (!(ld&&ld.ts)){ next = 'Loading in vehicle'; if (canStep('dispatch')) act = `<button class="btn save" data-wf="loaded" data-sid="${sid}">🚛 Mark loaded in vehicle</button>`; }
+  else if (!(dp&&dp.ts)){ next = 'Vehicle departure (driver: meter reading, then start trip)'; }
+  else if (!(ar&&ar.ts)){ next = 'On the road to the counter'; }
+  else next = 'At the counter — arrival QC, weighing and sales';
+  return `<div class="card" style="margin:8px 0 0;border-left:4px solid var(--green)"><b>Next: dispatch</b>
+    <div class="sub" style="margin-top:4px">${chip(q1,'QC')} → ${chip(pk&&pk.ts,'Packed')} → ${chip(ld&&ld.ts,'Loaded')} → ${chip(dp&&dp.ts,'Driving')} → ${chip(ar&&ar.ts,'Arrived')}</div>
+    <div class="sub">Now: <b style="color:var(--ink)">${next}</b></div>${act}
+    <button class="btn sec save" data-wf="open" data-sid="${sid}">Open full sheet to continue ›</button></div>`;
+}
 /* ---------- Production page ---------- */
 function renderProd(){
   const el = $('p-prod'); if (!el) return;
@@ -2753,7 +2772,7 @@ function renderProd(){
       ${edit && Object.keys(s.items||{}).length && canStep('prod') ? Object.entries(s.items||{}).map(([id,it])=>{ const d=items[id]||{name:'',unit:''}; return `<div class="row" style="margin-top:4px"><div class="grow sub" style="margin:0">Made: <b>${esc(d.name)}</b></div><input class="wfmade" data-sid="${sid}" data-id="${id}" type="number" inputmode="decimal" step="any" value="${it.prepared||''}" placeholder="made" style="width:84px"><span class="sub" style="margin:0">${esc(d.unit)}</span></div>`; }).join('') : ''}
       ${wfActions(sid,w)}
       ${started && !done && canStep('prod') ? `<button class="btn save" data-wf="done" data-sid="${sid}">✅ Cooking complete — pass to QC & dispatch</button>` : ''}
-      ${done ? `<div class="sub" style="margin-top:8px;color:var(--green)">✅ Cooked ${hm(w.pd.ts)} by ${esc(w.pd.by||'')} — continues in Meals (QC → packing → vehicle)</div>`:''}
+      ${done ? `<div class="sub" style="margin-top:8px;color:var(--green)">✅ Cooked ${hm(w.pd.ts)} by ${esc(w.pd.by||'')}</div>${wfNext(sid,s)}`:''}
     </div>`);
   }));
   const hello = { store:'You issue the raw material. The kitchen is alerted with a loud alarm the moment you save an issue.', prodmanager:'Plan each meal and press <b>Send plan to kitchen</b> — the kitchen is alerted with a loud alarm.', kitchen:'Wait for the alarm, check material and plan, press <b>Start cooking</b>, enter quantities made, then <b>Cooking complete</b>.', cook:'Wait for the alarm, check material and plan, press <b>Start cooking</b>, enter quantities made, then <b>Cooking complete</b>.', admin:'Process: Store issues → Production Manager sends plan → Kitchen/Cook starts → cooking complete → QC → dispatch.' }[me.role] || '';
@@ -2798,6 +2817,7 @@ document.addEventListener('click', e=>{
     if (!(w.iss.n>0) && !confirm('No raw material has been issued for this meal yet.\nStart cooking anyway?')) return;
     b.disabled = true; stampT(sid,'cookStart').then(()=>{ toast('🍳 Cooking started'); renderAll(); }); return;
   }
+  if (act==='packed' || act==='loaded'){ b.disabled = true; stampT(sid,act).then(()=>{ toast(act==='packed'?'📦 Packed':'🚛 Loaded'); renderAll(); }); return; }
   if (act==='done'){
     const s = sessions[sid]||{}; const any = Object.values(s.items||{}).some(i=>i.prepared>0);
     if (!any){ alert('Enter the quantity made for at least one dish.'); return; }
