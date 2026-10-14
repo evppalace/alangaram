@@ -3086,7 +3086,7 @@ function reqWaitList(){ const out = []; [todayKey(), dayKey(1)].forEach(d=>reqLi
 function reqWaitHtml(){
   if (!['store','prodmanager','opsmanager','admin'].includes(me.role)) return '';
   const l = reqWaitList(); if (!l.length) return `<div class="notice info" style="margin-bottom:10px"><span>📝</span><div>No cook requirement is waiting. When the cook sends one and it is approved, it appears here.</div></div>`;
-  return `<div class="card" style="border-left:4px solid var(--amber)"><b>📝 Cook requirements waiting for issue</b>${l.map(x=>{ const [stt] = reqStatus(x); const n = Object.keys(x.items||{}).length; return `<div class="row" style="margin-top:8px"><div class="grow"><b>${esc(x.by||'Cook')}</b> · for ${esc(x.date)}<div class="sub">${esc(reqForLabel(x.forMeal))} · ${n} item${n===1?'':'s'}${x.photoKey?' · photo':''} · <b>${stt}</b></div></div><button class="btn save" data-rwi="${x.date}|${x.id}" style="padding:9px 12px">Prepare issue</button></div>`; }).join('')}</div>`;
+  return `<div class="card" style="border-left:4px solid var(--amber)"><b>📝 Cook requirements waiting for issue</b>${l.map(x=>{ const [stt] = reqStatus(x); const n = Object.keys(x.items||{}).length; return `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line)"><b>${esc(x.by||'Cook')}</b> · for ${esc(x.date)}<div class="sub">${esc(reqForLabel(x.forMeal))} · ${n} item${n===1?'':'s'}${x.photoKey?' · photo':''} · <b>${stt}</b></div><button class="btn save" data-rwi="${x.date}|${x.id}" style="margin-top:8px">📤 Prepare issue</button></div>`; }).join('')}</div>`;
 }
 function reqWaitBind(el){ el.querySelectorAll('[data-rwi]').forEach(b=>b.onclick=()=>{ const [d,id] = b.dataset.rwi.split('|'); startIssueFromReq(d,id); }); }
 
