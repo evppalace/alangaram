@@ -145,3 +145,16 @@ exports.onRequirementUpdated = onValueUpdated(opt('/prod_settings/reqs/{date}/{i
   }
   if (!a.rejected && b.rejected) await send(await tokensFor(v => v.role === 'cook' && v.name === b.by), `↩ Requirement sent back (${date})`, b.rejNote || 'Please check and send again', '', { type: 'req', loud: '1', tab: 'req', date });
 });
+
+/* ---- Internal chat: push to recipients who are not currently online in the app ---- */
+exports.onChatMessage = onValueCreated(opt('/prod_chat/msgs/{cid}/{id}'), async ev => {
+  const m = ev.data.val(); if (!m || !m.to) return;
+  const db = admin.database(), now = Date.now();
+  const pres = (await db.ref('prod_chat/presence').once('value')).val() || {};
+  const want = Object.keys(m.to).filter(u => !(pres[u] && now - pres[u] < 60000));
+  if (!want.length) return;
+  const snap = await db.ref('prod_push').once('value'), targets = [];
+  snap.forEach(u => { if (!want.includes(u.key)) return; u.forEach(t => { const v = t.val(); if (v && v.token) targets.push({ token: v.token, path: `prod_push/${u.key}/${t.key}` }); }); });
+  const txt = m.img ? '📷 Photo' : m.au ? '🎤 Voice message' : m.loc ? '📍 Location' : (m.t || '').slice(0, 120);
+  await send(targets, m.g ? `${m.g} · ${m.n}` : (m.n || 'New message'), txt, '', { type: 'chat', loud: '1', tab: 'chat', chat: ev.params.cid });
+});
