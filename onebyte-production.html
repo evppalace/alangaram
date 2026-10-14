@@ -87,6 +87,8 @@
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style id="v2">
+@media (prefers-color-scheme:dark){.seg,.soon,.jst b,.jdot{background:var(--card)!important}.bm a{color:#5fe0ab}.bm.me a{color:#fff}.bot-c button{background:var(--card)!important;color:#5fe0ab!important}.bm.bot{background:#1b3328!important;color:#e8f5ee!important}}
+
 #alarmBox{position:fixed;inset:0;z-index:99998;background:rgba(120,10,10,.72);display:none;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(3px)}
 #alarmBox.show{display:flex;animation:abFlash 1s infinite}
 @keyframes abFlash{0%,100%{background:rgba(120,10,10,.72)}50%{background:rgba(200,40,20,.82)}}
@@ -374,6 +376,7 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
   <div class="page" id="p-reports"></div>
   <div class="page" id="p-dishes"></div>
   <div class="page" id="p-prod"></div>
+  <div class="page" id="p-req"></div>
   <div class="page" id="p-agrep"></div>
   <div class="page" id="p-trends"></div>
   <div class="page" id="p-masters"></div>
@@ -407,17 +410,17 @@ const SETUP_PIN = "1234"; // works only until the first Admin user is created
 const P = 'prod_'; // all data of this module lives under prod_* in Firebase, separate from the old sales data
 
 const ROLES = {
-  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','prod','plan','meals','dishes','client','reports','trends','masters','users'] },
-  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','prod','plan','issue','meals','stock','purchase','dishes','client','masters'] },
-  store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','issue','stock','purchase','prod','plan'] },
-  kitchen:     { label:'Kitchen',            desc:'Production, cooking & dishes',         tabs:['home','prod','meals','issue','stock','plan','dishes'] },
-  cook:        { label:'Cook / Chef',        desc:'Production & cooking',          tabs:['home','prod','meals','dishes','issue'] },
+  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','stock','purchase','issue','prod','req','plan','meals','dishes','client','reports','trends','masters','users'] },
+  prodmanager: { label:'Production Manager', desc:'Stock, purchase, masters, QC',  tabs:['home','prod','req','plan','issue','meals','stock','purchase','dishes','client','masters'] },
+  store:       { label:'Store Keeper',       desc:'Purchase, daily issue & stock', tabs:['home','issue','req','stock','purchase','prod','plan'] },
+  kitchen:     { label:'Kitchen',            desc:'Production, cooking & dishes',         tabs:['home','prod','req','meals','issue','stock','plan','dishes'] },
+  cook:        { label:'Cook / Chef',        desc:'Production & cooking',          tabs:['home','prod','req','issue','meals','dishes'] },
   driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals'] },
   supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter, client escalations',tabs:['home','meals','dishes','client'], site:true },
   aggregator:  { label:'Aggregator / Client', desc:'Live view, ratings, feedback, escalation', tabs:['agg','aglive','agrate','agesc','agrep','agcontact'], siteOpt:true },
   counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals','dishes'], site:true }
 };
-const NAV = { prod:['👨‍🍳','Production'], dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
+const NAV = { req:['📝','Requirement'], prod:['👨‍🍳','Production'], dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
 const MEALS = ['breakfast','lunch','snacks','dinner'];
 const MEAL_ICON = {breakfast:'🌅', lunch:'🍛', snacks:'☕', dinner:'🌙'};
 const UNITS = ['kg','g','L','ml','nos','pack','box','bunch','pkt'];
@@ -556,6 +559,7 @@ function renderAll(){
   if (can('agrep'))    renderAgRep();
   if (can('dishes'))   renderDishes();
   if (can('prod'))     renderProd();
+  if (can('req'))      renderReq();
   try{ updateBell(); uwAttach(); botShow(); pushInit(); }catch(e){}
 }
 
@@ -756,9 +760,11 @@ function renderIssue(){
       const tgt = e.siteId && sites[e.siteId] ? sites[e.siteId].name+' '+e.meal : 'General';
       return `<div class="card row"><div class="grow"><b>${esc(it.name)}</b><div class="sub">${esc(tgt)} · ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · ${esc(e.by||'')}${e.note?' · '+esc(e.note):''}</div></div>
       <div class="qty">${fmt(-e.qty)} <small>${esc(it.unit)}</small></div>${e.reversed?'<span class="tag" style="background:#eee;color:#777">reversed</span>':(can('masters')||me.role==='store')?`<button class="btn danger" data-rev="${id}" style="padding:7px 10px;font-size:12px">Undo</button>`:''}</div>`;
-    }).join('') : '<div class="empty">Nothing issued yet today.</div>'}`;
+    }).join('') : '<div class="empty">Nothing issued yet today.</div>'}
+    ${retTable()}`;
+  retBind(el);
   const sel = (q,fn)=>el.querySelectorAll(q).forEach(fn);
-  sel('.is_item', x=>x.onchange=()=>{ issueRows[+x.dataset.n].itemId = x.value; issueFor=$('is_for').value; issueDay=+$('is_day').value; issueNote=$('is_note').value; el.querySelectorAll('.is_qty').forEach((q,n)=>issueRows[n].qty=q.value); renderIssue(); });
+  sel('.is_item', x=>x.onchange=()=>{ x.blur(); issueRows[+x.dataset.n].itemId = x.value; issueFor=$('is_for').value; issueDay=+$('is_day').value; issueNote=$('is_note').value; el.querySelectorAll('.is_qty').forEach((q,n)=>issueRows[n].qty=q.value); renderIssue(); });
   sel('.is_qty', x=>x.oninput=()=>{ issueRows[+x.dataset.n].qty = x.value; });
   sel('[data-rm]', b=>b.onclick=()=>{ issueRows.splice(+b.dataset.rm,1); renderIssue(); });
   sel('[data-rev]', b=>b.onclick=()=>reverseIssue(b.dataset.rev));
@@ -1285,7 +1291,7 @@ function buildReport(f){
       if (e.date < R.from) open += e.qty||0;
       else if (e.date <= R.to){
         if (e.type==='purchase') pur += e.qty;
-        else if (e.type==='issue' || e.type==='issue-reversal') used += -e.qty;
+        else if (e.type==='issue' || e.type==='issue-reversal' || e.type==='return') used += -e.qty;
         else adj += e.qty;
       }
     });
@@ -1310,6 +1316,9 @@ function buildReport(f){
     const k = tgt+'||'+e.itemId; agg[k] = (agg[k]||0) + (-e.qty);
   });
   const issRows = Object.entries(agg).filter(([,v])=>Math.abs(v)>0.0005).map(([k,v])=>{ const [t,id]=k.split('||'); return [t, items[id].name, fmt(v)+' '+items[id].unit]; }).sort((a,b)=>a[0].localeCompare(b[0])||a[1].localeCompare(b[1]));
+  const retAgg = {}; entries.filter(e=>e.type==='return' && inR(e) && rawItems.some(([id])=>id===e.itemId)).forEach(e=>{ const k = e.date+'||'+e.itemId; retAgg[k] = (retAgg[k]||0)+e.qty; });
+  const retRows = Object.entries(retAgg).filter(([,v])=>Math.abs(v)>0.0005).map(([k,v])=>{ const [d,id]=k.split('||'); return [d, items[id].name, fmt(v)+' '+items[id].unit]; }).sort((a,b)=>a[0].localeCompare(b[0])||a[1].localeCompare(b[1]));
+  const retSec = sectionTable('Returned to store room', ['Date','Item','Quantity'], retRows, retRows.length?'':'Nothing returned in this period.');
   const issSec = sectionTable('Issued to kitchen', ['Counter / meal','Item','Quantity'], issRows, issRows.length?'':'Nothing issued in this period / filter.');
 
   const later = mealSections(R);
@@ -1317,7 +1326,7 @@ function buildReport(f){
   let title, secs;
   if (R.type==='stock') { title='Stock & usage report'; secs=[stockSec]; }
   else if (R.type==='purchase') { title='Purchase report'; secs=[purSec]; }
-  else if (R.type==='issue') { title='Kitchen issue report'; secs=[issSec]; }
+  else if (R.type==='issue') { title='Kitchen issue report'; secs=[issSec, retSec]; }
   else if (R.type==='meals') { title = R.from===R.to ? 'Meal sheet' : 'Meal report'; secs = later; }
   else { title='Daily master report'; secs=[stockSec, purSec, issSec].concat(later); }
 
@@ -2848,6 +2857,10 @@ function wfEvents(){
     Object.entries(batches).forEach(([k,b])=>{ if (!b.ts || !days.includes(b.d) || (b.siteId && !vs.has(b.siteId))) return; const tgt = b.siteId && sites[b.siteId] ? sites[b.siteId].name+' · '+b.meal : 'general kitchen use';
       out.push({ id:'wf:issue:'+k, ts:b.ts, k:'wf', icon:'📤', lvl:'amber', loud:true, by:b.by, title:'Raw material issued — '+tgt, text:b.n+' item'+(b.n>1?'s':'')+' by '+(b.by||'Store Keeper')+' · check the Production tab', go:'prod' }); });
   }
+  const rq = (settings.reqs)||{};
+  if (['store','prodmanager','kitchen','admin'].includes(role)) Object.entries(rq).forEach(([dt,m])=>{ Object.entries(m||{}).forEach(([id,x])=>{ if (!x || !x.ts || !days.includes(dt)) return; const n = Object.keys(x.items||{}).length; const lo = ['store','prodmanager'].includes(role);
+    out.push({ id:'wf:req:'+dt+':'+id, ts:x.ts, k:'wf', icon:'📝', lvl:lo?'amber':'', loud:lo, by:x.by, title:'Requirement list for '+dt, text:'by '+(x.by||'Cook')+(x.photoKey?' · photo':'')+(n?' · '+n+' item'+(n>1?'s':''):''), go:'req' }); }); });
+  if (['store','prodmanager','admin'].includes(role)) Object.entries(ledger).forEach(([id,e])=>{ if (e.type!=='return' || !(e.qty>0) || !days.includes(e.date) || !items[e.itemId]) return; out.push({ id:'wf:ret:'+id, ts:e.ts||0, k:'wf', icon:'↩', by:e.by, title:'Returned to store — '+items[e.itemId].name, text:fmt(e.qty)+' '+items[e.itemId].unit+' by '+(e.by||''), go:'issue' }); });
   return out.filter(e=>e.by!==me.name || false);
 }
 
@@ -2889,6 +2902,86 @@ document.addEventListener('focusout', ()=>{
   setTimeout(()=>{ if (!skippedRender || ptrDown || !me) return; const a = document.activeElement; if (a && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) return; skippedRender = false; try{ renderAll(); }catch(e){} }, 700);
 });
 setInterval(()=>{ if (me && skippedRender && !ptrDown){ const a = document.activeElement; if (!(a && /INPUT|SELECT|TEXTAREA/.test(a.tagName))){ skippedRender = false; try{ renderAll(); }catch(e){} } } }, 4000);
+
+/* ============ v6: COOK DAILY REQUIREMENT + RETURNS TO STORE ============ */
+let reqRows = [{ itemId:'', qty:'' }], reqDay = 0, reqNote = '', reqView = todayKey();
+const dayKey = n => { const d = new Date(); d.setDate(d.getDate()+n); return keyOf(d); };
+function reqList(date){ const r = (settings.reqs||{})[date]||{}; return Object.entries(r).map(([id,x])=>Object.assign({id},x)).sort((a,b)=>(b.ts||0)-(a.ts||0)); }
+const canReq = () => me && ['cook','kitchen','prodmanager','admin'].includes(me.role);
+function reqItemOptions(sel){
+  const raws = Object.entries(items).filter(([,i])=>i.type==='raw' && i.active!==false).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const g = k => raws.filter(([,i])=>rawGroup(i)===k).map(([id,i])=>`<option value="${id}" ${id===sel?'selected':''}>${esc(i.name)}${i.ta?' · '+esc(i.ta):''} (${esc(i.unit)})</option>`).join('');
+  return '<option value="">Select item…</option><optgroup label="🥬 Vegetables">'+g('veg')+'</optgroup><optgroup label="🛒 Provisions">'+g('prov')+'</optgroup>';
+}
+function reqGrab(){ document.querySelectorAll('#p-req .rq_item').forEach(s=>{ if (reqRows[+s.dataset.n]) reqRows[+s.dataset.n].itemId = s.value; }); document.querySelectorAll('#p-req .rq_qty').forEach(s=>{ if (reqRows[+s.dataset.n]) reqRows[+s.dataset.n].qty = s.value; }); const n = $('rq_note'); if (n) reqNote = n.value; const d = $('rq_day'); if (d) reqDay = +d.value; }
+function renderReq(){
+  const el = $('p-req'); if (!el) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){ skippedRender = true; return; }
+  const list = reqList(reqView), canStore = ['store','prodmanager','admin'].includes(me.role);
+  el.innerHTML = `<h2>📝 Daily requirement</h2>
+    ${canReq() ? `<div class="card"><b>Send today's vegetables &amp; provisions requirement</b>
+      <div class="sub">Take a photo of the handwritten list, select items, or both — either one is enough. It reaches the Store Keeper, Production Manager and Kitchen instantly.</div>
+      <label>For which day</label><select id="rq_day"><option value="0" ${reqDay===0?'selected':''}>Today (${dayKey(0)})</option><option value="1" ${reqDay===1?'selected':''}>Tomorrow (${dayKey(1)})</option></select>
+      ${photoBox(draftCtx('req'),'Photo of written list',{draft:'req'})}
+      <label style="margin-top:10px">Select items (optional)</label>
+      ${reqRows.map((r,n)=>{ const u = r.itemId && items[r.itemId] ? items[r.itemId].unit : ''; return `<div class="row" style="margin-top:8px;align-items:flex-end;gap:8px"><div class="grow"><select data-n="${n}" class="rq_item">${reqItemOptions(r.itemId)}</select></div><div style="width:92px"><input data-n="${n}" class="rq_qty" type="number" inputmode="decimal" step="any" placeholder="${esc(u||'qty')}" value="${esc(r.qty)}"></div>${reqRows.length>1?`<button class="btn danger" data-rqrm="${n}" style="padding:9px 12px">✕</button>`:''}</div>`; }).join('')}
+      <button class="btn sec" id="rq_add" style="margin-top:8px;width:100%;padding:10px">+ Add another item</button>
+      <label>Note (optional)</label><input id="rq_note" value="${esc(reqNote)}" placeholder="e.g. need extra onion for biryani">
+      <button class="btn save" id="rq_send">📨 Send requirement</button></div>` : ''}
+    <div class="row" style="margin:10px 0"><button class="btn sec" id="rqPrev" style="padding:9px 14px">‹</button><input type="date" id="rqPick" value="${reqView}" style="text-align:center"><button class="btn sec" id="rqNext" style="padding:9px 14px">›</button></div>
+    ${list.length ? list.map(x=>{ const ln = Object.entries(x.items||{}); return `<div class="card"><div class="row"><div class="grow"><b>${esc(x.by||'Cook')}</b><div class="sub">${new Date(x.ts||0).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} · for ${esc(x.for||reqView)}</div></div>${(me.role==='admin'||x.byId===me.id)?`<button class="btn danger" data-rqdel="${x.id}" style="padding:7px 10px;font-size:12px">Delete</button>`:''}</div>
+      ${x.photoKey?photoBox(x.photoKey,'',{ro:true}):''}
+      ${ln.length?`<div style="margin-top:6px">${ln.map(([id,q])=>{ const it = items[id]||{name:'(deleted)',unit:''}; return `<div class="row" style="padding:4px 0;border-bottom:1px solid var(--line)"><div class="grow">${esc(it.name)}</div><b>${fmt(q)} ${esc(it.unit)}</b><span class="sub" style="margin:0 0 0 8px;min-width:70px;text-align:right">stock ${fmt(Math.round(stockOf(id)*100)/100)}</span></div>`; }).join('')}</div>`:''}
+      ${x.note?`<div class="sub" style="margin-top:6px">📝 ${esc(x.note)}</div>`:''}
+      ${canStore && ln.length?`<button class="btn sec save" data-rqissue="${x.id}">📤 Prepare kitchen issue from this list</button>`:''}</div>`; }).join('') : '<div class="empty">No requirement sent for this day yet.</div>'}`;
+  const shift = n => { const d = new Date(reqView+'T00:00:00'); d.setDate(d.getDate()+n); reqView = keyOf(d); renderReq(); };
+  $('rqPrev').onclick = ()=>shift(-1); $('rqNext').onclick = ()=>shift(1); $('rqPick').onchange = ()=>{ if ($('rqPick').value){ reqView = $('rqPick').value; renderReq(); } };
+  const add = $('rq_add'); if (add) add.onclick = ()=>{ reqGrab(); reqRows.push({itemId:'',qty:''}); renderReq(); };
+  el.querySelectorAll('[data-rqrm]').forEach(b=>b.onclick=()=>{ reqGrab(); reqRows.splice(+b.dataset.rqrm,1); if (!reqRows.length) reqRows.push({itemId:'',qty:''}); renderReq(); });
+  el.querySelectorAll('[data-rqdel]').forEach(b=>b.onclick=()=>{ if (confirm('Delete this requirement?')) db.ref(P+'settings/reqs/'+reqView+'/'+b.dataset.rqdel).remove(); });
+  el.querySelectorAll('[data-rqissue]').forEach(b=>b.onclick=()=>{ const x = list.find(y=>y.id===b.dataset.rqissue); if (!x) return; issueRows = Object.entries(x.items||{}).map(([id,q])=>({ itemId:id, qty:String(q) })); issueFor = '__'; issueDay = reqView>todayKey()?1:0; issueNote = 'Cook requirement '+reqView; go('issue'); });
+  const sd = $('rq_send'); if (sd) sd.onclick = ()=>{
+    reqGrab(); const its = {}; let bad = false;
+    reqRows.forEach(r=>{ if (!r.itemId && r.qty==='') return; const q = num(r.qty); if (!r.itemId || !(q>0)) bad = true; else its[r.itemId] = (its[r.itemId]||0)+q; });
+    if (bad){ alert('Each selected item needs a quantity above 0 (or remove the empty line).'); return; }
+    const hasPh = !!(PHD.req && phCount(PHD.req));
+    if (!Object.keys(its).length && !hasPh && !reqNote.trim()){ alert('Add a photo of the written list, select some items, or write a note.'); return; }
+    const day = dayKey(reqDay), pk = usePh('req');
+    sd.disabled = true;
+    db.ref(P+'settings/reqs/'+day).push({ items:its, note:reqNote.trim()||null, photoKey:pk||null, for:day, by:me.name, byId:me.id, ts:Date.now() }).then(()=>{ toast('📨 Requirement sent'); reqRows = [{itemId:'',qty:''}]; reqNote=''; reqView = day; renderAll(); }).catch(()=>{ sd.disabled = false; alert('Could not send. Check the internet and try again.'); });
+  };
+}
+
+/* ---------- issued vs returned, per item per day ---------- */
+let retDay = todayKey(), retExtra = {};
+const canReturn = () => me && ['store','prodmanager','cook','admin'].includes(me.role);
+function retTable(){
+  const day = retDay, iss = {}, ret = {};
+  Object.values(ledger).forEach(e=>{ if (e.date!==day) return; if (e.type==='issue' || e.type==='issue-reversal') iss[e.itemId] = (iss[e.itemId]||0) + -e.qty; else if (e.type==='return') ret[e.itemId] = (ret[e.itemId]||0) + e.qty; });
+  const ids = [...new Set([...Object.keys(iss), ...Object.keys(ret), ...Object.keys(retExtra[day]||{})])].filter(id=>items[id]).sort((a,b)=>items[a].name.localeCompare(items[b].name));
+  const raws = Object.entries(items).filter(([id,i])=>i.type==='raw' && i.active!==false && !ids.includes(id)).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const ed = canReturn();
+  return `<h2>↩ Issued &amp; returned — by day</h2>
+    <div class="card"><div class="row"><div class="grow sub" style="margin:0">Leftover vegetables &amp; provisions go back to the store room. Enter what came back for each item; stock updates automatically.</div></div>
+    <input type="date" id="rt_day" value="${day}" max="${todayKey()}" style="margin-top:8px">
+    ${ids.length ? `<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:6px">Item</th><th style="text-align:right;padding:6px">Issued</th><th style="text-align:right;padding:6px">Returned</th><th style="text-align:right;padding:6px">Used</th></tr></thead><tbody>${ids.map(id=>{ const i = items[id], a = Math.round((iss[id]||0)*1000)/1000, r = Math.round((ret[id]||0)*1000)/1000;
+      return `<tr><td style="padding:6px;border-top:1px solid var(--line)">${esc(i.name)} <span class="sub" style="display:inline;margin:0">${esc(i.unit)}</span></td><td style="text-align:right;padding:6px;border-top:1px solid var(--line)">${fmt(a)}</td>
+      <td style="text-align:right;padding:4px 6px;border-top:1px solid var(--line)">${ed?`<input class="rt_in" data-id="${id}" data-cur="${r}" type="number" inputmode="decimal" step="any" min="0" value="${r||''}" placeholder="0" style="width:78px;text-align:right;padding:7px">`:fmt(r)}</td>
+      <td style="text-align:right;padding:6px;border-top:1px solid var(--line);font-weight:700">${fmt(Math.round((a-r)*1000)/1000)}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty" style="margin-top:8px">Nothing issued on this day.</div>'}
+    ${ed && raws.length ? `<select id="rt_more" style="margin-top:8px"><option value="">+ Return another item…</option>${raws.map(([id,i])=>`<option value="${id}">${esc(i.name)} (${esc(i.unit)})</option>`).join('')}</select>` : ''}</div>`;
+}
+function retBind(el){
+  const d = el.querySelector('#rt_day'); if (d) d.onchange = ()=>{ if (d.value){ retDay = d.value; renderIssue(); } };
+  const m = el.querySelector('#rt_more'); if (m) m.onchange = ()=>{ if (!m.value) return; (retExtra[retDay] = retExtra[retDay]||{})[m.value] = 1; m.blur(); renderIssue(); };
+  el.querySelectorAll('.rt_in').forEach(inp=>inp.onchange = ()=>{
+    const id = inp.dataset.id, cur = +inp.dataset.cur||0, v = inp.value===''?0:num(inp.value);
+    if (!(v>=0)){ alert('Enter a quantity of 0 or more.'); inp.value = cur||''; return; }
+    const delta = Math.round((v-cur)*1000)/1000; if (!delta) return;
+    const issued = Object.values(ledger).reduce((a,e)=>e.date===retDay&&e.itemId===id&&(e.type==='issue'||e.type==='issue-reversal')?a+(-e.qty):a,0);
+    if (v>issued+0.0005 && !confirm('Returning '+fmt(v)+' but only '+fmt(issued)+' was issued on this day.\nContinue?')){ inp.value = cur||''; return; }
+    addLedger({ date:retDay, itemId:id, type:'return', qty:delta, note:'returned from kitchen' }).then(()=>{ toast('↩ Return saved — stock updated'); });
+  });
+}
 
 const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
 if (saved && ROLES[saved.role]){ me = saved; enter(); }

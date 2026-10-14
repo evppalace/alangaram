@@ -107,3 +107,11 @@ exports.onKitchenIssue = onValueCreated(opt('/prod_ledger/{id}'), async ev => {
   const tgt = e.siteId ? `${String(e.siteId).toUpperCase()} · ${e.meal}` : 'general kitchen use';
   await send(await tokensFor(v => ['kitchen', 'cook', 'prodmanager', 'admin'].includes(v.role)), `📤 Raw material issued — ${tgt}`, `by ${e.by || 'Store Keeper'} · check the Production tab`, '', { type: 'issue', loud: '1', tab: 'prod' });
 });
+/* ---- Cook's daily vegetable & provision requirement -> Store Keeper, Production Manager (loud), Kitchen, Admin ---- */
+exports.onRequirement = onValueCreated(opt('/prod_settings/reqs/{date}/{id}'), async ev => {
+  const x = ev.data.val(); if (!x) return;
+  const n = Object.keys(x.items || {}).length, txt = `by ${x.by || 'Cook'}${x.photoKey ? ' · photo' : ''}${n ? ' · ' + n + ' items' : ''}`;
+  const title = `📝 Requirement list for ${ev.params.date}`;
+  await send(await tokensFor(v => ['store', 'prodmanager'].includes(v.role)), title, txt, '', { type: 'req', loud: '1', tab: 'req' });
+  await send(await tokensFor(v => ['kitchen', 'admin'].includes(v.role)), title, txt, '', { type: 'req' });
+});
