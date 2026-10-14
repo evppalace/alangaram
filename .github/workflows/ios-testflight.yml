@@ -1,0 +1,84 @@
+name: Build OneByte Production iOS (TestFlight / App Store)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Add iOS platform
+        working-directory: production-android
+        run: |
+          npm install
+          npm install @capacitor/ios@^8.0.0 @capacitor/push-notifications@^8.0.0
+          mkdir -p www && cp ../onebyte-production.html www/index.html
+          npx cap add ios
+          npx cap sync ios
+      - name: Info.plist permissions, background modes, icon, version
+        working-directory: production-android/ios/App
+        run: |
+          P=App/Info.plist
+          pb() { /usr/libexec/PlistBuddy -c "$1" $P 2>/dev/null || true; }
+          pb "Add :NSLocationWhenInUseUsageDescription string OneByte uses your location to record attendance, trips and deliveries."
+          pb "Add :NSLocationAlwaysAndWhenInUseUsageDescription string OneByte tracks your location while you are signed in for work, so your trip and attendance route is recorded even when the app is in the background."
+          pb "Add :NSCameraUsageDescription string OneByte uses the camera to photograph food, weighing, QC checks and chat pictures."
+          pb "Add :NSPhotoLibraryUsageDescription string OneByte lets you choose pictures to attach to work records and chat."
+          pb "Add :NSMicrophoneUsageDescription string OneByte uses the microphone for voice messages in chat."
+          pb "Add :UIBackgroundModes array"
+          pb "Add :UIBackgroundModes:0 string location"
+          pb "Add :UIBackgroundModes:1 string remote-notification"
+          pb "Add :ITSAppUsesNonExemptEncryption bool false"
+          pb "Set :CFBundleDisplayName OneByte Production"
+          cd App; xcrun agvtool new-version -all ${{ github.run_number }} >/dev/null || true
+          python3 -m pip install pillow --break-system-packages -q || pip install pillow -q
+          python3 - <<'PY'
+          from PIL import Image
+          im=Image.open('../../resources/icon.png').convert('RGB').resize((1024,1024))
+          im.save('Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png')
+          PY
+      - name: Import signing certificate and profile
+        env:
+          CERT_P12_B64: ${{ secrets.IOS_CERT_P12_B64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+          PROFILE_B64: ${{ secrets.IOS_PROFILE_B64 }}
+        run: |
+          if [ -z "$CERT_P12_B64" ]; then echo "::error title=Missing Apple secrets::See STORE_RELEASE.md section B"; exit 1; fi
+          echo "$CERT_P12_B64" | base64 -d > cert.p12
+          security create-keychain -p ci build.keychain
+          security default-keychain -s build.keychain; security unlock-keychain -p ci build.keychain
+          security import cert.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci build.keychain
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROFILE_B64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/onebyte.mobileprovision
+          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/onebyte.mobileprovision > profile.plist
+          echo "PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' profile.plist)" >> $GITHUB_ENV
+          echo "TEAM_ID=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' profile.plist)" >> $GITHUB_ENV
+      - name: Archive and export IPA
+        working-directory: production-android/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release -archivePath $RUNNER_TEMP/App.xcarchive \
+            CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=$TEAM_ID PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            PRODUCT_BUNDLE_IDENTIFIER=com.evp.onebyte.production archive
+          cat > $RUNNER_TEMP/export.plist <<PL
+          <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict><key>method</key><string>app-store-connect</string><key>teamID</key><string>$TEAM_ID</string>
+          <key>signingStyle</key><string>manual</string><key>provisioningProfiles</key><dict><key>com.evp.onebyte.production</key><string>$PROFILE_NAME</string></dict></dict></plist>
+          PL
+          xcodebuild -exportArchive -archivePath $RUNNER_TEMP/App.xcarchive -exportOptionsPlist $RUNNER_TEMP/export.plist -exportPath $RUNNER_TEMP/out
+      - name: Upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_B64: ${{ secrets.ASC_KEY_P8_B64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_KEY_P8_B64" | base64 -d > ~/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8
+          xcrun altool --upload-app -f $RUNNER_TEMP/out/*.ipa -t ios --apiKey $ASC_KEY_ID --apiIssuer $ASC_ISSUER_ID
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OneByte-Production-IPA
+          path: ${{ runner.temp }}/out/*.ipa
