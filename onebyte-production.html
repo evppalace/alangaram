@@ -408,6 +408,7 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
   <div class="page" id="p-dishes"></div>
   <div class="page" id="p-prod"></div>
   <div class="page" id="p-req"></div>
+  <div class="page" id="p-attend"></div>
   <div class="page" id="p-agrep"></div>
   <div class="page" id="p-trends"></div>
   <div class="page" id="p-masters"></div>
@@ -441,19 +442,19 @@ const SETUP_PIN = "1234"; // works only until the first Admin user is created
 const P = 'prod_'; // all data of this module lives under prod_* in Firebase, separate from the old sales data
 
 const ROLES = {
-  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','prod','req','issue','plan','stock','purchase','meals','dishes','client','reports','trends','masters','users'] },
-  opsmanager:  { label:'Operations Manager', desc:'Meal plan, approvals, production & dispatch',  tabs:['home','prod','req','plan','issue','meals','stock','purchase','dishes','client','masters'] },
-  prodmanager: { label:'Production Manager', desc:'Meal plan, approvals, stock, QC',  tabs:['home','prod','req','plan','issue','meals','stock','purchase','dishes','client','masters'] },
-  store:       { label:'Store Keeper',       desc:'Purchase, kitchen issue & stock', tabs:['home','req','issue','stock','purchase','prod','plan'] },
-  kitchen:     { label:'Kitchen',            desc:'Production, cooking & dishes',         tabs:['home','prod','issue','meals','stock','plan','dishes'] },
-  cook:        { label:'Cook / Chef',        desc:'Requirement & cooking',          tabs:['home','req','prod','issue','meals','dishes'] },
-  driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals'] },
-  supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter, client escalations',tabs:['home','meals','dishes','client'], site:true },
+  admin:       { label:'Admin',              desc:'Everything, all counters', tabs:['home','prod','req','issue','plan','stock','purchase','meals','dishes','client','reports','trends','masters','users','attend'] },
+  opsmanager:  { label:'Operations Manager', desc:'Meal plan, approvals, production & dispatch',  tabs:['home','prod','req','plan','issue','meals','stock','purchase','dishes','client','masters','attend'] },
+  prodmanager: { label:'Production Manager', desc:'Meal plan, approvals, stock, QC',  tabs:['home','prod','req','plan','issue','meals','stock','purchase','dishes','client','masters','attend'] },
+  store:       { label:'Store Keeper',       desc:'Purchase, kitchen issue & stock', tabs:['home','req','issue','stock','purchase','prod','plan','attend'] },
+  kitchen:     { label:'Kitchen',            desc:'Production, cooking & dishes',         tabs:['home','prod','issue','meals','stock','plan','dishes','attend'] },
+  cook:        { label:'Cook / Chef',        desc:'Requirement & cooking',          tabs:['home','req','prod','issue','meals','dishes','attend'] },
+  driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals','attend'] },
+  supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter, client escalations',tabs:['home','meals','dishes','client','attend'], site:true },
   aggregator:  { label:'Aggregator / Client', desc:'Live view, ratings, feedback, escalation', tabs:['agg','aglive','agrate','agesc','agrep','agcontact'], siteOpt:true },
-  counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals','dishes'], site:true }
+  counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals','dishes','attend'], site:true }
 };
 const isPMrole = r => r==='prodmanager' || r==='opsmanager';
-const NAV = { req:['📝','Requirement'], prod:['👨‍🍳','Production'], dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'] };
+const NAV = { req:['📝','Requirement'], prod:['👨‍🍳','Production'], dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'], attend:['🕒','Attendance'] };
 const MEALS = ['breakfast','lunch','snacks','dinner'];
 const MEAL_ICON = {breakfast:'🌅', lunch:'🍛', snacks:'☕', dinner:'🌙'};
 const UNITS = ['kg','g','L','ml','nos','pack','box','bunch','pkt'];
@@ -514,14 +515,14 @@ function logout(){ try{ store.removeItem('prod_user'); }catch(e){} location.relo
 $('unlockBtn').onclick = login; $('lgStaff').onclick = ()=>setLoginMode('staff'); $('lgClient').onclick = ()=>setLoginMode('client');
 $('uname').addEventListener('keydown', e=>{ if(e.key==='Enter') $('pin').focus(); });
 $('pin').addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
-$('lockBtn').onclick = logout;
+$('lockBtn').onclick = ()=>{ try{ if (me && attOpen(attRec(todayKey(),me.id)) && !confirm('You are still signed in for attendance. Logging out stops location tracking until you open the app again. Log out anyway?')) return; }catch(e){} logout(); };
 
 function enter(){
   $('lock').style.display='none'; $('app').style.display='block'; $('nav').style.display='flex';
   userNav = false;
   buildNav();
   listen();
-  go(tabsFor()[0]); landingStart();
+  go(tabsFor()[0]); landingStart(); setTimeout(attPrompt, 3000);
   // revoked users get signed out on next open
   if (me.id!=='setup') db.ref(P+'users/'+me.id).once('value').then(s=>{ if(!s.exists()){ toast('Login removed'); setTimeout(logout,800);} });
 }
@@ -567,6 +568,7 @@ function listenNow(){
   bind('ratings', v=>ratings=v);
   bind('feedback', v=>feedbacks=v);
   bind('escalations', v=>escs=v);
+  db.ref(P+'attendance').limitToLast(70).on('value', x=>{ attendance = x.val()||{}; renderAll(); });
   db.ref(P+'sessions').limitToLast(600).on('value', s=>{ sessions = s.val()||{}; _ld.s=1; renderAll(); });
   db.ref(P+'ledger').limitToLast(30000).on('value', s=>{ ledger = s.val()||{}; _ld.l=1; renderAll(); });
 }
@@ -597,6 +599,8 @@ function renderAll(){
   if (can('dishes'))   renderDishes();
   if (can('prod'))     renderProd();
   if (can('req'))      renderReq();
+  if (can('attend'))   renderAttend();
+  try{ attendTick(); }catch(e){}
   try{ updateBell(); uwAttach(); botShow(); pushInit(); dlSchedule(); }catch(e){}
 }
 
@@ -1286,7 +1290,7 @@ function recForm(){
 }
 
 /* ============ REPORTS ============ */
-const REPORT_TYPES = [['master','Daily master (lifecycle)'],['meals','Meal sheets — per meal / day / week'],['stock','Stock & usage'],['purchase','Purchases'],['issue','Kitchen issue']];
+const REPORT_TYPES = [['master','Daily master (lifecycle)'],['meals','Meal sheets — per meal / day / week'],['stock','Stock & usage'],['purchase','Purchases'],['issue','Kitchen issue'],['attendance','Attendance']];
 const rep0 = ()=>({ type:'master', from:todayKey(), to:todayKey(), site:'', meal:'', cat:'', item:'' });
 let rep = rep0();
 let lastReport = null;
@@ -1385,6 +1389,7 @@ function buildReport(f){
   if (R.type==='stock') { title='Stock & usage report'; secs=[stockSec]; }
   else if (R.type==='purchase') { title='Purchase report'; secs=[purSec]; }
   else if (R.type==='issue') { title='Kitchen issue report'; secs=[issSec, retSec]; }
+  else if (R.type==='attendance') { title='Attendance report'; secs=attSections(R); }
   else if (R.type==='meals') { title = R.from===R.to ? 'Meal sheet' : 'Meal report'; secs = later; }
   else { title='Daily master report'; secs=[stockSec, purSec, issSec].concat(later); }
 
@@ -1603,10 +1608,10 @@ function renderMasters(){
   const el = $('p-masters');
   if (el.querySelector('input:focus, select:focus')) return;
   el.innerHTML = `
-    <div class="chips">${[['items','Items'],['recipes','Recipes'],['sites','Companies'],...(me.role==='admin'?[['aggs','🏢 Aggregators']]:[]),['basins','Basins'],['contacts','Contacts'],['alarms','⏰ Alarms'],['settings','Settings']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
+    <div class="chips">${[['items','Items'],['recipes','Recipes'],['sites','Companies'],...(me.role==='admin'?[['aggs','🏢 Aggregators']]:[]),['basins','Basins'],['contacts','Contacts'],...(me.role==='admin'?[['attset','🕒 Attendance']]:[]),['alarms','⏰ Alarms'],['settings','Settings']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
     <div id="mBody"></div>`;
   el.querySelectorAll('[data-m]').forEach(c=>c.onclick=()=>{ mTab=c.dataset.m; renderMasters(); });
-  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else if (mTab==='aggs') mAggs(); else if (mTab==='basins') mBasins(); else if (mTab==='recipes') mRecipes(); else if (mTab==='contacts') mContacts(); else if (mTab==='alarms') mAlarms(); else mSettings();
+  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else if (mTab==='aggs') mAggs(); else if (mTab==='basins') mBasins(); else if (mTab==='recipes') mRecipes(); else if (mTab==='contacts') mContacts(); else if (mTab==='alarms') mAlarms(); else if (mTab==='attset') mAttSet(); else mSettings();
 }
 function formShell(title, body, saveId){
   return `<div class="card" id="mForm"><b>${title}</b>${body}${saveId?`<button class="btn save" id="${saveId}">Save</button>`:""}</div>`;
@@ -3543,6 +3548,234 @@ function seedAggs(){
   [['HungerBox','hungerbox','Hunger@2026','hungerbox'],['Platos','platos','Platos@2026','platos']].forEach(([nm,un,pw,agg])=>{
     if (!Object.values(users).some(u=>(u.username||'').toLowerCase()===un)) work.push(db.ref(P+'users').push({ name:nm, username:un, password:pw, role:'aggregator', aggId:agg, siteId:'all', perms:{ reports:false } })); });
   Promise.all(work).then(()=>toast('✅ HungerBox & Platos set up')).catch(()=>alert('Could not save. Check the internet and try again.'));
+}
+
+/* ============ ATTENDANCE (sign in / out + GPS while signed in) ============ */
+let attendance = {}, attTab = 'me', attDate = todayKey(), attMonth = todayKey().slice(0,7), attTrk = null, attNative = null, attPrompted = false, attStaleDone = false, attBusy = false;
+const attT = ts => ts ? new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
+const attHrs = m => { m = Math.max(0, Math.round(m)); return Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m'; };
+const attIsMgr = () => me && (me.role==='admin' || isPMrole(me.role));
+const attStaff = () => Object.entries(users).filter(([,u])=>ROLES[u.role] && u.role!=='aggregator').sort((a,b)=>(a[1].name||'').localeCompare(b[1].name||''));
+const attRec = (d,uid) => ((attendance||{})[d]||{})[uid] || null;
+const attSegs = rec => Object.entries((rec&&rec.segs)||{}).map(([id,s])=>Object.assign({id},s)).sort((a,b)=>(a.i||0)-(b.i||0));
+const attOpen = rec => attSegs(rec).find(s=>s.i && !s.o) || null;
+function attMins(rec, d){ const now = Date.now(); let t = 0; attSegs(rec).forEach(s=>{ if (!s.i) return; const end = s.o || (d===todayKey() ? now : s.i); t += Math.max(0,end-s.i); }); return Math.round(t/60000); }
+function attKind(rec, d){
+  if (!rec || !attSegs(rec).length) return d<todayKey() ? 'absent' : 'none';
+  const m = attMins(rec,d), full = settings.attFull||8, half = settings.attHalf||4;
+  if (d===todayKey() && attOpen(rec)) return 'in';
+  return m>=full*60 ? 'present' : m>=half*60 ? 'half' : 'short';
+}
+function attDist(a,b){ const R=6371000, rad=x=>x*Math.PI/180, dLa=rad(b.lat-a.lat), dLo=rad(b.lng-a.lng); const h=Math.sin(dLa/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+function attNearest(loc){ const L = Object.values(settings.attLocs||{}).filter(x=>isFinite(x.lat)&&isFinite(x.lng)); if (!L.length || !loc) return null; let best=null; L.forEach(x=>{ const d=attDist(loc,x); if (!best||d<best.d) best={d,name:x.name,r:x.r||150}; }); return best; }
+function attGetPos(cb){
+  if (!navigator.geolocation) return cb(null);
+  navigator.geolocation.getCurrentPosition(p=>cb({lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6), acc:Math.round(p.coords.accuracy||0)}), ()=>cb(null), {enableHighAccuracy:true, timeout:9000, maximumAge:20000});
+}
+const attMap = l => l ? `https://maps.google.com/?q=${l.lat},${l.lng}` : '#';
+
+function attSignIn(){
+  if (!me || me.id==='setup' || attBusy) return; attBusy = true;
+  const d = todayKey(); if (attOpen(attRec(d,me.id))){ attBusy=false; return; }
+  toast('Getting your location…');
+  attGetPos(loc=>{
+    if (!loc && settings.attGps!==false){ attBusy=false; alert('Switch on Location (GPS) and allow it for this app, then try again. Attendance needs your location.'); return; }
+    const near = attNearest(loc), outside = !!(near && near.d>near.r);
+    if (outside && settings.attBlock){ attBusy=false; alert('You are '+Math.round(near.d)+' m from '+near.name+'. Sign in is allowed only at the work location.'); return; }
+    const rec = attRec(d,me.id), first = !rec || !attSegs(rec).length, now = Date.now();
+    const up = { uid:me.id, name:me.name, role:me.role, siteId:me.siteId||'all' };
+    if (first && settings.attStart){ const late = Math.round((now - new Date(d+'T'+settings.attStart+':00').getTime())/60000) - (settings.attGrace!=null?settings.attGrace:15); if (late>0) up.lateMin = late; }
+    const seg = { i:now, il:loc||null, out_of_zone:outside||null };
+    db.ref(P+'attendance/'+d+'/'+me.id).update(up).then(()=>db.ref(P+'attendance/'+d+'/'+me.id+'/segs').push(seg)).then(()=>{
+      attBusy=false; closeSheet(); toast('✅ Signed in '+attT(now)+(up.lateMin?' · late '+up.lateMin+' min':'')+(outside?' · outside work location':'')); startAttTracking();
+    }).catch(()=>{ attBusy=false; alert('Could not sign in. Check the internet and try again.'); });
+  });
+}
+function attSignOut(){
+  if (!me || attBusy) return; const d = todayKey(), rec = attRec(d,me.id), s = attOpen(rec); if (!s) return;
+  if (!confirm('Sign out now? Location tracking will stop.')) return; attBusy = true;
+  attGetPos(loc=>{
+    const now = Date.now();
+    db.ref(P+'attendance/'+d+'/'+me.id+'/segs/'+s.id).update({ o:now, ol:loc||null }).then(()=>{
+      attBusy=false; stopAttTracking(); toast('Signed out · today '+attHrs(attMins(attRec(d,me.id),d)));
+    }).catch(()=>{ attBusy=false; alert('Could not sign out. Check the internet and try again.'); });
+  });
+}
+/* GPS while signed in: native background service when available, else browser (screen open) */
+function startAttTracking(){
+  if (attTrk || !me) return;
+  const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation; let last = 0;
+  const post = (lat,lng) => { const now = Date.now(); if (now-last < 120000) return; last = now; const d = todayKey();
+    const pt = { lat:+lat.toFixed(6), lng:+lng.toFixed(6), ts:now, bg:!!BG };
+    db.ref(P+'attendance/'+d+'/'+me.id+'/last').set(pt); db.ref(P+'attendtrack/'+d+'/'+me.id).push(pt); };
+  if (BG && BG.addWatcher){
+    attTrk = 'native';
+    BG.addWatcher({ backgroundTitle:'On duty — attendance on', backgroundMessage:'OneByte records your location while you are signed in', requestPermissions:true, stale:false, distanceFilter:30 },
+      (loc,err)=>{ if (err){ if (err.code==='NOT_AUTHORIZED' && BG.openSettings) BG.openSettings(); return; } post(loc.latitude, loc.longitude); }).then(id=>{ attNative = id; });
+    return;
+  }
+  if (!navigator.geolocation) return;
+  attTrk = navigator.geolocation.watchPosition(p=>post(p.coords.latitude,p.coords.longitude), ()=>{}, {enableHighAccuracy:true, maximumAge:15000});
+}
+function stopAttTracking(){
+  if (attTrk==='native'){ const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation; if (BG && attNative!=null) BG.removeWatcher({id:attNative}); attNative = null; }
+  else if (attTrk!=null && navigator.geolocation){ navigator.geolocation.clearWatch(attTrk); }
+  attTrk = null;
+}
+/* called on every render: resume tracking, close forgotten sign-outs, show the Home card */
+function attendTick(){
+  if (!me || me.id==='setup' || me.role==='aggregator') return;
+  const d = todayKey();
+  if (attOpen(attRec(d,me.id))) startAttTracking(); else if (attTrk) stopAttTracking();
+  if (!attStaleDone && Object.keys(attendance).length){
+    attStaleDone = true;
+    Object.keys(attendance).filter(k=>k<d).forEach(k=>{ const rec = attRec(k,me.id), s = attOpen(rec); if (!s) return;
+      const o = (rec.last && rec.last.ts>s.i) ? rec.last.ts : s.i+8*3600000; db.ref(P+'attendance/'+k+'/'+me.id+'/segs/'+s.id).update({ o, auto:true }); });
+  }
+  const h = $('p-home'); if (h && can('home')){
+    const html = attendCard(); const ex = h.querySelector('#attCard');
+    if (ex) ex.outerHTML = html; else h.insertAdjacentHTML('afterbegin', html);
+  }
+}
+function attendCard(){
+  const d = todayKey(), rec = attRec(d,me.id), s = attOpen(rec), m = attMins(rec,d), segs = attSegs(rec);
+  const line = s ? `Signed in ${attT(s.i)} · ${attHrs(m)} today · 📡 GPS tracking on` : segs.length ? `Signed out · ${attHrs(m)} today` : 'Not signed in yet';
+  return `<div class="card" id="attCard" style="${s?'border-color:#9fd3b8;background:#EEF8F2':''}"><div class="row"><div style="font-size:26px">🕒</div><div class="grow"><b>Attendance</b><div class="sub">${esc(line)}</div></div>
+    ${s ? `<button class="btn danger" data-att="out" style="padding:9px 14px">Sign out</button>` : `<button class="btn" data-att="in" style="padding:9px 14px">Sign in</button>`}</div></div>`;
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest && e.target.closest('[data-att]'); if (!b || !me) return;
+  if (b.dataset.att==='in') attSignIn(); else if (b.dataset.att==='out') attSignOut();
+  else if (b.dataset.att==='later') closeSheet();
+});
+function attPrompt(){
+  if (attPrompted || !me || me.id==='setup' || me.role==='aggregator' || !can('attend')) return;
+  if (!_ld.s) { setTimeout(attPrompt, 1200); return; } attPrompted = true;
+  if (attOpen(attRec(todayKey(),me.id))) return;
+  const g = new Date().getHours(); const hi = g<12?'Good morning':g<17?'Good afternoon':'Good evening';
+  openSheet(`<h3>🕒 ${hi}, ${esc((me.name||'').split(' ')[0])}</h3><div class="sub" style="font-size:14px;margin-bottom:12px">Sign in to start your duty. Your location is recorded while you are signed in.</div>
+    <button class="btn save" data-att="in">Sign in now</button><button class="btn sec save" data-att="later">Later</button>`);
+}
+
+/* ---- attendance page ---- */
+const attFlags = (rec,d)=>{ const f=[]; if (rec&&rec.lateMin) f.push(`<span class="badge" style="background:#FFF1D6;color:#8a5a00">Late ${rec.lateMin}m</span>`); if (attSegs(rec).some(s=>s.out_of_zone)) f.push('<span class="badge" style="background:#FDE3DF;color:#a3261b">Outside zone</span>'); if (attSegs(rec).some(s=>s.auto)) f.push('<span class="badge">No sign-out</span>'); if (rec&&rec.edited) f.push('<span class="badge">Edited</span>'); return f.join(' '); };
+function renderAttend(){
+  const el = $('p-attend'); if (!el) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
+  const mgr = attIsMgr();
+  if (!mgr) attTab = 'me';
+  const chips = mgr ? `<div class="chips">${[['me','My attendance'],['team','Team'],['month','Month']].map(([k,l])=>`<div class="chip ${attTab===k?'active':''}" data-at="${k}">${l}</div>`).join('')}</div>` : '';
+  let body = '';
+  if (attTab==='me') body = attMeHtml(); else if (attTab==='team') body = attTeamHtml(); else body = attMonthHtml();
+  el.innerHTML = `<h2>🕒 Attendance</h2>${chips}${body}`;
+  el.querySelectorAll('[data-at]').forEach(c=>c.onclick=()=>{ attTab = c.dataset.at; renderAttend(); });
+  const dd = $('at_date'); if (dd) dd.onchange = ()=>{ if (dd.value){ attDate = dd.value; renderAttend(); } };
+  const mm = $('at_month'); if (mm) mm.onchange = ()=>{ if (mm.value){ attMonth = mm.value; renderAttend(); } };
+  el.querySelectorAll('[data-atedit]').forEach(b=>b.onclick=()=>attEditForm(b.dataset.atedit, attDate));
+  el.querySelectorAll('[data-attrack]').forEach(b=>b.onclick=()=>attTrackView(b.dataset.attrack, attDate));
+  const cv = $('at_csv'); if (cv) cv.onclick = ()=>attCsv();
+  const wa = $('at_wa'); if (wa) wa.onclick = ()=>shareWhatsApp(attText());
+}
+function attMeHtml(){
+  const d = todayKey(), rec = attRec(d,me.id), s = attOpen(rec), segs = attSegs(rec);
+  const days = Object.keys(attendance).filter(k=>attRec(k,me.id)).sort().reverse().slice(0,10);
+  return `<div class="card" style="${s?'border-color:#9fd3b8;background:#EEF8F2':''}"><div style="text-align:center;padding:6px 0">
+      <div style="font-size:40px">${s?'🟢':'⚪'}</div><div style="font-size:19px;font-weight:700">${s?'You are signed in':segs.length?'Signed out':'Not signed in'}</div>
+      <div class="sub">${s?'Since '+attT(s.i)+' · '+attHrs(attMins(rec,d)):segs.length?'Today '+attHrs(attMins(rec,d)):new Date().toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'})}</div>
+      ${s?`<div class="sub" style="margin-top:4px">📡 Location tracking is ON while you are signed in${rec&&rec.last?' · last ping '+attT(rec.last.ts):''}</div>`:''}
+      <div style="margin-top:12px">${s?'<button class="btn danger" data-att="out" style="width:100%">Sign out</button>':'<button class="btn" data-att="in" style="width:100%">Sign in</button>'}</div>
+      ${rec&&attFlags(rec,d)?`<div style="margin-top:8px">${attFlags(rec,d)}</div>`:''}</div></div>
+    ${segs.length?`<h2>Today</h2><div class="card">${segs.map(x=>`<div class="row" style="margin:4px 0"><div class="grow">In ${attT(x.i)}${x.o?' → Out '+attT(x.o):' → still in'}</div><b>${x.o?attHrs((x.o-x.i)/60000):''}</b></div>`).join('')}</div>`:''}
+    <h2>Recent days</h2>${days.length?`<div class="card">${days.map(k=>{ const r = attRec(k,me.id), kd = attKind(r,k), ic = {present:'✅',half:'🌓',short:'⏱️',in:'🟢',absent:'❌',none:'—'}[kd]; return `<div class="row" style="margin:6px 0"><div class="grow">${ic} ${k}<div class="sub">${attSegs(r).map(x=>attT(x.i)+'–'+(x.o?attT(x.o):'…')).join(' · ')}</div></div><div style="text-align:right"><b>${attHrs(attMins(r,k))}</b><div>${attFlags(r,k)}</div></div></div>`; }).join('')}</div>`:'<div class="empty">No attendance yet. Tap Sign in to start.</div>'}`;
+}
+function attTeamHtml(){
+  const d = attDate, rows = attStaff().map(([uid,u])=>({uid,u,rec:attRec(d,uid)})).map(x=>Object.assign(x,{kind:attKind(x.rec,d)}));
+  const n = k => rows.filter(x=>x.kind===k).length, inN = n('in'), presentN = rows.filter(x=>['in','present','half','short'].includes(x.kind)).length, lateN = rows.filter(x=>x.rec&&x.rec.lateMin).length, absN = rows.filter(x=>x.kind==='absent'||(x.kind==='none')).length;
+  const lab = {in:['🟢 In','#1b7a4b'], present:['✅ Present','#1b7a4b'], half:['🌓 Half day','#8a5a00'], short:['⏱️ Short','#8a5a00'], absent:['❌ Absent','#a3261b'], none:['⚪ Not in yet','#6b7a74']};
+  const tile = (v,l,c)=>`<div class="card" style="text-align:center;padding:10px 4px"><div style="font-size:22px;font-weight:800;${c?'color:'+c:''}">${v}</div><div class="sub">${l}</div></div>`;
+  return `<div class="card"><div class="two"><div><label>Date</label><input type="date" id="at_date" value="${d}" max="${todayKey()}"></div><div style="display:flex;align-items:flex-end;gap:8px"><button class="btn sec" id="at_csv" style="padding:11px 12px">CSV</button><button class="btn sec" id="at_wa" style="padding:11px 12px">WhatsApp</button></div></div></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0">${tile(presentN,'Present')}${tile(inN,'Signed in','#1b7a4b')}${tile(lateN,'Late','#8a5a00')}${tile(absN,d===todayKey()?'Not in':'Absent','#a3261b')}</div>
+    ${rows.map(x=>{ const [l,c] = lab[x.kind]; const last = x.rec&&x.rec.last, ping = last ? Math.round((Date.now()-last.ts)/60000) : null;
+      return `<div class="card"><div class="row"><div class="grow"><b>${esc(x.u.name||x.u.username)}</b><div class="sub">${esc((ROLES[x.u.role]||{}).label||x.u.role)}${x.u.siteId&&x.u.siteId!=='all'&&sites[x.u.siteId]?' · '+esc(sites[x.u.siteId].name):''}</div></div><b style="color:${c}">${l}</b></div>
+      ${x.rec&&attSegs(x.rec).length?`<div class="sub" style="margin-top:4px">${attSegs(x.rec).map(s=>attT(s.i)+'–'+(s.o?attT(s.o):'…')).join(' · ')} · <b>${attHrs(attMins(x.rec,d))}</b> ${attFlags(x.rec,d)}</div>`:''}
+      ${x.kind==='in'&&last?`<div class="sub">📡 <a href="${attMap(last)}" target="_blank">Live location</a> · ping ${ping<1?'just now':ping+' min ago'}${ping>10?' ⚠ no recent signal':''}</div>`:''}
+      <div class="two" style="margin-top:8px">${x.rec&&attSegs(x.rec).length?`<button class="btn sec" data-attrack="${x.uid}" style="padding:8px">🗺️ Route</button>`:'<span></span>'}${me.role==='admin'?`<button class="btn sec" data-atedit="${x.uid}" style="padding:8px">✏️ Correct</button>`:'<span></span>'}</div></div>`; }).join('') || '<div class="empty">No staff logins yet.</div>'}`;
+}
+function attMonthData(){
+  const ym = attMonth, days = Object.keys(attendance).filter(k=>k.startsWith(ym)).sort();
+  return attStaff().map(([uid,u])=>{ let p=0,l=0,half=0,tot=0; days.forEach(k=>{ const r = attRec(k,uid); if (!r||!attSegs(r).length) return; const kd = attKind(r,k); p += (kd==='present'||kd==='in')?1:0; half += kd==='half'?1:0; tot += attMins(r,k); if (r.lateMin) l++; });
+    return { uid, name:u.name||u.username, role:(ROLES[u.role]||{}).label||u.role, present:p, half, late:l, mins:tot }; });
+}
+function attMonthHtml(){
+  const rows = attMonthData(), td = 'padding:7px 8px;border-top:1px solid #e3ebe7';
+  return `<div class="card"><div class="two"><div><label>Month</label><input type="month" id="at_month" value="${attMonth}" max="${todayKey().slice(0,7)}"></div><div style="display:flex;align-items:flex-end;gap:8px"><button class="btn sec" id="at_csv" style="padding:11px 12px">CSV</button><button class="btn sec" id="at_wa" style="padding:11px 12px">WhatsApp</button></div></div></div>
+    <div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>${['Name','Role','Full','Half','Late','Hours'].map(c=>`<th style="text-align:left;padding:8px">${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td style="${td}"><b>${esc(r.name)}</b></td><td style="${td}">${esc(r.role)}</td><td style="${td}">${r.present}</td><td style="${td}">${r.half}</td><td style="${td}">${r.late}</td><td style="${td};white-space:nowrap">${attHrs(r.mins)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="sub" style="margin-top:8px">Full day = ${settings.attFull||8}h or more · Half day = ${settings.attHalf||4}h or more. Change under Masters → Attendance.</div>`;
+}
+function attText(){
+  if (attTab==='month'){ const L = ['*Attendance — '+attMonth+'*']; attMonthData().forEach(r=>L.push(`• ${r.name} (${r.role}): ${r.present} full, ${r.half} half, ${r.late} late · ${attHrs(r.mins)}`)); return L.join('\n'); }
+  const d = attDate, L = ['*Attendance — '+d+'*']; attStaff().forEach(([uid,u])=>{ const r = attRec(d,uid), k = attKind(r,d); L.push(`• ${u.name||u.username}: ${r&&attSegs(r).length?attSegs(r).map(s=>attT(s.i)+'–'+(s.o?attT(s.o):'in')).join(', ')+' ('+attHrs(attMins(r,d))+')'+(r.lateMin?' late '+r.lateMin+'m':''):(k==='absent'?'Absent':'Not in yet')}`); }); return L.join('\n');
+}
+function attCsv(){
+  const q = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; let out;
+  if (attTab==='month') out = [['Name','Role','Full days','Half days','Late days','Total hours'].map(q).join(',')].concat(attMonthData().map(r=>[r.name,r.role,r.present,r.half,r.late,(r.mins/60).toFixed(2)].map(q).join(',')));
+  else out = [['Date','Name','Role','Sign in','Sign out','Hours','Late (min)','Status'].map(q).join(',')].concat(attStaff().map(([uid,u])=>{ const r = attRec(attDate,uid), s = attSegs(r); return [attDate,u.name||u.username,(ROLES[u.role]||{}).label,s.length?attT(s[0].i):'',s.length&&s[s.length-1].o?attT(s[s.length-1].o):'',(attMins(r,attDate)/60).toFixed(2),r&&r.lateMin||'',attKind(r,attDate)].map(q).join(','); }));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+out.join('\n')], {type:'text/csv'})); a.download = 'onebyte-attendance-'+(attTab==='month'?attMonth:attDate)+'.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+function attEditForm(uid, d){
+  const u = users[uid]||{}, rec = attRec(d,uid), s = attSegs(rec), f = s[0], l = s[s.length-1], hhmm = ts => ts ? new Date(ts).toTimeString().slice(0,5) : '';
+  openSheet(`<h3>✏️ Correct attendance</h3><div class="sub" style="margin-bottom:8px">${esc(u.name||'')} · ${d}</div>
+    <div class="two"><div><label>Sign in</label><input type="time" id="ae_i" value="${hhmm(f&&f.i)}"></div><div><label>Sign out</label><input type="time" id="ae_o" value="${hhmm(l&&l.o)}"></div></div>
+    <label>Reason (required)</label><input id="ae_r" placeholder="e.g. forgot to sign out">
+    <button class="btn save" id="ae_save">Save correction</button>${rec?'<button class="btn danger save" id="ae_del">Remove this day\'s record</button>':''}<button class="btn sec save" id="ae_x">Cancel</button>`);
+  $('ae_x').onclick = closeSheet;
+  $('ae_save').onclick = ()=>{ const i=$('ae_i').value, o=$('ae_o').value, r=$('ae_r').value.trim(); if (!i){ alert('Enter the sign-in time.'); return; } if (!r){ alert('Give a reason.'); return; }
+    const ti = new Date(d+'T'+i+':00').getTime(), to = o ? new Date(d+'T'+o+':00').getTime() : null; if (to && to<=ti){ alert('Sign out must be after sign in.'); return; }
+    const seg = { i:ti, o:to, edited:true }; const k = db.ref(P+'attendance/'+d+'/'+uid+'/segs').push().key;
+    db.ref(P+'attendance/'+d+'/'+uid).set({ uid, name:u.name, role:u.role, siteId:u.siteId||'all', segs:{[k]:seg}, edited:{ by:me.name, ts:Date.now(), reason:r } }).then(()=>{ closeSheet(); toast('Attendance corrected'); }); };
+  const dl = $('ae_del'); if (dl) dl.onclick = ()=>{ if (confirm('Remove this attendance record?')) db.ref(P+'attendance/'+d+'/'+uid).remove().then(()=>{ closeSheet(); toast('Removed'); }); };
+}
+function attTrackView(uid, d){
+  const u = users[uid]||{};
+  db.ref(P+'attendtrack/'+d+'/'+uid).once('value').then(s=>{
+    const pts = Object.values(s.val()||{}).sort((a,b)=>a.ts-b.ts);
+    let svg = '';
+    if (pts.length>1){ const la = pts.map(p=>p.lat), lo = pts.map(p=>p.lng), a0=Math.min(...la), a1=Math.max(...la), o0=Math.min(...lo), o1=Math.max(...lo), W=300, H=170, sx=(o1-o0)||1e-4, sy=(a1-a0)||1e-4;
+      const xy = p => [10+(p.lng-o0)/sx*(W-20), H-10-(p.lat-a0)/sy*(H-20)];
+      svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;background:#eef6f2;border-radius:10px"><polyline fill="none" stroke="#1b7a4b" stroke-width="2.5" points="${pts.map(p=>xy(p).join(',')).join(' ')}"/><circle cx="${xy(pts[0])[0]}" cy="${xy(pts[0])[1]}" r="5" fill="#2b9a62"/><circle cx="${xy(pts[pts.length-1])[0]}" cy="${xy(pts[pts.length-1])[1]}" r="5" fill="#d9372b"/></svg><div class="sub">Green = first point · red = latest</div>`; }
+    openSheet(`<h3>🗺️ Route — ${esc(u.name||'')}</h3><div class="sub" style="margin-bottom:8px">${d} · ${pts.length} location points</div>${svg}
+      <div style="max-height:200px;overflow:auto;margin-top:8px">${pts.slice().reverse().map(p=>`<div class="row" style="margin:3px 0"><div class="grow sub" style="margin:0">${attT(p.ts)}${p.bg?' · background':''}</div><a href="${attMap(p)}" target="_blank">map ›</a></div>`).join('')||'<div class="empty">No location points recorded.</div>'}</div>
+      <button class="btn sec save" data-att="later">Close</button>`);
+  });
+}
+/* Reports → Attendance */
+function attSections(R){
+  const days = Object.keys(attendance).filter(k=>k>=R.from && k<=R.to).sort();
+  const sum = attStaff().map(([uid,u])=>{ let p=0,half=0,l=0,mins=0; days.forEach(k=>{ const r=attRec(k,uid); if(!r||!attSegs(r).length) return; const kd=attKind(r,k); if(kd==='present'||kd==='in') p++; if(kd==='half') half++; if(r.lateMin) l++; mins+=attMins(r,k); }); return [u.name||u.username,(ROLES[u.role]||{}).label||u.role,String(p),String(half),String(l),attHrs(mins)]; });
+  const log = []; days.forEach(k=>attStaff().forEach(([uid,u])=>{ const r=attRec(k,uid); if(!r||!attSegs(r).length) return; const s=attSegs(r); log.push([k,u.name||u.username,(ROLES[u.role]||{}).label||u.role,attT(s[0].i),s[s.length-1].o?attT(s[s.length-1].o):'—',attHrs(attMins(r,k)),r.lateMin?r.lateMin+' min':'',attSegs(r).some(x=>x.out_of_zone)?'Outside zone':'']); }));
+  return [sectionTable('Attendance summary',['Name','Role','Full days','Half days','Late days','Hours'],sum,sum.length?'':'No staff logins.'), sectionTable('Daily attendance log',['Date','Name','Role','In','Out','Hours','Late','Zone'],log,log.length?'':'No attendance recorded in this period.')];
+}
+/* Masters → Attendance settings */
+let attLocDraft = null;
+function mAttSet(){
+  const st = settings, locs = attLocDraft || Object.entries(st.attLocs||{}).map(([id,x])=>Object.assign({id},x));
+  attLocDraft = locs;
+  $('mBody').innerHTML = formShell('Attendance settings', `
+    <div class="two"><div><label>Shift starts at</label><input type="time" id="as_start" value="${esc(st.attStart||'')}"></div><div><label>Grace (minutes)</label><input type="number" id="as_grace" value="${st.attGrace!=null?st.attGrace:15}"></div></div>
+    <div class="sub">Signing in after start time + grace is marked Late. Leave blank to turn the late check off.</div>
+    <div class="two"><div><label>Full day (hours)</label><input type="number" step="any" id="as_full" value="${st.attFull||8}"></div><div><label>Half day (hours)</label><input type="number" step="any" id="as_half" value="${st.attHalf||4}"></div></div>
+    <label class="row" style="gap:10px;margin-top:10px"><input type="checkbox" id="as_gps" ${st.attGps!==false?'checked':''} style="width:auto"><span class="grow">Location (GPS) is required to sign in</span></label>
+    <label class="row" style="gap:10px;margin-top:6px"><input type="checkbox" id="as_blk" ${st.attBlock?'checked':''} style="width:auto"><span class="grow">Block sign-in outside the work locations <div class="sub">If off, it is allowed but flagged "Outside zone".</div></span></label>
+    <h2 style="margin-top:14px">Work locations</h2>
+    ${locs.map((l,n)=>`<div class="card"><input class="al_n" data-n="${n}" placeholder="Name e.g. Central kitchen" value="${esc(l.name||'')}"><div class="two" style="margin-top:6px"><input class="al_a" data-n="${n}" placeholder="Latitude" value="${l.lat!=null?l.lat:''}"><input class="al_o" data-n="${n}" placeholder="Longitude" value="${l.lng!=null?l.lng:''}"></div>
+      <div class="two" style="margin-top:6px"><input class="al_r" data-n="${n}" type="number" placeholder="Radius (m)" value="${l.r||150}"><button class="btn sec al_me" data-n="${n}" style="padding:9px">📍 Use my location</button></div><button class="btn danger al_rm" data-n="${n}" style="margin-top:6px;padding:8px">Remove</button></div>`).join('')||'<div class="sub">No work location added. Sign-ins are accepted from anywhere.</div>'}
+    <button class="btn sec save" id="al_add">+ Add work location</button>`, 'as_save');
+  const grab = ()=>{ document.querySelectorAll('.al_n').forEach(i=>attLocDraft[+i.dataset.n].name=i.value); document.querySelectorAll('.al_a').forEach(i=>attLocDraft[+i.dataset.n].lat=i.value); document.querySelectorAll('.al_o').forEach(i=>attLocDraft[+i.dataset.n].lng=i.value); document.querySelectorAll('.al_r').forEach(i=>attLocDraft[+i.dataset.n].r=i.value); };
+  $('al_add').onclick = ()=>{ grab(); attLocDraft.push({name:'',lat:'',lng:'',r:150}); mAttSet(); };
+  document.querySelectorAll('.al_rm').forEach(b=>b.onclick=()=>{ grab(); attLocDraft.splice(+b.dataset.n,1); mAttSet(); });
+  document.querySelectorAll('.al_me').forEach(b=>b.onclick=()=>{ grab(); const n=+b.dataset.n; attGetPos(p=>{ if(!p){ alert('Could not get your location. Allow Location for this app.'); return; } attLocDraft[n].lat=p.lat; attLocDraft[n].lng=p.lng; mAttSet(); toast('Location captured'); }); });
+  $('as_save').onclick = ()=>{ grab(); const L = {}; for (const l of attLocDraft){ if (!l.name && l.lat==='' && l.lng==='') continue; const la=num(l.lat), lo=num(l.lng); if (!l.name || !isFinite(la) || !isFinite(lo)){ alert('Each work location needs a name, latitude and longitude.'); return; } L[slug(l.name)||('loc'+Object.keys(L).length)] = { name:l.name.trim(), lat:la, lng:lo, r:num(l.r)>0?num(l.r):150 }; }
+    db.ref(P+'settings').update({ attStart:$('as_start').value||null, attGrace:num($('as_grace').value)>=0?num($('as_grace').value):15, attFull:num($('as_full').value)||8, attHalf:num($('as_half').value)||4, attGps:$('as_gps').checked, attBlock:$('as_blk').checked, attLocs:Object.keys(L).length?L:null }).then(()=>{ attLocDraft=null; toast('Attendance settings saved'); }); };
 }
 
 const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
