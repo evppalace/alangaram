@@ -87,6 +87,11 @@
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style id="v2">
+.lgchip{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:9px;padding:3px 7px;vertical-align:middle;margin-right:7px;box-shadow:0 0 0 1px rgba(0,0,0,.1)}
+.lgchip img{display:block;max-width:110px;object-fit:contain}
+.lgfield{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0}
+.lgpv{min-width:60px}
+
 /* v8 flow, next task, clickable tiles */
 .kpi .card.tap,.feed.tap,.fstep.tap,.nextcard.tap{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .kpi .card.tap:active,.feed.tap:active,.fstep.tap:active{transform:scale(.98)}
@@ -469,6 +474,7 @@ const db = firebase.database();
 const authReady = (firebase.auth ? firebase.auth().signInAnonymously() : Promise.resolve()).catch(e=>console.warn('anon auth',e&&e.message));
 let me = null;
 let users = {}, sites = {}, items = {}, basins = {}, ledger = {}, notices = {}, sessions = {}, settings = {}, recipes = {};
+let aggs = {};
 let stockFilter = 'all', stockSearch = '', skippedRender = false, stockMode = 'all', userNav = false;
 const _ld = {};
 
@@ -522,7 +528,7 @@ function enter(){
 let navKey = '';
 function buildNav(active){
   const r = ROLES[me.role], tabs = tabsFor();
-  $('who').textContent = me.name + ' · ' + r.label;
+  $('who').innerHTML = (me.role==='aggregator' && me.aggId && aggs[me.aggId] ? logoImg({logo:aggs[me.aggId].icon||aggs[me.aggId].logo},20) : '')+esc(me.name + ' · ' + r.label);
   navKey = tabs.join(',');
   const cur = active || tabs[0];
   const MAX = 5, main = tabs.length>MAX ? tabs.slice(0,MAX-1) : tabs, more = tabs.length>MAX ? tabs.slice(MAX-1) : [];
@@ -552,6 +558,7 @@ function listenNow(){
     }
   });
   bind('sites',  v=>sites=v);
+  bind('aggs',   v=>aggs=v);
   bind('items',  v=>items=v);
   bind('basins', v=>basins=v);
   bind('notices', v=>notices=v);
@@ -669,7 +676,7 @@ function renderHome(){
     ${exp.length ? `<h2>Check expiry</h2>` + exp.map(e=>`<div class="card row" style="border-color:#EBB9B2"><div class="grow"><b>${esc(items[e.itemId].name)}</b><div class="sub">${e.expiry<t?'EXPIRED ':'Expires '}${esc(e.expiry)}${e.lot?' · lot '+esc(e.lot):''}${e.supplier?' · '+esc(e.supplier):''}</div></div><div class="qty">${fmt(e.qty)} <small>${esc(items[e.itemId].unit)} bought</small></div></div>`).join('') : ''}
     ${usedList.length ? `<h2>Used today</h2><div class="card">${usedList.map(([id,v])=>esc(items[id].name)+' <b>'+fmt(v)+' '+esc(items[id].unit)+'</b>').join(' · ')}</div>` : ''}
     <h2>Counters</h2>
-    <div class="card">${Object.values(sites).map(s=>`<b>${esc(s.name)}</b> <span class="sub">${(s.meals||[]).map(esc).join(' · ')}</span>`).join('<br>') || '<span class="sub">No counters yet — add them in Masters.</span>'}</div>
+    <div class="card">${Object.values(sites).map(s=>`<div class="row" style="margin:4px 0">${logoImg(s,30)}<div class="grow"><b>${esc(s.name)}</b><div class="sub">${aggOf(s)?esc(aggOf(s).name)+' · ':''}${esc(s.location||'')}${s.location?' · ':''}${(s.meals||[]).map(esc).join(' · ')}</div></div></div>`).join('') || '<span class="sub">No companies yet — add them in Masters.</span>'}</div>
     <h2>Recent activity</h2>${recentLedger(6)}
     <div class="ksfoot"><div class="ksseal"><div class="kslogo-bg"></div></div>Internal production system for Kalyana Sapadu</div>
     ${canPost ? `<h2>Post a note or alert to all staff</h2><div class="card">
@@ -860,9 +867,14 @@ const sidOf = (d,site,meal) => d+'_'+site+'_'+meal;
 const hm = ts => ts ? new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
 function dur(a,b){ if(!a||!b) return '—'; const m = Math.round((b-a)/60000); return m>=60 ? Math.floor(m/60)+'h '+(m%60)+'m' : m+' min'; }
 function visibleSites(){
-  const all = Object.entries(sites);
+  let all = Object.entries(sites);
   const r = ROLES[me.role];
-  return r && (r.site || (r.siteOpt && me.siteId && me.siteId!=='all')) ? all.filter(([k])=>k===me.siteId) : all;
+  if (me.role==='aggregator'){
+    if (me.aggId) all = all.filter(([,x])=>x.aggId===me.aggId);
+    if (me.siteId && me.siteId!=='all') all = all.filter(([k])=>k===me.siteId);
+    return all;
+  }
+  return r && r.site ? all.filter(([k])=>k===me.siteId) : all;
 }
 const T = (s,k) => s && s.times && s.times[k];
 const MEAL_STAGES = [['prodDone','Cooked'],['qc1','QC'],['packed','Packed'],['loaded','Loaded'],['departed','Departed'],['arrived','Arrived'],['qc2','Arrival QC'],['counterLoaded','At counter'],['closed','Closed']];
@@ -1591,10 +1603,10 @@ function renderMasters(){
   const el = $('p-masters');
   if (el.querySelector('input:focus, select:focus')) return;
   el.innerHTML = `
-    <div class="chips">${[['items','Items'],['recipes','Recipes'],['sites','Counters'],['basins','Basins'],['contacts','Contacts'],['alarms','⏰ Alarms'],['settings','Settings']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
+    <div class="chips">${[['items','Items'],['recipes','Recipes'],['sites','Companies'],...(me.role==='admin'?[['aggs','🏢 Aggregators']]:[]),['basins','Basins'],['contacts','Contacts'],['alarms','⏰ Alarms'],['settings','Settings']].map(([k,l])=>`<div class="chip ${mTab===k?'active':''}" data-m="${k}">${l}</div>`).join('')}</div>
     <div id="mBody"></div>`;
   el.querySelectorAll('[data-m]').forEach(c=>c.onclick=()=>{ mTab=c.dataset.m; renderMasters(); });
-  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else if (mTab==='basins') mBasins(); else if (mTab==='recipes') mRecipes(); else if (mTab==='contacts') mContacts(); else if (mTab==='alarms') mAlarms(); else mSettings();
+  if (mTab==='items') mItems(); else if (mTab==='sites') mSites(); else if (mTab==='aggs') mAggs(); else if (mTab==='basins') mBasins(); else if (mTab==='recipes') mRecipes(); else if (mTab==='contacts') mContacts(); else if (mTab==='alarms') mAlarms(); else mSettings();
 }
 function formShell(title, body, saveId){
   return `<div class="card" id="mForm"><b>${title}</b>${body}${saveId?`<button class="btn save" id="${saveId}">Save</button>`:""}</div>`;
@@ -1649,18 +1661,21 @@ function itemForm(id){
 
 function mSites(){
   const rows = Object.entries(sites);
-  $('mBody').innerHTML = `<button class="btn save" id="addSite" style="margin:0 0 12px">+ Add counter</button><div id="mf"></div>` +
-    (rows.length ? rows.map(([id,s])=>`<div class="card"><b>${esc(s.name)}</b><div class="sub">Meals: ${(s.meals||[]).map(esc).join(', ')||'—'}${s.company?' · '+esc(s.company):''}</div>
-      <div class="actions"><button data-e="${id}">Edit</button></div></div>`).join('') : '<div class="empty">No counters yet. Add Teleperformance and HDFC.</div>');
+  $('mBody').innerHTML = `<button class="btn save" id="addSite" style="margin:0 0 12px">+ Add company</button><div id="mf"></div>` +
+    (rows.length ? rows.map(([id,s])=>`<div class="card">${logoImg(s,30)}<b>${esc(s.name)}</b><div class="sub">${aggOf(s)?esc(aggOf(s).name)+' · ':''}${esc(s.location||'')}${s.location?' · ':''}Meals: ${(s.meals||[]).map(esc).join(', ')||'—'}${s.company?' · '+esc(s.company):''}</div>
+      <div class="actions"><button data-e="${id}">Edit</button></div></div>`).join('') : '<div class="empty">No companies yet. Add them under an aggregator (Masters → Aggregators).</div>');
   $('addSite').onclick = ()=>siteForm(null);
   $('mBody').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>siteForm(b.dataset.e));
 }
-function siteForm(id){
+function siteForm(id, presetAgg){
   const s = id ? sites[id] : { name:'', company:'', meals:['breakfast','lunch','dinner'] };
   const m = s.meals||[];
   $('mf').innerHTML = formShell(id?'Edit counter':'New counter', `
-    <label>Counter name</label><input id="s_name" value="${esc(s.name)}" placeholder="e.g. Teleperformance">
-    <label>Company / site note</label><input id="s_co" value="${esc(s.company||'')}" placeholder="optional">
+    <label>Company name</label><input id="s_name" value="${esc(s.name)}" placeholder="e.g. Teleperformance">
+    <label>Aggregator</label><select id="s_agg"><option value="">— none —</option>${Object.entries(aggs).map(([k,a])=>`<option value="${k}" ${(s.aggId||presetAgg)===k?'selected':''}>${esc(a.name)}</option>`).join('')}</select>
+    <label>Location</label><input id="s_loc" value="${esc(s.location||'')}" placeholder="e.g. Ambit IT Park, Ambattur">
+    <label>Company logo</label>${logoField('s_logo', s.logo)}
+    <label>Note (optional)</label><input id="s_co" value="${esc(s.company||'')}" placeholder="optional">
     <label>Meals served</label>
     <div class="chips">${MEALS.map(x=>`<label style="margin:0"><input type="checkbox" class="s_meal" value="${x}" ${m.includes(x)?'checked':''} style="width:auto;margin-right:5px;">${x}</label>`).join('')}</div>
     <label>Planned schedule (optional — late trips get flagged)</label>
@@ -1673,7 +1688,7 @@ function siteForm(id){
     const key = id || name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
     if (!id && sites[key]){ alert('This counter already exists.'); return; }
     const sched = {}; MEALS.forEach(x=>{ const dp = document.querySelector('.s_dep[data-m="'+x+'"]').value, ar = document.querySelector('.s_arr[data-m="'+x+'"]').value; if (meals.includes(x) && (dp||ar)) sched[x] = { depart:dp||null, arrive:ar||null }; });
-    db.ref(P+'sites/'+key).update({ name, company:$('s_co').value.trim(), meals, sched:Object.keys(sched).length?sched:null }).then(()=>{ toast('Saved'); $('mf').innerHTML=''; });
+    db.ref(P+'sites/'+key).update({ name, company:$('s_co').value.trim(), aggId:$('s_agg').value||null, location:$('s_loc').value.trim()||null, logo:lgGet('s_logo', s.logo)||null, meals, sched:Object.keys(sched).length?sched:null }).then(()=>{ toast('Saved'); $('mf').innerHTML=''; });
   };
 }
 
@@ -1785,8 +1800,9 @@ function userForm(id){
     <label>Password (min 4 characters)</label><div style="display:flex;gap:6px"><input id="u_pass" value="${esc(u.password||u.pin||'')}"><button type="button" id="u_gen" style="white-space:nowrap">Generate</button></div>
     <label>Role</label><select id="u_role">${Object.entries(ROLES).map(([k,r])=>`<option value="${k}" ${u.role===k?'selected':''}>${r.label} — ${r.desc}</option>`).join('')}</select>
     <div id="u_repWrap"><label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="u_rep" ${u.perms&&u.perms.reports?'checked':''} style="width:auto"> Can view &amp; share reports</label><div class="sub">Admin always has access.</div></div>
-    <div id="u_siteWrap"><label>Counter <span style="font-weight:500">(Aggregator: leave blank for all counters)</span></label><select id="u_site"><option value="">Select…</option>${Object.entries(sites).map(([k,s])=>`<option value="${k}" ${u.siteId===k?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`, 'u_save');
-  const sync = ()=>{ $('u_repWrap').style.display = $('u_role').value==='admin' ? 'none' : 'block'; $('u_siteWrap').style.display = (ROLES[$('u_role').value].site||ROLES[$('u_role').value].siteOpt) ? 'block' : 'none'; };
+    <div id="u_aggWrap"><label>Aggregator (sees only its companies)</label><select id="u_agg"><option value="">— all —</option>${Object.entries(aggs).map(([k,a])=>`<option value="${k}" ${u.aggId===k?'selected':''}>${esc(a.name)}</option>`).join('')}</select></div>
+    <div id="u_siteWrap"><label>Company <span style="font-weight:500">(Aggregator: optional — limit to one company)</span></label><select id="u_site"><option value="">Select…</option>${Object.entries(sites).map(([k,s])=>`<option value="${k}" ${u.siteId===k?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>`, 'u_save');
+  const sync = ()=>{ $('u_aggWrap').style.display = $('u_role').value==='aggregator' ? 'block' : 'none'; $('u_repWrap').style.display = $('u_role').value==='admin' ? 'none' : 'block'; $('u_siteWrap').style.display = (ROLES[$('u_role').value].site||ROLES[$('u_role').value].siteOpt) ? 'block' : 'none'; };
   $('u_role').onchange = sync; sync();
   $('u_gen').onclick = ()=>{ $('u_pass').value = genPw(); };
   $('u_save').onclick = ()=>{
@@ -1798,7 +1814,7 @@ function userForm(id){
     if (ROLES[role].site && !siteId){ alert('Pick a counter for this role.'); return; }
     if (Object.entries(users).some(([k,x])=>(x.username||'').toLowerCase()===username && k!==id)){ alert('That username is already used.'); return; }
     const ref = id ? db.ref(P+'users/'+id) : db.ref(P+'users').push();
-    ref.set({ name, username, password, role, siteId, perms:{ reports: role==='admin' || $('u_rep').checked } }).then(()=>{
+    ref.set({ name, username, password, role, siteId, aggId: role==='aggregator' ? ($('u_agg').value||null) : null, perms:{ reports: role==='admin' || $('u_rep').checked } }).then(()=>{
       toast('Saved'); $('uf').innerHTML='';
       if (me.id==='setup' && role==='admin') toast('Admin created — setup login is now disabled');
     });
@@ -1986,7 +2002,7 @@ function dayFacts(dateKey){
   return { list, load, waste, wpct: load>0 ? waste/load*100 : null, onT, onN, qcOk, qcN, rating: rts.length ? rts.reduce((a,r)=>a+r.r.overall,0)/rts.length : null, wd };
 }
 function clientSummary(dateKey){
-  const f = dayFacts(dateKey), nm = Object.values(sites).map(s=>s.name).join(' & ');
+  const f = dayFacts(dateKey), nm = visibleSites().map(([,s])=>s.name).join(' & ');
   let t = '*Kalyana Sapadu — Daily service update*\n'+dateKey+(nm?' · '+nm:'')+'\n\n';
   f.list.sort((a,b)=>MEALS.indexOf(a[1].meal)-MEALS.indexOf(b[1].meal)).forEach(([sid,x])=>{
     const c = sessionCalc(x), s = sites[x.siteId]||{}, sc = ((s.sched||{})[x.meal])||{};
@@ -2028,6 +2044,7 @@ function renderAgg(){
   <div class="greet"><div class="art">${sceneSvg({seed:3})}</div><div class="crest"></div><small>${gr}</small><b>${esc(me.name)}</b><small>${new Date().toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'})}</small>
     <div class="pillrow"><span class="pill">${f.list.length} meal${f.list.length===1?'':'s'} today</span>${f.rating?`<span class="pill">⭐ ${r1(f.rating)} today</span>`:''}${openEsc?`<span class="pill">🚨 ${openEsc} open</span>`:''}</div></div>
   <div class="qa"><button data-go="aglive"><i>📍</i>Live</button><button data-go="agrate"><i>⭐</i>Rate</button><button data-go="agesc"><i>🚨</i>Escalate</button><button data-go="agcontact"><i>📞</i>Contact</button></div>
+  <div class="card">${me.aggId&&aggs[me.aggId]?`<div style="margin-bottom:6px">${logoImg(aggs[me.aggId],44)}</div>`:''}<div class="sub" style="font-weight:700;color:var(--ink)">Your companies</div>${visibleSites().map(([,x])=>`<div class="row" style="margin-top:8px;gap:8px">${logoImg(x,30)}<div class="grow"><b>${esc(x.name)}</b>${x.location?`<div class="sub">📍 ${esc(x.location)}</div>`:''}</div></div>`).join('')||'<div class="sub">No companies yet</div>'}</div>
   <h2>Today's meals</h2>
   ${meals.map(([k,s,m])=>{
     const sid = sidOf(t,k,m), x = sessions[sid], st = mealStatus(x), sc = ((s.sched||{})[m])||{}, c = x ? sessionCalc(x) : {};
@@ -2827,7 +2844,7 @@ function renderProd(){
     const status = st.n ? st.label : (started?'Cooking':(w.pl&&w.pl.ts?'Plan received':(w.iss.n?'Material issued':'Waiting')));
     const edit = canStep('plan') && !done;
     const kEdit = canStep('prod') && !done && !!started;
-    cards.push(`<div class="card"><div class="row"><div style="font-size:26px">${MEAL_ICON[meal]}</div><div class="grow"><b>${esc(site.name)} — ${meal}</b><div class="sub">${esc(status)}</div></div><button class="btn sec" data-wf="open" data-sid="${sid}" style="padding:7px 11px;font-size:12.5px">Full sheet ›</button></div>
+    cards.push(`<div class="card"><div class="row"><div style="font-size:26px">${MEAL_ICON[meal]}</div><div class="grow"><b>${logoImg(site,22)}${esc(site.name)} — ${meal}</b><div class="sub">${esc(status)}</div></div><button class="btn sec" data-wf="open" data-sid="${sid}" style="padding:7px 11px;font-size:12.5px">Full sheet ›</button></div>
       ${wfLine(sid,s)}
       <div style="margin-top:8px"><div class="sub" style="font-weight:700;color:var(--ink)">📤 Raw material issued</div><div class="sub">${w.iss.n? (w.iss.all?'Entire production: ':'')+issueTxt(w.iss.lines)+' · '+esc(w.iss.by)+' '+hm(w.iss.ts) : (w.gen.n?'General issue only ('+w.gen.n+' lines today) — ask Store Keeper to link it to this meal':'Not issued yet')}</div></div>
       <div style="margin-top:8px"><div class="sub" style="font-weight:700;color:var(--ink)">🍛 Dishes</div>
@@ -3413,6 +3430,93 @@ document.addEventListener('click', e=>{
   b.disabled = true; const batch = 'pb'+Date.now().toString(36);
   Promise.all(list.map(m=>stampT(m.sid,'planned',{ batch }))).then(()=>{ toast('📣 Entire plan sent — cook alerted'); renderAll(); }).catch(()=>{ b.disabled = false; alert('Could not send. Check the internet.'); });
 }, true);
+
+/* ============ v9: AGGREGATORS → COMPANIES (with logos) ============ */
+const SEED_LOGOS = {"hdfc": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKoAAACFCAMAAAD8UpNTAAABIFBMVEX+/v4ASozaFCPiGCPUAxMAPoQMU5LjCRTvlJqauNHxparPDiE7dKfjEhyCpsfpjJXwnKGtxdroND3nO0TI2OYkZJ1qlbzoSVHY5O3vfYP4ycvaIjHlKDJUhrJznMA3PHB7osTm7PIva6FFeqseYJoAM37sXGT51Na90eG6zuDcER7udHvsZWyivdX1tLftU1o5Qna+AAEnLmc6W49hj7ivr8X83+EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABGssVdAAAAYHRSTlP/////////////////////////////////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGYnuuAAAGOklEQVR42u2bi3aiOhSGgUDwglQqUsZBR9FO1WnPzJzb+z/ayU4CSRAEFRBP+dfqKoZk82WTG5CtaZU0Mo1KisynpMiLUVHmQKtTI3Ms6dx1v6SoZ2snWRO1qwnVKKUEIRkVlWTmFmv3qlFKikAKKlUZa0OoJZwqqp2kobOszaCWcRLZeajFtE2hloMWoxbBNoNaAfQcahFrA6hVQM+iFsG2g4ouQ82HbQM1B6UMFd0HFV2Diu6BispQJ/k5UOuo6GpU1DJqEYb9VI6KWkVFaJIrta1OCjKhFlERip5zNYtSr74XZHmOMn5tFJWsSga32GoPFZrkLai26tYGUVEdqOiBUFELqOhhUFFdqKhpVFQfKupRTXU+rQUV9ahNoKIGUdHnRUWNoaIetVVUL946BdrGH8WoqCFUVIw6fNUL9bruFqqOi0ix7nYL1Sr2qnUOFTWCinrUHvUhUJXXI9FtqJFirHZUkC30dAuqEDVb73ert0FGb9ejltlqWJeg3lk9ao/ao/aonUD9I5opikbXo5bZunliPcK8Kr5O3LZcSezAzNrwyirqF4Gf8NmqEVSjR30cVONxXlkY9b8IusPrtdA7o/AOqJ/5rXX/heXRUI1Pitp/ua5/PwDqty486N4V47FQb91nhfotYdrpRjtzesM7BbPVPYHm+2gqa5RosEiJRKKSd/TeKiqxr34aEPqRFJnlnoZy3dhqG8n7V6OO7Aq+egPzw+xgR3eKC0APExdwcbQFainaYlyJ9RxqazEs40rxNpdGBhntxltVQS0ODms5iq0M9VwYW/uxgcUBd/eJDSyJuDwNY6wQctkY6viC4NBKsaHjBkNuS0J9K6OOG0OtGpVc3asNTQHT32ZFiUVg1RK/a94Q8lSkAfwJPaVL65GSzDLma6H16tWrV69e/xdNB+nbpMFI0xbi53Twz7BL0sbSwmGmae/yQuJP3eqQtK9iBT950bQvcpDpN6x3SJohvp6mqMnHz29691D5+0fSAH7YE/pusYuotAG8fAf9JCv40c93ehyRVLt7qGhyutt5Rvw6uRqVdIKmUE/X4TMbCVQMwUg4OeD/iObYSk8zsX7o/L0KlnKXTHPEetZkahTKCetwak5joGRUlIs6kVDnkAJX2cIBtpwkV+iCCwNRbE5+L/kGkKFw8irN4G+llAM93sFhQCqNJes7Ak4LrK9Aneeg0qtlUAXWPgeV2dF1Xxzj5FBGnet4Q0mtHNRwybQdFnkVK6ibTVJriuqD9jteDT+Ur8NQh0MP/rmQyCtLM+CkXjIqZpVxpTav0W8LgLrnqa8Bf5NvIAWVtMtXR6n3HKxtMPVqmBgEnE3M+H3Zq76lW3ASdo9ZQ96AhFdJE1BQvSwpjKtkGF0Iu5g56ZmMrbaC6garYKjU24rhv6Og0ttGrqrrbhBjBZWchLoteS4PjDkCVZvLqJ7a2inqFB7TN7ILKOoIkv+SUVOJhs+42G0IQbGV9kBiKNOtfB+yQ0fUl1DO4S5OUPc42xMCZcgTBCoqlVOCqocClRVI2ga/QafdarNMWknMyBhqCP52w2ynxY2gcq/GomMLtyZeZT2FDU++bn2w5kBR44x1Jk9BnUVEbyeoPyH5l4zqYExvnOhW7NYtKWqIdYy5i7QtONTz106mrbLyO/pzcziEDAaKbPQggzpcM0tKt5pM5G7FUclsdbSz46olD1bYsqi1uToC+Oz6PGtmBGB1tnxlmN3RcUQ/KKge6wihOrHycXWvouZMAeq46n34/B4pqNRx+9VQvn/MjasVbYwajuXmtKb8BBUrqJjPJW7eFMAGcZ/108qzFSQrqLTLKBNTZrY60EHV2/LJxmdtlbTsZd74ktq4dA2wzKL6xNf0NmzEjRomnd1Ju9Va6r2Yt3Cdj8vbZCRglRQ9gd1e/8KVlUtE1zru2l1jfecyBWwAjUlqIDUqx/X2h48AyylrWmC9dMCIC0ZAK5K+1cnvVXIZbp2ex+vkumJpXbpetZIFKD9InswKlqeWOgNIBSzFGj/K/FSvJrfVo2EcRwsqQvwvO1o837S0bvDZ6sgiStizFcjs7GPggzyxjtMXAfYLeFXardk5r45N88jQANVMd/yMO/lw/ZXKgAbAj2nyL9wl/QeE7L3C/H5INQAAAABJRU5ErkJggg==", "platos": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAABLCAMAAAD9JUoRAAABIFBMVEX+/v46QXMyOWwpZ5DFx9ZQVoIXh6orV4QPl7bZ2+VkaZDn6O4IqMSqrMK0t8pDSXlxdpqTl7K1w9OFiKcXa5Qkc5pVmbXU5ewOob1YYosWdZwFssujpb0Ye6HQ0t13gqMje6BJUH6bobp5fqAbWIVKc5i02uQzUH4kK2Oz5e2Otckzl7aN2+Zwuc6TxdY1iaovt81Sx9lsmLTZ8vaTqsFNqcNyo7yv0N0ppcAyw9dLfaBMiqpStct2qsJsydpp0+JUoryY4uscwNYpor4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgWKvtAAAAYHRSTlP//////////////////////////////////////////////////////////////////////////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABe/F86AAAK4UlEQVR42u2ciXabuBqAQQbbArPboXbwntVpkmmadjrd7syd93+n0QoCJCE7k5uea+v0nMa2DOLj339hy2oPGCbLy2mvd/n16XOak7f8xF3HSehbp1Ejtbkc2Pb1AI1erzceT77tCC+4BcBexyde1XBiG40BHT0yxuPZ2RX5bArwZ0l+wkSkB6O6vr4WYU3QmM0prgSxQv82J1KYBRYdpoMCrNmqP+/f4xnhNZa6i8vfjx1V7lFUEljzPhp3WP3gFNHqDXq7I7dWa85qMKBmC5G6GFew+kOsiv4lptUbPx01K5uzQmO6fE4hzGG6e1r1xrMVgTUcElrW5TWWt/HZMbOqxjKtGf0fKy5Zw+EtkS0sc5PZn0frBqNSrrawZcx+zLhovcN2y0c2qzdZze6PFNa0tO0heX11/+nLaPQf/vHV45zCGv5G0GLJQu88HCWrjLECUyJW6R0mM3ovzPiTSdbwJ4kgxgTW8BjDU6dkhXOZ/Axp3XD4pU7iExGs4WiEzZb1NMaw+t+PEBYLsICLWcHJeIWjqo+NSZTWaEQUMaeSRd3jq4/FL8Qq5AYL62A+GU8mUg27o7CoaH3GRJkJaw8f0uGjoZmR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", "hungerbox": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMQAAACCCAMAAAAueZcoAAABIFBMVEX+/v45FZIvCo2Pxjjs6O79UUhGJ5T+zRhQNJnTzOLa1ORuVqm0qM6nmMaIdrbEuddjS6N5Za3Nxtzi3Oq9s9NAG5WVhbpdRKL9S0M9IZD6zSOBbLX089KXyEr47LGbi8FbQ5zR5LD7SD380Bv50Sut1XPn689YPKD31tT0ZFz48LqmzmPyd3D1ysn52E753Gb45oxiSJ6ekcW714jD25FnVJ7zZmTyhH7ympUeAIWdkb2imb+ky1fF4prb6cDyi4X0urj0xbz44XiPvzLN36PZ09/0rKv4vcEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAikvfhAAAAYHRSTlP///////////////////////////////////////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAhc9csAAAIAUlEQVR42u2cB3ebOhSAQZGFLJYZxnaWnZ20zWibjtfxOt76///oga4kBAbHCW0icnzPaetgQPp0h66ulFrWRtaR3b8Peg5wcLK3tbV12l+Cg9uXe39tFdJTVZx+5SoQctJLhpdbFdnrJcSXKsTWn32EeFuDuO2lT9cgXvYytO49B6eoeXY/g+xtDeJtHyH+fA5OYdWdYrePECfPwSm+PgenOK1a08lpT51iTwIc9DYVPwGAWx1g99p8/8a4knl8eXtQ6/ONs/3CaILLDxeDwcW3y1X3XDnO9r7BSvgwPZxy+Ybb7zp2TKY4fT8dCDl81UrxwnFMpnh1KBBylsMPbXfdFAxHzrGZFN8lQwExOPzR7hK5HBuqC6UIAHnVcts2h8h1YSIFHkwrEINmr9h3hGybGGnPBzU5b7ztp4QodGEcxeV0LYgrZ1tSGOgX54MaRWOutHvkOCbr4v10Dcfed3TJ/cKwPOpjNTr923jTtbIm+Ne06QJfaKqYvm/LObado6Oj48Kqtq9+mhdlf5ReMW1x611H+MT28fW+mRn55WDKMaaHF5crcg7n+PrG4CUF/ngxnR4OLj62pX/XzvHVjdmrCR5p//t+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", "hbicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAMAAADVRocKAAABIFBMVEU6FZP+/v4wCZH+UUeQxzn9zBrCt97+1xNKJ5GV0jRJG46XbFllSKrwTUzs6fTQx+WIt0FRRnqKdL6sOGZXN6NnIoFwVrF5l1GllM64qtjOQlpNNIJZVnJ5KHpjaWiQe8JTO358Y7dnc2Nzi1iFXGSZhse2iUbGvOBjPHlxSXB+okyGLHabMm2ErkakelHJnDrUpjPktinxwiHh3O8/II1fY2xsfF+BabqbcFe9Pl+gjsvDP1/atCv/5AwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACHXuKnAAAAYHRSTlP//////////////////////////////////////////////////////////////////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABCETsjAAACOUlEQVR42u2XZ5PiMAyGc0qCHRNCCjXUpW6v18v//1sXIAxewu4i2/pwc36/MZnRgyRLfu04VlZWVlZWSgIgDQ48GdIFd6bjbhx4nCS8MxjOYy8IPC8YUhRpdrcNvlEwpwDEZfSN7igq9FUCeAPzKcBQAgRfCGrEpQSCLkUTulIKMUUTZnITEoImJHKNxgQ1+hxLgGsCAJRNKMYtnie74TYLGG+2hBd3x9NyoRpeSTDwvOtZwqFc13DJ6vo5jLI8z9rlj4TLdwF8Z9oEkbtbZaduGnhgviZBNNxS+anRfma+JiF3S0LDva225KqIr0douwc1RAVwvwXoEG4lgNuufH7cATQImQy4OU6A+3spE14BRseABdMmjGTAcQ9gdQD4f9QIh1Pqur8qX5/2LWDM/73QTaFyiGDKdsHZ02oxUF57N/v4lTME9U3w54f6pQM6VrL9oyhTIxPVMVuxx/srDvo+VXAhTnoATmuCjd82/+IjAy8U4GcNrZ5A/P+LTwpKz88BvqkAJghARwVwgQC0VAAhos0iUgBgfBjU8PGbmHMKEzyghwK0aFtQEJrY+C/IVZFiAUvkeuUR4RnaprAkbLHCKET4xwhu4aUKFxz0z4+/VjNeL4QFwk1bqOgAIDwvfkfZYZx3L3Q0HAyEHx7WqKPlkIB/sJSaXNOBgfPu5l4acHjQenMg+i0jBhIgPInoh8bsLwBP16/aHa0n3Ky7Lhhh2qs1C9V6aWjiZfCuX3WsrKysrKz+M/0FIrIg0TgLYe8AAAAASUVORK5CYII=", "tele": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAA1CAMAAADMDSagAAABIFBMVEX+/v4BAQHPIYSzJIfGxsaZmZnp6OlWVlYoKChpaWkXFxdFRUU6Ojp5eXmmpqbX19e3t7eHh4euGoKLJ4vjHoHGa67wyuHkIoSxNpF5KIzMHIHVs9bt1umvSZzutdaSO5bTFH3ONpDSqtHlE3uRSJ2VG4PLd7XERprTm8igaa/shrvmrNHuxN7oDnjtbK2WTaDWXabvd7P1m8dxHYeVV6aeZ67sVaDtjsB6MJGiDHu4F3+8lMbRUJ/Ij8PZxeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADRfZSuAAAAYHRSTlP///////////////////////////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMPoRgAAAG20lEQVR42u2b6XraOBSGbZBkSZYtOdCkQIZCkrYzTabLtLMv939ZY+0LYOw8ZEonPr/AaH11dM4nOcn++XL3ytvLyLbb7du/Xrxbo2w0ZXefX324+/Dh7u7uu9jeSpssl8vNcvvxfuQl7be7Lg73y0lry81m++uIKssWP3T9ej0xttxs1yOsxc9dv15OnG02o3N1e1YAq8X1boTVG9bV7U8jrL6wJvP55QirL6yr21/GAN/bs65un3dKXHzphLVMYL1/3gp+8edK2c0qkFc36/X6/v5+/SKBNb961rBWi8+LxWI2m72eXbuHb36/MJYE+Pn84VnTulGopAWwLqbaJgmsqx+fuXpwtHrBeu7CdHUY1jSFdfspG2n1hjUkHYJaiJr/73bi03hWkbdWnWyUoiKkEmdCy8N6cRDWoJh1UliA5crAedDqBctnQ8jKxJ4SFqf52cDKVj1gXUU6q8pTQ08Iq8zPCFZL6zisVsGjrwOL6x4wo2cBK1v1gBUmw/8UVq06qLPs/N6cHIa1/kqwoGyqPEspcQhWdJ+FgDSFDKuPPHtiWMW3BGs+v96/P1gYXTjaD4vv4mwfoeT7DnGuitQJrLYkSB0ZBZVdy3GTHIjdejvdylK8c1DHYS3n6wNLjp0YIpjmFFcohYUIVlRrLS9Za5zLDEdL7rWIlAemMmesZCKr22d1RpiqTdtaSpQ2SnPRQgf7pi1ZqB5Yq8bK0rZMUAZKGvRaYKqbgU78sLIdjGorGQZlpnHVM24Gwlou19kRWI2NXhjEsIRVSTlx7kjsM5GIA1UZyE+w0WEd+7gIJUf3rbLdUI7VOETYMoO2nKJFfSulj7rEPDJpFpVBTxl3PTM0BNZmss6OwApCPuUhLBBkgcrlNlcWRaza5pCpUpqZejrtFxSgyxvTDWa5h7XHZBdhPRKtbe5iSdA4jL4dzi47sJab5SeUHYEVIlHxxcHSfVJqVWUMSxUxTkDtVEDIJ/IsEtUFppu8Gxa0nhUeBJJ8LuIlg65l6r2zC5baffJPQ95fdqUp7PcRrrlQc+MelmYDEaoMRv2ANgLqCVieJUB6wyIPi1KRVYUJUkUBkHYDARq7KA4WZRZW0Ri+rCnc2rESCs5NvcbDKprSPhJmYACIqjZKuOIIpllsL6yLyXa7/fhufSSnYy+y5fYTpmsLy8cupgvXbnGBWVPhmqn1qhpYGOrk6qUDdDvXfjKwCEDIzLa2Z0lZg9hNhEKBWDhYwoxL+nMRRC+zTdX2I3ZqHbAu3lwj1EMA+VnqnU31JwuJuq4aDSkoWmo2leOJ9LiBi16JzvLkEdVzLZyrmHVidl3UeqSqw4TDkJqGQYx/N9F5VLhm4RFYD/3UInYLpoWCzkx2XlxHfNQa1N3XSUaqdFEoi3BNGoSJMoTFfPxgegpFsEk8rHIfLAGbBrpNVblQb2D5zeGmkQs5KNEhrx2s9QBYqkOKpRmnMLDATrANYDV6KixPMhOI9FsAC/urh0L7QRG4QycsiOPctwML2Aiaec9NMmgHrMsBsIq4aQ9LdMGCQ2HRBFbVG1aRCoUdWCLqNIVVnBBWnNJd5O3jWSRM2X08S/iY0tuzoMmYSqD38axImJ3Ys/SRug0K2mAcs/I2VhjjISwSeEfpiojDsNKYVfeFpTOe1bu9YxZxgwInhFXH0wsSF041XXD6NkG6SZXMQVjEzRCZHdkHVqlLU9f0Xli6xWrYrcmjYKE8za+2MxKpgPAqzykukFY+CAs6KVTlQdI9CktlWS8I98IyYU1vchTIwZPDsnoHqduSOoDFjehG8oeGu+NOAUluq5dGLbdFOIQdsPTq0woWeah5+3mWf9BKgj2w7AEAwopVtivI1bjFSWGZe3KKGabqkXPjyv4i70jEztmwCQ6WVBYpO2DFx1/Ks74xq4wgSza7sMKMSdw49bibk8KKGJRZOIsyPvrWqchIKhddsKLG6mwPrHIvrFTBFAEs9ym4ZyDJUTuBdfP3zffKXk6HwbKRWeDgAsCMt0pvbywsbLQV5juVLSy6/w7eiRRaZ9khz3LHHVfVuWRBA1hp1igjWQXpIVir2Wtl7oJmoGe1XUF1NZnjQu5wSEhFzFbnTbs5KcUl9GGkYdTdqirnKlQRJiMXJ6358QH51cV/QbAs1+iqtfzNduPKQfmJR1WBbB8T0JZirKzbZipCateEyddCj8Jcw7Yz0uNu0kPyw2w2mwbWAxYS8l1F+ODwnTWyp3Kns3aO6Qihfi+7+pbbqfaIxg/0tRoM6/FvAc/zxdbAt/gjrAG0RlgDaIX7cIR1xG6mLhv+McI6Zg/fTfW//U4/ZiOso3Z9jRB6ZHLuB4vSbxDWvyZ2dmpclY0uAAAAAElFTkSuQmCC"};
+function logoImg(o,h){ h = h||28; return o && o.logo ? `<span class="lgchip" style="height:${h}px"><img src="${o.logo}" alt="" style="height:${Math.max(10,h-8)}px"></span>` : ''; }
+function aggOf(site){ return site && site.aggId ? aggs[site.aggId] : null; }
+/* logo picker: camera or gallery, compressed small and kept until Save */
+const lgPend = {};
+function logoField(fid, cur){
+  return `<div class="lgfield" data-lg="${fid}"><span id="${fid}_pv" class="lgpv">${cur?`<span class="lgchip" style="height:44px"><img src="${cur}" alt="" style="height:36px"></span>`:'<span class="sub">No logo yet</span>'}</span>
+    <label class="phadd">📷 Camera<input type="file" accept="image/*" capture="environment" hidden class="lgin" data-t="${fid}"></label><label class="phadd phgal">🖼️ Gallery<input type="file" accept="image/*" hidden class="lgin" data-t="${fid}"></label>
+    ${cur?`<a href="#" class="lgclr" data-t="${fid}" style="font-size:12px;color:var(--red);margin-left:6px">remove</a>`:''}</div>`;
+}
+function lgGet(fid, cur){ return fid in lgPend ? lgPend[fid] : cur; }
+function logoCompress(file){
+  return new Promise((res,rej)=>{ const url = URL.createObjectURL(file), im = new Image();
+    im.onload = ()=>{ URL.revokeObjectURL(url); let max = 260;
+      const run = ()=>{ const sc = Math.min(1, max/Math.max(im.width,im.height)), c = document.createElement('canvas'); c.width = Math.max(1,Math.round(im.width*sc)); c.height = Math.max(1,Math.round(im.height*sc));
+        const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0,c.width,c.height);
+        let d = c.toDataURL('image/jpeg',.85); if (d.length>60000 && max>120){ max = Math.round(max*.75); return run(); } res(d); };
+      run(); };
+    im.onerror = ()=>rej(new Error('Not an image')); im.src = url; });
+}
+document.addEventListener('change', e=>{
+  const i = e.target; if (!(i && i.classList && i.classList.contains('lgin')) || !i.files || !i.files[0]) return;
+  const t = i.dataset.t; logoCompress(i.files[0]).then(d=>{ lgPend[t] = d; const pv = document.getElementById(t+'_pv'); if (pv) pv.innerHTML = `<span class="lgchip" style="height:44px"><img src="${d}" alt="" style="height:36px"></span>`; toast('Logo ready — press Save'); }).catch(()=>alert('Could not read that picture.')); i.value = '';
+});
+document.addEventListener('click', e=>{ const a = e.target.closest && e.target.closest('.lgclr'); if (!a) return; e.preventDefault(); lgPend[a.dataset.t] = null; const pv = document.getElementById(a.dataset.t+'_pv'); if (pv) pv.innerHTML = '<span class="sub">Logo removed — press Save</span>'; });
+
+const slug = n => String(n||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+function mAggs(){
+  if (me.role!=='admin'){ $('mBody').innerHTML = '<div class="empty">Only the Admin can manage aggregators and companies.</div>'; return; }
+  const rows = Object.entries(aggs), has = re => Object.values(aggs).some(a=>re.test(a.name||''));
+  const orphan = Object.entries(sites).filter(([,x])=>!x.aggId || !aggs[x.aggId]);
+  $('mBody').innerHTML = `<div class="sub" style="margin-bottom:10px">An <b>aggregator</b> (e.g. HungerBox, Platos) has its own login and sees only its own <b>companies</b> (e.g. Teleperformance, HDFC). Add as many aggregators and companies as you need.</div>
+    <button class="btn save" id="addAgg" style="margin:0 0 8px">+ Add aggregator</button>
+    ${!has(/hunger/i) || !has(/plato/i) ? `<button class="btn" id="seedAgg" style="margin:0 0 12px;background:var(--ok-soft);color:var(--brand)">⚡ Set up HungerBox → Teleperformance &amp; Platos → HDFC</button>` : ''}
+    <div id="mf"></div>
+    ${rows.map(([id,a])=>{ const cs = Object.entries(sites).filter(([,x])=>x.aggId===id), us = Object.entries(users).filter(([,u])=>u.role==='aggregator' && u.aggId===id);
+      return `<div class="card"><div class="row" style="gap:10px">${logoImg(a,42)}<div class="grow"><b style="font-size:17px">${esc(a.name)}</b><div class="sub">${cs.length} compan${cs.length===1?'y':'ies'} · ${us.length} login${us.length===1?'':'s'}</div></div></div>
+        ${cs.map(([sid,x])=>`<div class="row" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);gap:10px">${logoImg(x,34)}<div class="grow"><b>${esc(x.name)}</b><div class="sub">${esc(x.location||'No location')} · ${(x.meals||[]).map(esc).join(', ')||'—'}</div></div><button class="btn sec" data-ce="${sid}" style="padding:7px 11px;font-size:12.5px">Edit</button></div>`).join('')}
+        ${us.map(([uid,u])=>`<div class="sub" style="margin-top:8px">👤 <b>${esc(u.username)}</b> · 🔑 <b>${esc(u.password||'')}</b>${u.siteId&&u.siteId!=='all'&&sites[u.siteId]?' · only '+esc(sites[u.siteId].name):''}</div>`).join('')}
+        <div class="actions" style="margin-top:10px"><button data-addco="${id}">+ Company</button><button data-addlg="${id}">+ Login</button><button data-ae="${id}">Edit</button><button class="danger" data-ad="${id}">Delete</button></div></div>`; }).join('') || '<div class="empty">No aggregators yet. Tap “Add aggregator”, or the ⚡ setup button above.</div>'}
+    ${orphan.length ? `<div class="card"><b>Companies without an aggregator</b>${orphan.map(([sid,x])=>`<div class="row" style="margin-top:8px;gap:10px">${logoImg(x,30)}<div class="grow"><b>${esc(x.name)}</b></div><button class="btn sec" data-ce="${sid}" style="padding:7px 11px;font-size:12.5px">Assign</button></div>`).join('')}</div>` : ''}`;
+  const B = $('mBody');
+  $('addAgg').onclick = ()=>aggForm(null);
+  const sd = $('seedAgg'); if (sd) sd.onclick = seedAggs;
+  B.querySelectorAll('[data-ae]').forEach(b=>b.onclick=()=>aggForm(b.dataset.ae));
+  B.querySelectorAll('[data-addco]').forEach(b=>b.onclick=()=>{ siteForm(null,b.dataset.addco); $('mf').scrollIntoView&&$('mf').scrollIntoView(); });
+  B.querySelectorAll('[data-ce]').forEach(b=>b.onclick=()=>{ siteForm(b.dataset.ce); try{ $('mf').scrollIntoView(); }catch(e){} });
+  B.querySelectorAll('[data-addlg]').forEach(b=>b.onclick=()=>aggLoginForm(b.dataset.addlg));
+  B.querySelectorAll('[data-ad]').forEach(b=>b.onclick=()=>{ const id = b.dataset.ad, n = Object.values(sites).filter(x=>x.aggId===id).length;
+    if (n){ alert('Move or delete its '+n+' compan'+(n===1?'y':'ies')+' first (Edit company → change aggregator).'); return; }
+    if (confirm('Delete aggregator '+aggs[id].name+'? Its logins will stop working.')){ db.ref(P+'aggs/'+id).remove(); Object.entries(users).filter(([,u])=>u.role==='aggregator'&&u.aggId===id).forEach(([uid])=>db.ref(P+'users/'+uid).remove()); } });
+}
+function aggForm(id){
+  const a = id ? aggs[id] : { name:'' }; delete lgPend.ag_logo;
+  $('mf').innerHTML = formShell(id?'Edit aggregator':'New aggregator', `<label>Aggregator name</label><input id="ag_name" value="${esc(a.name)}" placeholder="e.g. HungerBox"><label>Logo</label>${logoField('ag_logo', a.logo)}`, 'ag_save');
+  $('ag_save').onclick = ()=>{ const name = $('ag_name').value.trim(); if (!name){ alert('Enter the aggregator name.'); return; }
+    const key = id || slug(name); if (!id && aggs[key]){ alert('This aggregator already exists.'); return; }
+    db.ref(P+'aggs/'+key).update({ name, logo:lgGet('ag_logo', a.logo)||null }).then(()=>{ toast('Saved'); $('mf').innerHTML=''; }); };
+}
+function aggLoginForm(aggId){
+  const a = aggs[aggId]; if (!a) return;
+  $('mf').innerHTML = formShell('New login for '+esc(a.name), `<label>Name</label><input id="al_name" value="${esc(a.name)}">
+    <label>Username (no spaces, unique)</label><input id="al_user" autocapitalize="none" value="${esc(slug(a.name).replace(/-/g,''))}">
+    <label>Password (min 4 characters)</label><div style="display:flex;gap:6px"><input id="al_pass" value="${genPw()}"><button type="button" id="al_gen" style="white-space:nowrap">Generate</button></div>
+    <label>Limit to one company (optional)</label><select id="al_site"><option value="">All companies of ${esc(a.name)}</option>${Object.entries(sites).filter(([,x])=>x.aggId===aggId).map(([k,x])=>`<option value="${k}">${esc(x.name)}</option>`).join('')}</select>`, 'al_save');
+  $('al_gen').onclick = ()=>{ $('al_pass').value = genPw(); };
+  $('al_save').onclick = ()=>{ const name = $('al_name').value.trim(), username = $('al_user').value.trim().toLowerCase(), password = $('al_pass').value.trim();
+    if (!name){ alert('Enter a name.'); return; } if (!/^[a-z0-9._-]{3,}$/.test(username)){ alert('Username: at least 3 letters/numbers, no spaces.'); return; } if (password.length<4){ alert('Password must be at least 4 characters.'); return; }
+    if (Object.values(users).some(x=>(x.username||'').toLowerCase()===username)){ alert('That username is already used.'); return; }
+    db.ref(P+'users').push({ name, username, password, role:'aggregator', aggId, siteId:$('al_site').value||'all', perms:{ reports:false } }).then(()=>{ toast('Login created'); $('mf').innerHTML=''; }); };
+}
+function seedAggs(){
+  if (!confirm('Create HungerBox (with Teleperformance, Ambit IT Park) and Platos (with HDFC, Porur), their logos and logins?')) return;
+  const find = k=>Object.entries(sites).find(([,x])=>(x.name||'').toLowerCase().includes(k));
+  const work = [];
+  work.push(db.ref(P+'aggs/hungerbox').update({ name:'HungerBox', logo:SEED_LOGOS.hungerbox, icon:SEED_LOGOS.hbicon }));
+  work.push(db.ref(P+'aggs/platos').update({ name:'Platos', logo:SEED_LOGOS.platos }));
+  [['tele','Teleperformance','hungerbox','Ambit IT Park, Ambattur',SEED_LOGOS.tele],['hdfc','HDFC','platos','Porur, Chennai',SEED_LOGOS.hdfc]].forEach(([k,nm,agg,loc,logo])=>{
+    const ex = find(k);
+    if (ex) work.push(db.ref(P+'sites/'+ex[0]).update({ aggId:agg, location:loc, logo }));
+    else work.push(db.ref(P+'sites/'+slug(nm)).update({ name:nm, meals:['breakfast','lunch','dinner'], aggId:agg, location:loc, logo })); });
+  [['HungerBox','hungerbox','Hunger@2026','hungerbox'],['Platos','platos','Platos@2026','platos']].forEach(([nm,un,pw,agg])=>{
+    if (!Object.values(users).some(u=>(u.username||'').toLowerCase()===un)) work.push(db.ref(P+'users').push({ name:nm, username:un, password:pw, role:'aggregator', aggId:agg, siteId:'all', perms:{ reports:false } })); });
+  Promise.all(work).then(()=>toast('✅ HungerBox & Platos set up')).catch(()=>alert('Could not save. Check the internet and try again.'));
+}
 
 const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
 if (saved && ROLES[saved.role]){ me = saved; enter(); }
