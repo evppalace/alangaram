@@ -3557,11 +3557,14 @@ const attHrs = m => { m = Math.max(0, Math.round(m)); return Math.floor(m/60)+'h
 const attIsMgr = () => me && (me.role==='admin' || isPMrole(me.role));
 const attStaff = () => Object.entries(users).filter(([,u])=>ROLES[u.role] && u.role!=='aggregator').sort((a,b)=>(a[1].name||'').localeCompare(b[1].name||''));
 const attRec = (d,uid) => ((attendance||{})[d]||{})[uid] || null;
+const ATT_DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const attOffDays = () => settings.attOffSet ? Object.keys(settings.attOffSet).filter(k=>/^d\d$/.test(k)).map(k=>+k[1]) : [0];
+function attOff(d){ const h = (settings.attHolidays||{})[d]; if (h) return h.name||'Public holiday'; const wd = new Date(d+'T00:00:00').getDay(); return attOffDays().includes(wd) ? ATT_DAYS[wd] : null; }
 const attSegs = rec => Object.entries((rec&&rec.segs)||{}).map(([id,s])=>Object.assign({id},s)).sort((a,b)=>(a.i||0)-(b.i||0));
 const attOpen = rec => attSegs(rec).find(s=>s.i && !s.o) || null;
 function attMins(rec, d){ const now = Date.now(); let t = 0; attSegs(rec).forEach(s=>{ if (!s.i) return; const end = s.o || (d===todayKey() ? now : s.i); t += Math.max(0,end-s.i); }); return Math.round(t/60000); }
 function attKind(rec, d){
-  if (!rec || !attSegs(rec).length) return d<todayKey() ? 'absent' : 'none';
+  if (!rec || !attSegs(rec).length) return attOff(d) ? 'off' : d<todayKey() ? 'absent' : 'none';
   const m = attMins(rec,d), full = settings.attFull||8, half = settings.attHalf||4;
   if (d===todayKey() && attOpen(rec)) return 'in';
   return m>=full*60 ? 'present' : m>=half*60 ? 'half' : 'short';
@@ -3584,7 +3587,7 @@ function attSignIn(){
     if (outside && settings.attBlock){ attBusy=false; alert('You are '+Math.round(near.d)+' m from '+near.name+'. Sign in is allowed only at the work location.'); return; }
     const rec = attRec(d,me.id), first = !rec || !attSegs(rec).length, now = Date.now();
     const up = { uid:me.id, name:me.name, role:me.role, siteId:me.siteId||'all' };
-    if (first && settings.attStart){ const late = Math.round((now - new Date(d+'T'+settings.attStart+':00').getTime())/60000) - (settings.attGrace!=null?settings.attGrace:15); if (late>0) up.lateMin = late; }
+    if (first && settings.attStart && !attOff(d)){ const late = Math.round((now - new Date(d+'T'+settings.attStart+':00').getTime())/60000) - (settings.attGrace!=null?settings.attGrace:15); if (late>0) up.lateMin = late; }
     const seg = { i:now, il:loc||null, out_of_zone:outside||null };
     db.ref(P+'attendance/'+d+'/'+me.id).update(up).then(()=>db.ref(P+'attendance/'+d+'/'+me.id+'/segs').push(seg)).then(()=>{
       attBusy=false; closeSheet(); toast('✅ Signed in '+attT(now)+(up.lateMin?' · late '+up.lateMin+' min':'')+(outside?' · outside work location':'')); startAttTracking();
@@ -3639,7 +3642,7 @@ function attendTick(){
 }
 function attendCard(){
   const d = todayKey(), rec = attRec(d,me.id), s = attOpen(rec), m = attMins(rec,d), segs = attSegs(rec);
-  const line = s ? `Signed in ${attT(s.i)} · ${attHrs(m)} today · 📡 GPS tracking on` : segs.length ? `Signed out · ${attHrs(m)} today` : 'Not signed in yet';
+  const off = attOff(d), line = (off && !segs.length) ? `🏖️ Holiday — ${off}. Sign in only if you are working today.` : s ? `Signed in ${attT(s.i)} · ${attHrs(m)} today · 📡 GPS tracking on` : segs.length ? `Signed out · ${attHrs(m)} today` : 'Not signed in yet';
   return `<div class="card" id="attCard" style="${s?'border-color:#9fd3b8;background:#EEF8F2':''}"><div class="row"><div style="font-size:26px">🕒</div><div class="grow"><b>Attendance</b><div class="sub">${esc(line)}</div></div>
     ${s ? `<button class="btn danger" data-att="out" style="padding:9px 14px">Sign out</button>` : `<button class="btn" data-att="in" style="padding:9px 14px">Sign in</button>`}</div></div>`;
 }
@@ -3651,14 +3654,14 @@ document.addEventListener('click', e=>{
 function attPrompt(){
   if (attPrompted || !me || me.id==='setup' || me.role==='aggregator' || !can('attend')) return;
   if (!_ld.s) { setTimeout(attPrompt, 1200); return; } attPrompted = true;
-  if (attOpen(attRec(todayKey(),me.id))) return;
+  if (attOpen(attRec(todayKey(),me.id)) || attOff(todayKey())) return;
   const g = new Date().getHours(); const hi = g<12?'Good morning':g<17?'Good afternoon':'Good evening';
   openSheet(`<h3>🕒 ${hi}, ${esc((me.name||'').split(' ')[0])}</h3><div class="sub" style="font-size:14px;margin-bottom:12px">Sign in to start your duty. Your location is recorded while you are signed in.</div>
     <button class="btn save" data-att="in">Sign in now</button><button class="btn sec save" data-att="later">Later</button>`);
 }
 
 /* ---- attendance page ---- */
-const attFlags = (rec,d)=>{ const f=[]; if (rec&&rec.lateMin) f.push(`<span class="badge" style="background:#FFF1D6;color:#8a5a00">Late ${rec.lateMin}m</span>`); if (attSegs(rec).some(s=>s.out_of_zone)) f.push('<span class="badge" style="background:#FDE3DF;color:#a3261b">Outside zone</span>'); if (attSegs(rec).some(s=>s.auto)) f.push('<span class="badge">No sign-out</span>'); if (rec&&rec.edited) f.push('<span class="badge">Edited</span>'); return f.join(' '); };
+const attFlags = (rec,d)=>{ const f=[]; if (rec && attSegs(rec).length && attOff(d)) f.push('<span class="badge" style="background:#E6EEFF;color:#2a4a9a">Holiday work</span>'); if (rec&&rec.lateMin) f.push(`<span class="badge" style="background:#FFF1D6;color:#8a5a00">Late ${rec.lateMin}m</span>`); if (attSegs(rec).some(s=>s.out_of_zone)) f.push('<span class="badge" style="background:#FDE3DF;color:#a3261b">Outside zone</span>'); if (attSegs(rec).some(s=>s.auto)) f.push('<span class="badge">No sign-out</span>'); if (rec&&rec.edited) f.push('<span class="badge">Edited</span>'); return f.join(' '); };
 function renderAttend(){
   const el = $('p-attend'); if (!el) return;
   if (el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) { skippedRender = true; return; }
@@ -3680,20 +3683,20 @@ function attMeHtml(){
   const d = todayKey(), rec = attRec(d,me.id), s = attOpen(rec), segs = attSegs(rec);
   const days = Object.keys(attendance).filter(k=>attRec(k,me.id)).sort().reverse().slice(0,10);
   return `<div class="card" style="${s?'border-color:#9fd3b8;background:#EEF8F2':''}"><div style="text-align:center;padding:6px 0">
-      <div style="font-size:40px">${s?'🟢':'⚪'}</div><div style="font-size:19px;font-weight:700">${s?'You are signed in':segs.length?'Signed out':'Not signed in'}</div>
-      <div class="sub">${s?'Since '+attT(s.i)+' · '+attHrs(attMins(rec,d)):segs.length?'Today '+attHrs(attMins(rec,d)):new Date().toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'})}</div>
+      <div style="font-size:40px">${s?'🟢':attOff(d)&&!segs.length?'🏖️':'⚪'}</div><div style="font-size:19px;font-weight:700">${s?'You are signed in':segs.length?'Signed out':attOff(d)?'Holiday today':'Not signed in'}</div>
+      <div class="sub">${s?'Since '+attT(s.i)+' · '+attHrs(attMins(rec,d)):segs.length?'Today '+attHrs(attMins(rec,d)):(attOff(d)?attOff(d)+' · sign in only if you are working':new Date().toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'}))}</div>
       ${s?`<div class="sub" style="margin-top:4px">📡 Location tracking is ON while you are signed in${rec&&rec.last?' · last ping '+attT(rec.last.ts):''}</div>`:''}
       <div style="margin-top:12px">${s?'<button class="btn danger" data-att="out" style="width:100%">Sign out</button>':'<button class="btn" data-att="in" style="width:100%">Sign in</button>'}</div>
       ${rec&&attFlags(rec,d)?`<div style="margin-top:8px">${attFlags(rec,d)}</div>`:''}</div></div>
     ${segs.length?`<h2>Today</h2><div class="card">${segs.map(x=>`<div class="row" style="margin:4px 0"><div class="grow">In ${attT(x.i)}${x.o?' → Out '+attT(x.o):' → still in'}</div><b>${x.o?attHrs((x.o-x.i)/60000):''}</b></div>`).join('')}</div>`:''}
-    <h2>Recent days</h2>${days.length?`<div class="card">${days.map(k=>{ const r = attRec(k,me.id), kd = attKind(r,k), ic = {present:'✅',half:'🌓',short:'⏱️',in:'🟢',absent:'❌',none:'—'}[kd]; return `<div class="row" style="margin:6px 0"><div class="grow">${ic} ${k}<div class="sub">${attSegs(r).map(x=>attT(x.i)+'–'+(x.o?attT(x.o):'…')).join(' · ')}</div></div><div style="text-align:right"><b>${attHrs(attMins(r,k))}</b><div>${attFlags(r,k)}</div></div></div>`; }).join('')}</div>`:'<div class="empty">No attendance yet. Tap Sign in to start.</div>'}`;
+    <h2>Recent days</h2>${days.length?`<div class="card">${days.map(k=>{ const r = attRec(k,me.id), kd = attKind(r,k), ic = {present:'✅',half:'🌓',short:'⏱️',in:'🟢',absent:'❌',none:'—',off:'🏖️'}[kd]; return `<div class="row" style="margin:6px 0"><div class="grow">${ic} ${k}<div class="sub">${attSegs(r).map(x=>attT(x.i)+'–'+(x.o?attT(x.o):'…')).join(' · ')}</div></div><div style="text-align:right"><b>${attHrs(attMins(r,k))}</b><div>${attFlags(r,k)}</div></div></div>`; }).join('')}</div>`:'<div class="empty">No attendance yet. Tap Sign in to start.</div>'}`;
 }
 function attTeamHtml(){
   const d = attDate, rows = attStaff().map(([uid,u])=>({uid,u,rec:attRec(d,uid)})).map(x=>Object.assign(x,{kind:attKind(x.rec,d)}));
   const n = k => rows.filter(x=>x.kind===k).length, inN = n('in'), presentN = rows.filter(x=>['in','present','half','short'].includes(x.kind)).length, lateN = rows.filter(x=>x.rec&&x.rec.lateMin).length, absN = rows.filter(x=>x.kind==='absent'||(x.kind==='none')).length;
-  const lab = {in:['🟢 In','#1b7a4b'], present:['✅ Present','#1b7a4b'], half:['🌓 Half day','#8a5a00'], short:['⏱️ Short','#8a5a00'], absent:['❌ Absent','#a3261b'], none:['⚪ Not in yet','#6b7a74']};
+  const lab = {in:['🟢 In','#1b7a4b'], present:['✅ Present','#1b7a4b'], half:['🌓 Half day','#8a5a00'], short:['⏱️ Short','#8a5a00'], absent:['❌ Absent','#a3261b'], none:['⚪ Not in yet','#6b7a74'], off:['🏖️ Holiday','#2a4a9a']};
   const tile = (v,l,c)=>`<div class="card" style="text-align:center;padding:10px 4px"><div style="font-size:22px;font-weight:800;${c?'color:'+c:''}">${v}</div><div class="sub">${l}</div></div>`;
-  return `<div class="card"><div class="two"><div><label>Date</label><input type="date" id="at_date" value="${d}" max="${todayKey()}"></div><div style="display:flex;align-items:flex-end;gap:8px"><button class="btn sec" id="at_csv" style="padding:11px 12px">CSV</button><button class="btn sec" id="at_wa" style="padding:11px 12px">WhatsApp</button></div></div></div>
+  return `${attOff(d)?`<div class="notice info" style="margin:0 0 8px"><span>🏖️</span><div class="grow"><b>${esc(attOff(d))}</b><div class="sub">Weekly off / public holiday — nobody is marked absent. Anyone who signs in is recorded as holiday work.</div></div></div>`:''}<div class="card"><div class="two"><div><label>Date</label><input type="date" id="at_date" value="${d}" max="${todayKey()}"></div><div style="display:flex;align-items:flex-end;gap:8px"><button class="btn sec" id="at_csv" style="padding:11px 12px">CSV</button><button class="btn sec" id="at_wa" style="padding:11px 12px">WhatsApp</button></div></div></div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0">${tile(presentN,'Present')}${tile(inN,'Signed in','#1b7a4b')}${tile(lateN,'Late','#8a5a00')}${tile(absN,d===todayKey()?'Not in':'Absent','#a3261b')}</div>
     ${rows.map(x=>{ const [l,c] = lab[x.kind]; const last = x.rec&&x.rec.last, ping = last ? Math.round((Date.now()-last.ts)/60000) : null;
       return `<div class="card"><div class="row"><div class="grow"><b>${esc(x.u.name||x.u.username)}</b><div class="sub">${esc((ROLES[x.u.role]||{}).label||x.u.role)}${x.u.siteId&&x.u.siteId!=='all'&&sites[x.u.siteId]?' · '+esc(sites[x.u.siteId].name):''}</div></div><b style="color:${c}">${l}</b></div>
@@ -3703,22 +3706,22 @@ function attTeamHtml(){
 }
 function attMonthData(){
   const ym = attMonth, days = Object.keys(attendance).filter(k=>k.startsWith(ym)).sort();
-  return attStaff().map(([uid,u])=>{ let p=0,l=0,half=0,tot=0; days.forEach(k=>{ const r = attRec(k,uid); if (!r||!attSegs(r).length) return; const kd = attKind(r,k); p += (kd==='present'||kd==='in')?1:0; half += kd==='half'?1:0; tot += attMins(r,k); if (r.lateMin) l++; });
-    return { uid, name:u.name||u.username, role:(ROLES[u.role]||{}).label||u.role, present:p, half, late:l, mins:tot }; });
+  return attStaff().map(([uid,u])=>{ let p=0,l=0,half=0,tot=0,hol=0; days.forEach(k=>{ const r = attRec(k,uid); if (!r||!attSegs(r).length) return; const kd = attKind(r,k); if (attOff(k)){ hol++; tot += attMins(r,k); return; } p += (kd==='present'||kd==='in')?1:0; half += kd==='half'?1:0; tot += attMins(r,k); if (r.lateMin) l++; });
+    return { uid, name:u.name||u.username, role:(ROLES[u.role]||{}).label||u.role, present:p, half, late:l, hol, mins:tot }; });
 }
 function attMonthHtml(){
   const rows = attMonthData(), td = 'padding:7px 8px;border-top:1px solid #e3ebe7';
   return `<div class="card"><div class="two"><div><label>Month</label><input type="month" id="at_month" value="${attMonth}" max="${todayKey().slice(0,7)}"></div><div style="display:flex;align-items:flex-end;gap:8px"><button class="btn sec" id="at_csv" style="padding:11px 12px">CSV</button><button class="btn sec" id="at_wa" style="padding:11px 12px">WhatsApp</button></div></div></div>
-    <div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>${['Name','Role','Full','Half','Late','Hours'].map(c=>`<th style="text-align:left;padding:8px">${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td style="${td}"><b>${esc(r.name)}</b></td><td style="${td}">${esc(r.role)}</td><td style="${td}">${r.present}</td><td style="${td}">${r.half}</td><td style="${td}">${r.late}</td><td style="${td};white-space:nowrap">${attHrs(r.mins)}</td></tr>`).join('')}</tbody></table></div>
-    <div class="sub" style="margin-top:8px">Full day = ${settings.attFull||8}h or more · Half day = ${settings.attHalf||4}h or more. Change under Masters → Attendance.</div>`;
+    <div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>${['Name','Role','Full','Half','Late','Hol. work','Hours'].map(c=>`<th style="text-align:left;padding:8px">${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td style="${td}"><b>${esc(r.name)}</b></td><td style="${td}">${esc(r.role)}</td><td style="${td}">${r.present}</td><td style="${td}">${r.half}</td><td style="${td}">${r.late}</td><td style="${td}">${r.hol}</td><td style="${td};white-space:nowrap">${attHrs(r.mins)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="sub" style="margin-top:8px">Full day = ${settings.attFull||8}h or more · Half day = ${settings.attHalf||4}h or more · Sundays / public holidays are not counted as absent; hours worked on them show as Holiday work. Change under Masters → Attendance.</div>`;
 }
 function attText(){
-  if (attTab==='month'){ const L = ['*Attendance — '+attMonth+'*']; attMonthData().forEach(r=>L.push(`• ${r.name} (${r.role}): ${r.present} full, ${r.half} half, ${r.late} late · ${attHrs(r.mins)}`)); return L.join('\n'); }
-  const d = attDate, L = ['*Attendance — '+d+'*']; attStaff().forEach(([uid,u])=>{ const r = attRec(d,uid), k = attKind(r,d); L.push(`• ${u.name||u.username}: ${r&&attSegs(r).length?attSegs(r).map(s=>attT(s.i)+'–'+(s.o?attT(s.o):'in')).join(', ')+' ('+attHrs(attMins(r,d))+')'+(r.lateMin?' late '+r.lateMin+'m':''):(k==='absent'?'Absent':'Not in yet')}`); }); return L.join('\n');
+  if (attTab==='month'){ const L = ['*Attendance — '+attMonth+'*']; attMonthData().forEach(r=>L.push(`• ${r.name} (${r.role}): ${r.present} full, ${r.half} half, ${r.late} late${r.hol?', '+r.hol+' holiday-work day(s)':''} · ${attHrs(r.mins)}`)); return L.join('\n'); }
+  const d = attDate, L = ['*Attendance — '+d+'*']; attStaff().forEach(([uid,u])=>{ const r = attRec(d,uid), k = attKind(r,d); L.push(`• ${u.name||u.username}: ${r&&attSegs(r).length?attSegs(r).map(s=>attT(s.i)+'–'+(s.o?attT(s.o):'in')).join(', ')+' ('+attHrs(attMins(r,d))+')'+(r.lateMin?' late '+r.lateMin+'m':''):(k==='absent'?'Absent':k==='off'?'Holiday ('+attOff(d)+')':'Not in yet')}`); }); return L.join('\n');
 }
 function attCsv(){
   const q = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; let out;
-  if (attTab==='month') out = [['Name','Role','Full days','Half days','Late days','Total hours'].map(q).join(',')].concat(attMonthData().map(r=>[r.name,r.role,r.present,r.half,r.late,(r.mins/60).toFixed(2)].map(q).join(',')));
+  if (attTab==='month') out = [['Name','Role','Full days','Half days','Late days','Holiday-work days','Total hours'].map(q).join(',')].concat(attMonthData().map(r=>[r.name,r.role,r.present,r.half,r.late,r.hol,(r.mins/60).toFixed(2)].map(q).join(',')));
   else out = [['Date','Name','Role','Sign in','Sign out','Hours','Late (min)','Status'].map(q).join(',')].concat(attStaff().map(([uid,u])=>{ const r = attRec(attDate,uid), s = attSegs(r); return [attDate,u.name||u.username,(ROLES[u.role]||{}).label,s.length?attT(s[0].i):'',s.length&&s[s.length-1].o?attT(s[s.length-1].o):'',(attMins(r,attDate)/60).toFixed(2),r&&r.lateMin||'',attKind(r,attDate)].map(q).join(','); }));
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+out.join('\n')], {type:'text/csv'})); a.download = 'onebyte-attendance-'+(attTab==='month'?attMonth:attDate)+'.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
@@ -3751,31 +3754,43 @@ function attTrackView(uid, d){
 /* Reports → Attendance */
 function attSections(R){
   const days = Object.keys(attendance).filter(k=>k>=R.from && k<=R.to).sort();
-  const sum = attStaff().map(([uid,u])=>{ let p=0,half=0,l=0,mins=0; days.forEach(k=>{ const r=attRec(k,uid); if(!r||!attSegs(r).length) return; const kd=attKind(r,k); if(kd==='present'||kd==='in') p++; if(kd==='half') half++; if(r.lateMin) l++; mins+=attMins(r,k); }); return [u.name||u.username,(ROLES[u.role]||{}).label||u.role,String(p),String(half),String(l),attHrs(mins)]; });
-  const log = []; days.forEach(k=>attStaff().forEach(([uid,u])=>{ const r=attRec(k,uid); if(!r||!attSegs(r).length) return; const s=attSegs(r); log.push([k,u.name||u.username,(ROLES[u.role]||{}).label||u.role,attT(s[0].i),s[s.length-1].o?attT(s[s.length-1].o):'—',attHrs(attMins(r,k)),r.lateMin?r.lateMin+' min':'',attSegs(r).some(x=>x.out_of_zone)?'Outside zone':'']); }));
-  return [sectionTable('Attendance summary',['Name','Role','Full days','Half days','Late days','Hours'],sum,sum.length?'':'No staff logins.'), sectionTable('Daily attendance log',['Date','Name','Role','In','Out','Hours','Late','Zone'],log,log.length?'':'No attendance recorded in this period.')];
+  const sum = attStaff().map(([uid,u])=>{ let p=0,half=0,l=0,mins=0,hol=0; days.forEach(k=>{ const r=attRec(k,uid); if(!r||!attSegs(r).length) return; const kd=attKind(r,k); if (attOff(k)){ hol++; mins+=attMins(r,k); return; } if(kd==='present'||kd==='in') p++; if(kd==='half') half++; if(r.lateMin) l++; mins+=attMins(r,k); }); return [u.name||u.username,(ROLES[u.role]||{}).label||u.role,String(p),String(half),String(l),String(hol),attHrs(mins)]; });
+  const log = []; days.forEach(k=>attStaff().forEach(([uid,u])=>{ const r=attRec(k,uid); if(!r||!attSegs(r).length) return; const s=attSegs(r); log.push([k,u.name||u.username,(ROLES[u.role]||{}).label||u.role,attT(s[0].i),s[s.length-1].o?attT(s[s.length-1].o):'—',attHrs(attMins(r,k)),r.lateMin?r.lateMin+' min':'',(attOff(k)?'Holiday work':'')+(attSegs(r).some(x=>x.out_of_zone)?' Outside zone':'')]); }));
+  return [sectionTable('Attendance summary',['Name','Role','Full days','Half days','Late days','Holiday work','Hours'],sum,sum.length?'':'No staff logins.'), sectionTable('Daily attendance log',['Date','Name','Role','In','Out','Hours','Late','Note'],log,log.length?'':'No attendance recorded in this period.')];
 }
 /* Masters → Attendance settings */
-let attLocDraft = null;
+let attLocDraft = null, attHolDraft = null;
 function mAttSet(){
   const st = settings, locs = attLocDraft || Object.entries(st.attLocs||{}).map(([id,x])=>Object.assign({id},x));
   attLocDraft = locs;
+  const hols = attHolDraft || Object.entries(st.attHolidays||{}).map(([d,x])=>({d,name:x.name||''})).sort((a,b)=>a.d.localeCompare(b.d)); attHolDraft = hols;
   $('mBody').innerHTML = formShell('Attendance settings', `
     <div class="two"><div><label>Shift starts at</label><input type="time" id="as_start" value="${esc(st.attStart||'')}"></div><div><label>Grace (minutes)</label><input type="number" id="as_grace" value="${st.attGrace!=null?st.attGrace:15}"></div></div>
     <div class="sub">Signing in after start time + grace is marked Late. Leave blank to turn the late check off.</div>
     <div class="two"><div><label>Full day (hours)</label><input type="number" step="any" id="as_full" value="${st.attFull||8}"></div><div><label>Half day (hours)</label><input type="number" step="any" id="as_half" value="${st.attHalf||4}"></div></div>
     <label class="row" style="gap:10px;margin-top:10px"><input type="checkbox" id="as_gps" ${st.attGps!==false?'checked':''} style="width:auto"><span class="grow">Location (GPS) is required to sign in</span></label>
     <label class="row" style="gap:10px;margin-top:6px"><input type="checkbox" id="as_blk" ${st.attBlock?'checked':''} style="width:auto"><span class="grow">Block sign-in outside the work locations <div class="sub">If off, it is allowed but flagged "Outside zone".</div></span></label>
+    <h2 style="margin-top:14px">Weekly off</h2><div class="sub">Nobody is marked absent on these days. Anyone who signs in is recorded as holiday work.</div>
+    <div class="chips" style="margin-top:6px">${ATT_DAYS.map((n,i)=>`<label class="chip ${attOffDays().includes(i)?'active':''}" style="cursor:pointer"><input type="checkbox" class="as_off" data-d="${i}" ${attOffDays().includes(i)?'checked':''} style="display:none">${n.slice(0,3)}</label>`).join('')}</div>
+    <h2 style="margin-top:14px">Public holidays</h2>
+    ${hols.map((h,n)=>`<div class="row" style="gap:6px;margin-top:6px"><input type="date" class="ah_d" data-n="${n}" value="${esc(h.d)}" style="width:150px"><input class="ah_n" data-n="${n}" placeholder="Holiday name" value="${esc(h.name)}"><button class="btn danger ah_rm" data-n="${n}" style="padding:8px 10px">✕</button></div>`).join('')||'<div class="sub">No public holidays added.</div>'}
+    <div class="two" style="margin-top:8px"><button class="btn sec" id="ah_add" style="padding:10px">+ Add holiday</button><button class="btn sec" id="ah_fix" style="padding:10px">Add fixed-date holidays</button></div>
+    <div class="sub">"Fixed-date" adds Jan 1, Jan 15 (Pongal), Jan 26, Apr 14, May 1, Aug 15, Oct 2 and Dec 25 for the next 2 years. Festival dates that move every year (Deepavali, Ramzan, Bakrid and others) must be added by hand.</div>
     <h2 style="margin-top:14px">Work locations</h2>
     ${locs.map((l,n)=>`<div class="card"><input class="al_n" data-n="${n}" placeholder="Name e.g. Central kitchen" value="${esc(l.name||'')}"><div class="two" style="margin-top:6px"><input class="al_a" data-n="${n}" placeholder="Latitude" value="${l.lat!=null?l.lat:''}"><input class="al_o" data-n="${n}" placeholder="Longitude" value="${l.lng!=null?l.lng:''}"></div>
       <div class="two" style="margin-top:6px"><input class="al_r" data-n="${n}" type="number" placeholder="Radius (m)" value="${l.r||150}"><button class="btn sec al_me" data-n="${n}" style="padding:9px">📍 Use my location</button></div><button class="btn danger al_rm" data-n="${n}" style="margin-top:6px;padding:8px">Remove</button></div>`).join('')||'<div class="sub">No work location added. Sign-ins are accepted from anywhere.</div>'}
     <button class="btn sec save" id="al_add">+ Add work location</button>`, 'as_save');
   const grab = ()=>{ document.querySelectorAll('.al_n').forEach(i=>attLocDraft[+i.dataset.n].name=i.value); document.querySelectorAll('.al_a').forEach(i=>attLocDraft[+i.dataset.n].lat=i.value); document.querySelectorAll('.al_o').forEach(i=>attLocDraft[+i.dataset.n].lng=i.value); document.querySelectorAll('.al_r').forEach(i=>attLocDraft[+i.dataset.n].r=i.value); };
+  const grabH = ()=>{ document.querySelectorAll('.ah_d').forEach(i=>attHolDraft[+i.dataset.n].d=i.value); document.querySelectorAll('.ah_n').forEach(i=>attHolDraft[+i.dataset.n].name=i.value); };
+  document.querySelectorAll('.as_off').forEach(c=>c.onchange=()=>c.parentNode.classList.toggle('active',c.checked));
+  $('ah_add').onclick = ()=>{ grab(); grabH(); attHolDraft.push({d:'',name:''}); mAttSet(); };
+  document.querySelectorAll('.ah_rm').forEach(b=>b.onclick=()=>{ grab(); grabH(); attHolDraft.splice(+b.dataset.n,1); mAttSet(); });
+  $('ah_fix').onclick = ()=>{ grab(); grabH(); const y0 = new Date().getFullYear(); [y0,y0+1].forEach(y=>[['01-01','New Year'],['01-15','Pongal'],['01-26','Republic Day'],['04-14','Tamil New Year'],['05-01','May Day'],['08-15','Independence Day'],['10-02','Gandhi Jayanti'],['12-25','Christmas']].forEach(([md,n])=>{ const d=y+'-'+md; if (!attHolDraft.some(h=>h.d===d)) attHolDraft.push({d,name:n}); })); attHolDraft.sort((a,b)=>a.d.localeCompare(b.d)); mAttSet(); toast('Fixed-date holidays added — tap Save'); };
   $('al_add').onclick = ()=>{ grab(); attLocDraft.push({name:'',lat:'',lng:'',r:150}); mAttSet(); };
   document.querySelectorAll('.al_rm').forEach(b=>b.onclick=()=>{ grab(); attLocDraft.splice(+b.dataset.n,1); mAttSet(); });
   document.querySelectorAll('.al_me').forEach(b=>b.onclick=()=>{ grab(); const n=+b.dataset.n; attGetPos(p=>{ if(!p){ alert('Could not get your location. Allow Location for this app.'); return; } attLocDraft[n].lat=p.lat; attLocDraft[n].lng=p.lng; mAttSet(); toast('Location captured'); }); });
-  $('as_save').onclick = ()=>{ grab(); const L = {}; for (const l of attLocDraft){ if (!l.name && l.lat==='' && l.lng==='') continue; const la=num(l.lat), lo=num(l.lng); if (!l.name || !isFinite(la) || !isFinite(lo)){ alert('Each work location needs a name, latitude and longitude.'); return; } L[slug(l.name)||('loc'+Object.keys(L).length)] = { name:l.name.trim(), lat:la, lng:lo, r:num(l.r)>0?num(l.r):150 }; }
-    db.ref(P+'settings').update({ attStart:$('as_start').value||null, attGrace:num($('as_grace').value)>=0?num($('as_grace').value):15, attFull:num($('as_full').value)||8, attHalf:num($('as_half').value)||4, attGps:$('as_gps').checked, attBlock:$('as_blk').checked, attLocs:Object.keys(L).length?L:null }).then(()=>{ attLocDraft=null; toast('Attendance settings saved'); }); };
+  $('as_save').onclick = ()=>{ grab(); grabH(); const L = {}; const H = {}; for (const h of attHolDraft){ if (!h.d && !h.name) continue; if (!h.d){ alert('Each public holiday needs a date.'); return; } H[h.d] = { name:(h.name||'Public holiday').trim() }; } const offSet = {}; document.querySelectorAll('.as_off').forEach(c=>{ if (c.checked) offSet['d'+c.dataset.d] = true; }); if (!Object.keys(offSet).length) offSet.none = true; for (const l of attLocDraft){ if (!l.name && l.lat==='' && l.lng==='') continue; const la=num(l.lat), lo=num(l.lng); if (!l.name || !isFinite(la) || !isFinite(lo)){ alert('Each work location needs a name, latitude and longitude.'); return; } L[slug(l.name)||('loc'+Object.keys(L).length)] = { name:l.name.trim(), lat:la, lng:lo, r:num(l.r)>0?num(l.r):150 }; }
+    db.ref(P+'settings').update({ attStart:$('as_start').value||null, attGrace:num($('as_grace').value)>=0?num($('as_grace').value):15, attFull:num($('as_full').value)||8, attHalf:num($('as_half').value)||4, attGps:$('as_gps').checked, attBlock:$('as_blk').checked, attLocs:Object.keys(L).length?L:null, attHolidays:Object.keys(H).length?H:null, attOffSet:offSet }).then(()=>{ attLocDraft=null; attHolDraft=null; toast('Attendance settings saved'); }); };
 }
 
 const saved = (function(){ try{ return JSON.parse(store.getItem('prod_user')||'null'); }catch(e){ return null; } })();
