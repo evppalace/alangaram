@@ -1041,7 +1041,7 @@ function renderSession(el){
     ${cl&&cl.ts&&!(closed&&closed.ts)?(canStep('close')?`<button class="btn sec save" id="saveClose">Save sales &amp; wastage</button><button class="btn save" id="btnClose">Close this meal</button>`:`<div class="sub">Needs: ${STEP_ROLES.close.filter(r=>r!=='admin').map(r=>ROLES[r].label).join(' / ')}</div>`):(closed&&closed.ts?lock('closed',1):'')}
   </div>
 
-  <div class="card"><b>Report</b><div class="sub">Send this meal sheet to management${settings.reportEmails?' ('+esc(settings.reportEmails)+')':''}.${s.sentAt?' Last sent '+hm(s.sentAt)+' by '+esc(s.sentBy||''):''}</div>
+  <div class="card"><b>Report</b><div class="sub">Send this meal sheet to management (${esc(settings.reportEmails||OFFICIAL_EMAIL_DEFAULT)}).${s.sentAt?' Last sent '+hm(s.sentAt)+' by '+esc(s.sentBy||''):''}</div>
     ${canStep('send')?`<div class="two" style="margin-top:10px"><button class="btn" id="rWA">WhatsApp</button><button class="btn sec" id="rMail">Email</button></div>
     <div class="two" style="margin-top:8px"><button class="btn sec" id="rCopy">Copy</button><button class="btn sec" id="rCsv">Export CSV</button></div>`:''}
   </div>`;
@@ -1113,7 +1113,7 @@ function renderSession(el){
   const rp = () => buildReport({ type:'meals', from:date, to:date, site:siteId, meal, cat:'', item:'' });
   const logSend = () => db.ref(P+'sessions/'+sid).update({ sentAt:Date.now(), sentBy:me.name });
   const w = $('rWA'); if (w) w.onclick = ()=>{ const t = rp().text; logSend(); const url='https://wa.me/?text='+encodeURIComponent(t); const x=window.open(url,'_blank'); if(!x) location.href=url; };
-  const m = $('rMail'); if (m) m.onclick = ()=>{ const r = rp(); logSend(); location.href = 'mailto:'+encodeURIComponent((settings.reportEmails||'').replace(/\s/g,''))+'?subject='+encodeURIComponent('OneByte '+r.title+' '+site.name+' '+meal+' '+date)+'&body='+encodeURIComponent(r.text.replace(/\*/g,'')); };
+  const m = $('rMail'); if (m) m.onclick = ()=>{ const r = rp(); logSend(); location.href = 'mailto:'+encodeURIComponent(reportMail())+'?subject='+encodeURIComponent('OneByte '+r.title+' '+site.name+' '+meal+' '+date)+'&body='+encodeURIComponent(r.text.replace(/\*/g,'')); };
   const cp = $('rCopy'); if (cp) cp.onclick = ()=>copyText(rp().text);
   const cv = $('rCsv'); if (cv) cv.onclick = ()=>downloadCsv(rp());
 }
@@ -1695,7 +1695,7 @@ function siteForm(id, presetAgg){
 function mSettings(){
   const st = settings;
   $('mBody').innerHTML = formShell('Report & quality settings', `
-    <label>Send reports by email to (comma-separated, optional)</label><input id="st_mail" value="${esc(st.reportEmails||'')}" placeholder="boss@example.com, manager@example.com">
+    <label>Send reports by email to (comma-separated, optional)</label><input id="st_mail" value="${esc(st.reportEmails||'')}" placeholder="${OFFICIAL_EMAIL_DEFAULT}"><div class="sub">Left empty, reports go to ${OFFICIAL_EMAIL_DEFAULT}. Client escalations / email-us go to ${esc(ownerEmail())}.</div>
     <div class="sub">WhatsApp: the Send button opens WhatsApp — pick your management group there.</div>
     <div class="two"><div><label>Min. temp when leaving kitchen (°C)</label><input id="st_t1" type="number" value="${st.minTempDispatch||65}"></div>
     <div><label>Min. temp on arrival (°C)</label><input id="st_t2" type="number" value="${st.minTempArrival||60}"></div></div>
@@ -1706,6 +1706,32 @@ function mSettings(){
     <div class="two"><div><label>Alert if trip longer than (min)</label><input id="st_trip" type="number" value="${st.tripMaxMin||90}"></div>
     <div><label>Alert if no GPS for (min)</label><input id="st_stale" type="number" value="${st.staleMin||10}"></div></div>`, 'st_save');
   $('st_save').onclick = ()=>db.ref(P+'settings').update({ reportEmails:$('st_mail').value.trim(), minTempDispatch:num($('st_t1').value)||65, minTempArrival:num($('st_t2').value)||60, tolerance:num($('st_tol').value)||3, buffer:Math.max(0,num($('st_buf').value)||0), samples:Math.max(1,num($('st_smp').value)||6), tripMaxMin:num($('st_trip').value)||90, staleMin:num($('st_stale').value)||10 }).then(()=>toast('Settings saved'));
+  mDanger();
+}
+function mDanger(){
+  if (me.role!=='admin') return;
+  $('mBody').insertAdjacentHTML('beforeend', `<div class="card" style="margin-top:14px;border-color:#EBB9B2;background:#FDF3F1"><b>🧹 Clear demo / process data</b>
+    <div class="sub" style="margin:4px 0 10px">Admin only. Wipe test work so you can start fresh. Items, recipes, companies, aggregators, basins, logins and settings are kept.</div>
+    <button class="btn danger" id="wipeBtn" style="width:100%">Delete all processes…</button></div>`);
+  $('wipeBtn').onclick = ()=>{
+    openSheet(`<h3>🧹 Delete all processes</h3><div class="sub" style="margin-bottom:10px">This cannot be undone. Choose what to clear:</div>
+      <label class="row" style="gap:10px;margin:8px 0"><input type="checkbox" id="wp_a" checked style="width:auto"><span class="grow"><b>Meal & production processes</b><div class="sub">Meal plans, cooking, QC, dispatch, trips, photos, cook requirements, hand-off alerts</div></span></label>
+      <label class="row" style="gap:10px;margin:8px 0"><input type="checkbox" id="wp_b" checked style="width:auto"><span class="grow"><b>Client data</b><div class="sub">Escalations, feedback, ratings, notices</div></span></label>
+      <label class="row" style="gap:10px;margin:8px 0"><input type="checkbox" id="wp_c" style="width:auto"><span class="grow"><b>Stock movements</b><div class="sub">All purchases, kitchen issues and returns — stock goes back to zero</div></span></label>
+      <label>Type <b>DELETE</b> to confirm</label><input id="wp_t" autocomplete="off" placeholder="DELETE">
+      <button class="btn danger save" id="wp_go">Delete now</button><button class="btn sec save" id="wp_x">Cancel</button>`);
+    $('wp_x').onclick = closeSheet;
+    $('wp_go').onclick = ()=>{
+      if ($('wp_t').value.trim()!=='DELETE'){ alert('Type DELETE to confirm.'); return; }
+      const a=$('wp_a').checked, b=$('wp_b').checked, c=$('wp_c').checked;
+      if (!a && !b && !c){ alert('Choose something to clear.'); return; }
+      const w=[];
+      if (a) ['sessions','trips','photos','pushlock'].forEach(k=>w.push(db.ref(P+k).remove())), w.push(db.ref(P+'settings/reqs').remove());
+      if (b) ['escalations','feedback','ratings','notices'].forEach(k=>w.push(db.ref(P+k).remove()));
+      if (c) w.push(db.ref(P+'ledger').remove());
+      Promise.all(w).then(()=>{ closeSheet(); toast('✅ Cleared — starting fresh'); renderAll(); }).catch(()=>alert('Could not delete. Check the internet and try again.'));
+    };
+  };
 }
 function mBasins(){
   const rows = Object.entries(basins);
@@ -1831,7 +1857,8 @@ const ESC_CATS = ['Food quality / taste','Quantity short','Late delivery','Hygie
 const SEVS = [['low','Low'],['medium','Medium'],['high','High'],['critical','Critical — food safety / no food']];
 const FB_TYPES = [['feedback','💬 Feedback'],['appreciation','👏 Appreciation'],['complaint','😞 Complaint'],['suggestion','💡 Suggestion'],['request','📝 Request (menu / quantity change)']];
 const EMERGENCY = [['112','All-in-one emergency'],['108','Ambulance'],['101','Fire'],['100','Police'],['1800112100','FSSAI food-safety helpline']];
-const OWNER_EMAIL_DEFAULT = 'sales@evpmarriagepalace.com', OWNER_PHONE_DEFAULT = '9696962666';
+const OWNER_EMAIL_DEFAULT = 'sales@kalyanasapadu.com', OFFICIAL_EMAIL_DEFAULT = 'operations@kalyanasapadu.com', OWNER_PHONE_DEFAULT = '9696962666';
+const reportMail = () => (settings.reportEmails||'').replace(/\s/g,'') || OFFICIAL_EMAIL_DEFAULT;
 const slaHrs = sev => ({ low:(settings.sla&&settings.sla.low)||24, medium:(settings.sla&&settings.sla.medium)||8, high:(settings.sla&&settings.sla.high)||4, critical:(settings.sla&&settings.sla.critical)||1 })[sev] || 8;
 const DEF_CONTACTS = [
   {name:'Site Supervisor', label:'Site Supervisor', phone:'8081111114'},
