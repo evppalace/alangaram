@@ -411,6 +411,9 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
 #chReply,#chReply b,#chReply div{color:#111b21}
 #chRecBar{color:#111b21}
 .chday span{color:#54656f}
+
+#netBar{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:95;background:#b3261e;color:#fff;font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:99px;box-shadow:0 6px 18px rgba(0,0,0,.3);display:none;white-space:nowrap}
+#netBar.show{display:block}
 </style>
 </head>
 <body>
@@ -542,7 +545,9 @@ function isAdmin(){ return me && me.role==='admin'; }
 /* ============ LOGIN ============ */
 let loginMode = 'staff';
 function setLoginMode(m){ loginMode = m; $('lgStaff').classList.toggle('on', m==='staff'); $('lgClient').classList.toggle('on', m==='client'); $('lgHint').textContent = m==='client' ? 'For the client / food-service aggregator — view live status, rate, escalate' : ''; $('unlockBtn').textContent = m==='client' ? 'Open client portal' : 'Login'; $('pinErr').textContent=''; const ib=document.querySelector('#lock .internal'); if (ib) ib.style.display = m==='client' ? 'none' : ''; }
+let loginFails = 0, loginLockUntil = 0;
 function login(){
+  if (Date.now() < loginLockUntil){ $('pinErr').textContent = 'Too many wrong tries. Wait '+Math.ceil((loginLockUntil-Date.now())/1000)+' seconds.'; return; }
   const uname = ($('uname').value||'').trim().toLowerCase(), entered = $('pin').value.trim();
   authReady.then(()=>db.ref(P+'users').once('value')).then(snap=>{
     const u = snap.val() || {};
@@ -553,8 +558,8 @@ function login(){
       if (pw===entered && ((x.username||'').toLowerCase()===uname || !x.username) && ((loginMode==='client') === (x.role==='aggregator'))) m = Object.assign({id},x);
     });
     if (!m && loginMode==='staff' && Object.keys(u).length===0 && entered===SETUP_PIN && (!uname || uname==='admin')) m = { id:'setup', name:'Setup Admin', role:'admin', siteId:'all' };
-    if (m){ me = m; try{ store.setItem('prod_user', JSON.stringify(m)); }catch(e){} enter(); }
-    else { $('pinErr').textContent = loginMode==='client' ? 'Wrong client username or password' : 'Wrong username or password (client users: use the Client tab)'; $('pin').value=''; }
+    if (m){ loginFails = 0; me = m; try{ store.setItem('prod_user', JSON.stringify(m)); }catch(e){} enter(); }
+    else { if (++loginFails>=5){ loginFails = 0; loginLockUntil = Date.now()+60000; } $('pinErr').textContent = loginMode==='client' ? 'Wrong client username or password' : 'Wrong username or password (client users: use the Client tab)'; $('pin').value=''; }
   }).catch(()=>{ $('pinErr').textContent = 'No internet — try again'; });
 }
 function logout(){ try{ store.removeItem('prod_user'); }catch(e){} location.reload(); }
@@ -4054,6 +4059,12 @@ function chatBind(){
 
 document.addEventListener('DOMContentLoaded',()=>{ try{ chatBind(); $('chatBtn').onclick=()=>{ if (can('chat')) go('chat'); }; }catch(e){ console.error(e); } });
 if (document.readyState!=='loading'){ try{ chatBind(); $('chatBtn').onclick=()=>{ if (can('chat')) go('chat'); }; }catch(e){ console.error(e); } }
+/* ---- connection indicator: writes queue while offline and send automatically when back ---- */
+try{ const nb = document.createElement('div'); nb.id = 'netBar'; nb.textContent = '📡 Offline — your entries will send when you are back online'; document.body.appendChild(nb);
+  const setNet = on => nb.classList.toggle('show', !on);
+  window.addEventListener('offline', ()=>setNet(false)); window.addEventListener('online', ()=>setNet(true));
+  authReady.then(()=>{ try{ db.ref('.info/connected').on('value', s=>{ if (s.val()===false) setTimeout(()=>{ if (!navigator.onLine || true) setNet(false); }, 4000); else setNet(true); }); }catch(e){} });
+}catch(e){}
 /* ---- Android back button: close things in order, go back through screens, double-press to exit ---- */
 let backLast = 0;
 function appBack(){

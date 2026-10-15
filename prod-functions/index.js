@@ -5,6 +5,7 @@
  * Needs the Blaze (pay-as-you-go) plan. Cost for this volume is normally ₹0 (free tier).
  */
 const { onValueCreated, onValueUpdated, onValueWritten } = require('firebase-functions/v2/database');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 admin.initializeApp();
 const REGION = 'asia-southeast1', INSTANCE = 'evp-crm-default-rtdb';
@@ -157,4 +158,31 @@ exports.onChatMessage = onValueCreated(opt('/prod_chat/msgs/{cid}/{id}'), async 
   snap.forEach(u => { if (!want.includes(u.key)) return; u.forEach(t => { const v = t.val(); if (v && v.token) targets.push({ token: v.token, path: `prod_push/${u.key}/${t.key}` }); }); });
   const txt = m.img ? '📷 Photo' : m.au ? '🎤 Voice message' : m.loc ? '📍 Location' : (m.t || '').slice(0, 120);
   await send(targets, m.g ? `${m.g} · ${m.n}` : (m.n || 'New message'), txt, '', { type: 'chat', loud: '1', tab: 'chat', chat: ev.params.cid });
+});
+
+/* ---- Daily owner summary (9:30 pm IST) -> push to Admin / Operations / Production managers ---- */
+const istDate = (d = new Date()) => new Date(d.getTime() + 330 * 60000).toISOString().slice(0, 10);
+exports.dailySummary = onSchedule({ schedule: '30 21 * * *', timeZone: 'Asia/Kolkata', region: REGION }, async () => {
+  const db = admin.database(), today = istDate();
+  const [ses, att, esc, usr] = await Promise.all(['prod_sessions', 'prod_attendance/' + today, 'prod_escalations', 'prod_users'].map(p => db.ref(p).once('value').then(s => s.val() || {})));
+  const meals = Object.values(ses).filter(x => x.date === today);
+  const T = (x, k) => (x.times && x.times[k]) || null;
+  const cooked = meals.filter(x => T(x, 'prodDone')).length, arrived = meals.filter(x => T(x, 'arrived')).length;
+  const staff = Object.values(usr).filter(u => u && !['aggregator', 'admin'].includes(u.role)).length;
+  const present = Object.values(att).filter(r => Object.values((r && r.segs) || {}).some(g => g.i)).length;
+  const open = Object.values(esc).filter(e => e && e.status !== 'closed' && e.status !== 'resolved').length;
+  const body = `${meals.length} meals · ${cooked} cooked · ${arrived} delivered · attendance ${present}/${staff} · ${open} open escalation${open === 1 ? '' : 's'}`;
+  await send(await tokensFor(v => ['admin', 'opsmanager', 'prodmanager'].includes(v.role)), `📊 Day summary — ${today}`, body, '', { type: 'summary', tab: 'home' });
+  await db.ref('prod_settings/dailySummary/' + today).set({ meals: meals.length, cooked, arrived, present, staff, open, ts: Date.now() });
+});
+
+/* ---- Nightly backup (1:30 am IST): whole prod_* data (minus photos/chat media) -> Cloud Storage backups/ ---- */
+exports.nightlyBackup = onSchedule({ schedule: '30 1 * * *', timeZone: 'Asia/Kolkata', region: REGION, memory: '512MiB', timeoutSeconds: 300 }, async () => {
+  const db = admin.database(), out = {};
+  for (const k of ['users', 'sites', 'aggs', 'items', 'recipes', 'basins', 'settings', 'sessions', 'ledger', 'trips', 'ratings', 'feedback', 'escalations', 'attendance', 'notices']) out[k] = (await db.ref('prod_' + k).once('value')).val() || null;
+  const file = admin.storage().bucket().file(`backups/onebyte-${istDate()}.json`);
+  await file.save(JSON.stringify(out), { contentType: 'application/json' });
+  const [files] = await admin.storage().bucket().getFiles({ prefix: 'backups/onebyte-' });   // keep the latest 30
+  const old = files.map(f => f.name).sort().slice(0, -30);
+  await Promise.all(old.map(n => admin.storage().bucket().file(n).delete().catch(() => {})));
 });
