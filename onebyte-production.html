@@ -923,7 +923,7 @@ function reverseIssue(id){
 const REASONS = ['Unsold leftover','Spoilage','Spill / damage','Quality reject','Over-production','Other'];
 const STEP_ROLES = {
   prod:['admin','prodmanager','opsmanager','kitchen','cook'], plan:['admin','prodmanager','opsmanager'], cookstart:['admin','prodmanager','opsmanager','kitchen','cook'], qc1:['admin','prodmanager','opsmanager'],
-  dispatch:['admin','prodmanager','opsmanager','kitchen','cook'], depart:['admin','prodmanager','opsmanager','kitchen','driver'],
+  dispatch:['admin','prodmanager','opsmanager','kitchen','cook','driver'], depart:['admin','prodmanager','opsmanager','kitchen','driver'],
   arrive:['admin','prodmanager','opsmanager','driver','supervisor','counter'],
   qc2:['admin','prodmanager','opsmanager','supervisor','counter'], weigh:['admin','prodmanager','opsmanager','supervisor','counter'],
   close:['admin','prodmanager','opsmanager','supervisor','counter'], send:['admin','prodmanager','opsmanager','kitchen','cook','driver','supervisor','counter']
@@ -1010,6 +1010,12 @@ function stepHead(n, title, ts, extra){
     <b class="grow">${title}</b><span class="sub" style="margin:0">${ts?hm(ts)+(extra||''):''}</span><span class="phcnt" data-pc="${esc(ctx)}"></span><span style="font-size:20px;opacity:.55;margin-left:4px">›</span></div>${ctx?photoBox(ctx,'Photos'):''}`;
 }
 function renderSession(el){
+  renderSession0(el);
+  if (me && me.role==='driver'){   /* driver sees only: timeline, packed & loaded, vehicle trip, transfer */
+    Array.from(el.children).forEach(c=>{ const keep = c.querySelector && (c.querySelector('.jstrip') || c.querySelector('#sBack') || c.querySelector('.stephd[data-step="3"],.stephd[data-step="4"],.stephd[data-step="6"]')); if (!keep) c.remove(); });
+  }
+}
+function renderSession0(el){
   const sid = openSid, parts = sid.split('_'), date = parts[0], siteId = parts[1], meal = parts[2];
   const site = sites[siteId] || {name:siteId}, s = sessions[sid] || {};
   const calc = sessionCalc(s);
