@@ -417,6 +417,13 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
 
 #netBar{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:95;background:#b3261e;color:#fff;font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:99px;box-shadow:0 6px 18px rgba(0,0,0,.3);display:none;white-space:nowrap}
 #netBar.show{display:block}
+
+.phcnt{font-size:12px;font-weight:700;background:var(--ok-soft);color:var(--green);border-radius:99px;padding:2px 8px;margin-left:6px;display:none}.phcnt.on{display:inline-block}
+.stephd:active{opacity:.7}
+.phth{width:76px!important;height:76px!important}
+.stdet-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}
+.stdet-grid img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;cursor:pointer}
+.stdet-body{font-size:14px;line-height:1.5}.stdet-body .phbox,.stdet-body button,.stdet-body label.phadd,.stdet-body .stephd{display:none!important}
 </style>
 </head>
 <body>
@@ -998,8 +1005,9 @@ function lastStamp(s){
 }
 
 function stepHead(n, title, ts, extra){
-  return `<div class="row" style="margin-bottom:8px"><div style="width:26px;height:26px;border-radius:99px;background:${ts?'var(--green)':'var(--line)'};color:${ts?'#fff':'var(--muted)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">${ts?'✓':n}</div>
-    <b class="grow">${title}</b><span class="sub" style="margin:0">${ts?hm(ts)+(extra||''):''}</span></div>${typeof openSid==='string'&&openSid?photoBox(openSid+'_s'+n,'Photos'):''}`;
+  const ctx = typeof openSid==='string'&&openSid ? openSid+'_s'+n : '';
+  return `<div class="row stephd" data-step="${n}" data-stitle="${esc(String(title).replace(/<[^>]*>/g,''))}" style="margin-bottom:8px;cursor:pointer"><div style="width:26px;height:26px;border-radius:99px;background:${ts?'var(--green)':'var(--line)'};color:${ts?'#fff':'var(--muted)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">${ts?'✓':n}</div>
+    <b class="grow">${title}</b><span class="sub" style="margin:0">${ts?hm(ts)+(extra||''):''}</span><span class="phcnt" data-pc="${esc(ctx)}"></span><span style="font-size:20px;opacity:.55;margin-left:4px">›</span></div>${ctx?photoBox(ctx,'Photos'):''}`;
 }
 function renderSession(el){
   const sid = openSid, parts = sid.split('_'), date = parts[0], siteId = parts[1], meal = parts[2];
@@ -2444,10 +2452,12 @@ function phPaint(box){
   const h = phThumbs(box.dataset.ctx, box.classList.contains('ro'));
   if (row.dataset.h !== String(h.length)+':'+Object.keys(PH[box.dataset.ctx]||{}).join(',')){ row.innerHTML = h; row.dataset.h = String(h.length)+':'+Object.keys(PH[box.dataset.ctx]||{}).join(','); }
   box.classList.toggle('empty', box.classList.contains('ro') && !h);
+  phBadge(box.dataset.ctx);
 }
+function phBadge(ctx){ const n = Object.keys(PH[ctx]||{}).length; document.querySelectorAll('.phcnt').forEach(b=>{ if (b.dataset.pc===ctx){ b.textContent = '📷 '+n; b.classList.toggle('on', n>0); } }); }
 function phSub(ctx){
   if (PHsub[ctx]) return; PHsub[ctx] = 1;
-  authReady.then(()=>db.ref(P+'photos/'+ctx).on('value', s=>{ PH[ctx] = s.val()||{}; document.querySelectorAll('.phbox').forEach(b=>{ if (b.dataset.ctx===ctx) phPaint(b); }); }));
+  authReady.then(()=>db.ref(P+'photos/'+ctx).on('value', s=>{ PH[ctx] = s.val()||{}; document.querySelectorAll('.phbox').forEach(b=>{ if (b.dataset.ctx===ctx) phPaint(b); }); phBadge(ctx); }, err=>{ if (!window.__phErr){ window.__phErr = 1; toast('Photos cannot be read — add the prod_photos rule in Firebase (see FIREBASE_RULES_prod.md)'); } }));
 }
 let phQ = false;
 function phInit(){
@@ -2495,7 +2505,7 @@ document.addEventListener('change', e=>{
   const inp = e.target; if (!(inp && inp.type==='file' && inp.closest && inp.closest('.phbox'))) return;
   const box = inp.closest('.phbox'), files = Array.from(inp.files||[]); if (!files.length || !me) return;
   const ctx = box.dataset.ctx; phSub(ctx); toast('Uploading '+files.length+' photo'+(files.length>1?'s':'')+'…');
-  Promise.all(files.map(f=>phCompress(f).then(data=>authReady.then(()=>db.ref(P+'photos/'+ctx).push({ ts:Date.now(), by:me.name, byId:me.id, data }))))).then(()=>toast('📷 Photo saved')).catch(()=>alert('Could not save the photo. Check the internet and try again.'));
+  Promise.all(files.map(f=>phCompress(f).then(data=>authReady.then(()=>db.ref(P+'photos/'+ctx).push({ ts:Date.now(), by:me.name, byId:me.id, data }))))).then(()=>toast('📷 Photo saved')).catch(e=>alert('Could not save the photo. '+((e&&/permission/i.test(e.message||''))?'Database rule for prod_photos is missing (see FIREBASE_RULES_prod.md).':'Check the internet and try again.')));
   inp.value = '';
 });
 
@@ -4062,6 +4072,20 @@ function chatBind(){
 
 document.addEventListener('DOMContentLoaded',()=>{ try{ chatBind(); $('chatBtn').onclick=()=>{ if (can('chat')) go('chat'); }; }catch(e){ console.error(e); } });
 if (document.readyState!=='loading'){ try{ chatBind(); $('chatBtn').onclick=()=>{ if (can('chat')) go('chat'); }; }catch(e){ console.error(e); } }
+/* ---- tap a step header: read-only detail with the full pictures ---- */
+document.addEventListener('click', e=>{
+  const h = e.target.closest && e.target.closest('.stephd'); if (!h || !me || e.target.closest('a,button,input,label')) return;
+  const card = h.closest('.card'); if (!card) return;
+  const ctx = (typeof openSid==='string'&&openSid ? openSid : '')+'_s'+h.dataset.step;
+  const clone = card.cloneNode(true); clone.querySelectorAll('.stephd,.phbox,button,input,select,textarea,label,a[data-reset]').forEach(x=>x.remove());
+  const list = Object.entries(PH[ctx]||{}).sort((a,b)=>a[1].ts-b[1].ts);
+  const parts = String(openSid||'').split('_'), site = sites[parts[1]]||{name:parts[1]||''};
+  openSheet(`<h3>${logoImg(site,24)}${esc(h.dataset.stitle)}</h3><div class="sub" style="margin-bottom:6px">${esc(site.name)} · ${esc(parts[2]||'')} · ${esc(parts[0]||'')}</div>
+    <div class="stdet-body">${clone.innerHTML.trim()?clone.innerHTML:'<div class="sub">Not done yet.</div>'}</div>
+    ${list.length?`<b style="display:block;margin-top:10px">📷 Photos (${list.length})</b><div class="stdet-grid">${list.map(([id,p])=>`<div><img data-pid="${id}" src="${p.data}" alt=""><div class="sub" style="margin:2px 0 0;font-size:11px">${esc(p.by||'')} · ${new Date(p.ts||0).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div></div>`).join('')}</div>`:'<div class="sub" style="margin-top:10px">No photos uploaded for this step.</div>'}
+    <button class="btn sec save" onclick="closeSheet()">Close</button>`);
+  document.querySelectorAll('#sheet .stdet-grid img').forEach(i=>i.onclick=()=>{ closeSheet(); phView(ctx, i.dataset.pid); });
+});
 /* ---- connection indicator: writes queue while offline and send automatically when back ---- */
 try{ const nb = document.createElement('div'); nb.id = 'netBar'; nb.textContent = '📡 Offline — your entries will send when you are back online'; document.body.appendChild(nb);
   const setNet = on => nb.classList.toggle('show', !on);
