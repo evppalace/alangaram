@@ -399,6 +399,18 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
 #chSend{background:#075e54!important;color:#fff;border-radius:50%!important;width:42px;height:42px;font-size:18px!important;display:none}
 #chReply{display:none;background:#f0f2f5;padding:6px 12px;border-left:4px solid #25d366;align-items:center;gap:8px}
 #chRecBar{display:none;background:#fff;padding:10px 14px;align-items:center;gap:12px}#chRecBar b{color:#d93025}
+
+#chatView,#chatView *{color-scheme:light}
+#chatView{color:#111b21}
+#chMsgs,.chbub,.chbub div,.chbub a{color:#111b21}
+.chbub a{color:#027eb5;text-decoration:underline}
+.chbub .chtm,.chbub .chsn small,.chbub .sub{color:#667781}
+.chbub .chsn{color:inherit}
+#chText{background:#fff;color:#111b21;-webkit-text-fill-color:#111b21;caret-color:#075e54;border:1px solid #d8dde1}
+#chText::placeholder{color:#8696a0;-webkit-text-fill-color:#8696a0}
+#chReply,#chReply b,#chReply div{color:#111b21}
+#chRecBar{color:#111b21}
+.chday span{color:#54656f}
 </style>
 </head>
 <body>
@@ -2834,8 +2846,10 @@ function renderAgRep(){
 
 /* ============ v5: PRODUCTION AREA, HAND-OFFS, LOUD ALERTS ============ */
 const wfBy = () => me ? me.name : '';
+const planSig = x => Object.entries((x&&x.items)||{}).filter(([,i])=>i.planned>0).map(([id,i])=>id+':'+i.planned).sort().join('|');
 function stampT(sid, k, extra){
   const [date, siteId, meal] = sid.split('_');
+  if (k==='planned') extra = Object.assign({ sig:planSig(sessions[sid]) }, extra||{});
   return db.ref(P+'sessions/'+sid).update({ date, siteId, meal, ['times/'+k]: Object.assign({ ts:Date.now(), by:wfBy() }, extra||{}) });
 }
 function issuedFor(date, siteId, meal){
@@ -2870,10 +2884,15 @@ function wfDishEdit(sid, w, edit){
     ${edit?`<div class="row" style="margin-top:6px"><select class="grow wfadd" data-sid="${sid}"><option value="">+ Add dish…</option>${av.map(([id,i])=>`<option value="${id}">${i.diet==='nonveg'?'🔴 ':i.diet==='veg'?'🟢 ':''}${esc(i.name)} (${esc(i.unit)})</option>`).join('')}</select><input class="wfaddq" data-sid="${sid}" type="number" inputmode="decimal" step="any" placeholder="plan qty" style="width:92px"></div>
       <button class="btn sec save" data-wf="suggest" data-sid="${sid}" style="margin-top:6px">✨ Fill suggested quantities</button>`:''}`;
 }
+const planAllSent = date => { const l = dayMeals(date).map(m=>wfState(m.sid)).filter(w=>w.planned.length); return l.length>0 && l.every(w=>w.pl&&w.pl.ts&&(w.pl.sig===undefined||w.pl.sig===planSig(w.s))); };
 function wfActions(sid, w){
   const out = [];
   const canPlan = canStep('plan'), canStart = canStep('cookstart');
-  if (canPlan) out.push(`<button class="btn save" data-wf="plan" data-sid="${sid}">${w.pl&&w.pl.ts?'🔁 Send updated plan to kitchen':'📣 Send plan to kitchen'}</button>`);
+  if (canPlan){
+    const sent = !!(w.pl&&w.pl.ts), same = sent && (w.pl.sig===undefined || w.pl.sig===planSig(w.s));
+    if (same) out.push(`<button class="btn" disabled style="width:100%;background:#e3f4ec;color:#0b7a4b;border:1.5px solid #8fd3b3;box-shadow:none;opacity:1">✅ Plan sent to kitchen · ${hm(w.pl.ts)}</button>`);
+    else out.push(`<button class="btn save" data-wf="plan" data-sid="${sid}">${sent?'🔁 Plan changed — send updated plan':'📣 Send plan to kitchen'}</button>`);
+  }
   if (canStart && !(w.cs&&w.cs.ts) && !(w.pd&&w.pd.ts)) out.push(`<button class="btn save" data-wf="start" data-sid="${sid}">🍳 Start cooking</button>`);
   return out.join('');
 }
@@ -2932,7 +2951,7 @@ function renderProd(){
   el.innerHTML = `<h2>👨‍🍳 Production</h2>
     <div class="chips" style="margin-bottom:6px"><div class="chip ${date===todayKey()?'active':''}" data-prd="${todayKey()}">Today</div><div class="chip ${date===dayKey(1)?'active':''}" data-prd="${dayKey(1)}">Tomorrow</div></div>
     <div class="row" style="margin-bottom:10px"><button class="btn sec" id="prPrev" style="padding:9px 14px">‹</button><input type="date" id="prPick" value="${date}" style="text-align:center"><button class="btn sec" id="prNext" style="padding:9px 14px">›</button></div>
-    ${canStep('plan') && planN ? `<button class="btn save" data-wf="planall" data-date="${date}" style="margin-bottom:10px">📣 Send entire plan to kitchen (${planN} meal${planN>1?'s':''})</button>` : ''}
+    ${canStep('plan') && planN ? (planAllSent(date) ? `<button class="btn" disabled style="width:100%;margin-bottom:10px;background:#e3f4ec;color:#0b7a4b;border:1.5px solid #8fd3b3;box-shadow:none;opacity:1">✅ Plan sent to kitchen (${planN} meal${planN>1?'s':''})</button>` : `<button class="btn save" data-wf="planall" data-date="${date}" style="margin-bottom:10px">${dayMeals(date).some(m=>{const w=wfState(m.sid);return w.pl&&w.pl.ts;})?'🔁 Plan changed — send updated plan':'📣 Send entire plan to kitchen'} (${planN} meal${planN>1?'s':''})</button>`) : ''}
     ${flowCardHtml(date,'Flow')}
     ${hello?`<div class="notice info" style="margin-bottom:10px">ℹ️ <div>${hello}</div></div>`:''}
     ${cards.join('') || '<div class="empty">No counters/meals set up yet. Admin: Masters → Counters.</div>'}`;
