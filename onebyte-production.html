@@ -4063,7 +4063,9 @@ if (document.readyState!=='loading'){ try{ chatBind(); $('chatBtn').onclick=()=>
 try{ const nb = document.createElement('div'); nb.id = 'netBar'; nb.textContent = '📡 Offline — your entries will send when you are back online'; document.body.appendChild(nb);
   const setNet = on => nb.classList.toggle('show', !on);
   window.addEventListener('offline', ()=>setNet(false)); window.addEventListener('online', ()=>setNet(true));
-  authReady.then(()=>{ try{ db.ref('.info/connected').on('value', s=>{ if (s.val()===false) setTimeout(()=>{ if (!navigator.onLine || true) setNet(false); }, 4000); else setNet(true); }); }catch(e){} });
+  setNet(navigator.onLine !== false);
+  /* Firebase link flickers on phones; only trust it if the phone itself also reports no network */
+  authReady.then(()=>{ try{ db.ref('.info/connected').on('value', s=>{ if (s.val()===true) setNet(true); else if (navigator.onLine === false) setNet(false); }); }catch(e){} });
 }catch(e){}
 /* ---- Android back button: close things in order, go back through screens, double-press to exit ---- */
 let backLast = 0;
