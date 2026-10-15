@@ -427,6 +427,26 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
 
 .avt{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;object-fit:cover;color:#fff;font-weight:800;vertical-align:middle;margin-right:6px;flex:none;border:2px solid rgba(255,255,255,.7)}
 #who{cursor:pointer}
+
+.dhello{margin:4px 0 8px;font-size:19px}
+.dduty{background:#fff3e0;color:#9a5b00;border-radius:14px;padding:11px 14px;font-weight:700;margin-bottom:10px}.dduty.in{background:#e3f4ec;color:#0b7a4b}
+.dtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+.dtile{background:#fff;border-radius:16px;padding:12px 6px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.08)}.dtile b{display:block;font-size:30px;line-height:1.1}.dtile span{font-size:12px;color:#5b6b64;font-weight:600}
+.dcard{background:#fff;border-radius:20px;padding:14px;margin:10px 0;box-shadow:0 3px 14px rgba(0,0,0,.1);color:#16241e}.dcard.moving{border:2px solid #25d366}
+.dtop{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.dtop .grow{flex:1 1 150px;min-width:150px}.dtop .lgchip{margin-right:0}.dtop b{font-size:18px}.dst{font-size:12.5px;font-weight:800;background:#eef5f1;color:#075e54;border-radius:99px;padding:5px 10px;white-space:nowrap}
+.dsub{font-size:13.5px;color:#5b6b64;margin:6px 0}
+.dcount{margin:10px 0 4px;font-size:26px;font-weight:900;color:#075e54}.dcount small{display:block;font-size:12px;font-weight:600;color:#5b6b64}.dcount.soon{color:#c76a00}.dcount.late{color:#b3261e}
+.ddelay{background:#fdecea;color:#b3261e;border-radius:12px;padding:8px 12px;font-weight:800;margin:6px 0}
+.dchain{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.dchain span{background:#f1f3f2;color:#7a8a83;border-radius:99px;padding:5px 10px;font-size:12.5px;font-weight:700}.dchain span.on{background:#d9fdd3;color:#0b7a4b}
+.dok{background:#e3f4ec;color:#0b7a4b;border-radius:12px;padding:9px 12px;font-weight:700;margin:8px 0}
+.dcheck{background:#f6f8f7;border-radius:14px;padding:10px 12px;margin:8px 0}.dcheck b small{display:block;font-weight:500;color:#5b6b64}.dcheck label{display:flex;align-items:center;gap:10px;font-size:16px;padding:9px 0;font-weight:600;color:#16241e}.dcheck input{width:24px;height:24px;flex:none;accent-color:#0b7a4b}
+.dbtn{display:block;width:100%;border:0;border-radius:16px;padding:15px 12px;font-size:18px;font-weight:900;background:#e3ece8;color:#0f3d2e;cursor:pointer;margin-top:10px;line-height:1.2}.dbtn small{display:block;font-size:13px;font-weight:600;opacity:.85;margin-top:2px}
+.dbtn.go{background:linear-gradient(135deg,#25d366,#0b8a4a);color:#fff;box-shadow:0 6px 16px rgba(11,138,74,.35)}.dbtn.warn{background:linear-gradient(135deg,#ffb347,#e8820c);color:#3a2000}.dbtn:disabled{opacity:.45}
+.drow2{display:grid;grid-template-columns:2fr 1fr;gap:8px}
+#sheet .dgo{font-size:18px;padding:16px}
+#drvGate{position:fixed;inset:0;z-index:79;background:linear-gradient(160deg,#075e54,#0b8a4a);display:none;align-items:center;justify-content:center;padding:20px}#drvGate.show{display:flex}
+.dg-card{background:#fff;border-radius:26px;padding:26px 20px;text-align:center;width:100%;max-width:380px;color:#16241e}.dg-card h2{margin:6px 0 4px;font-size:24px}
+.dprob{display:grid;grid-template-columns:1fr 1fr;gap:10px}.dprob button{border:0;border-radius:18px;background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.1);padding:16px 8px;font-size:15px;font-weight:800;color:#16241e}.dprob button span{display:block;font-size:34px}.dprob button small{display:block;font-weight:500;color:#5b6b64;font-size:12.5px}
 </style>
 </head>
 <body>
@@ -467,6 +487,7 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
   <div class="page" id="p-req"></div>
   <div class="page" id="p-attend"></div>
   <div class="page" id="p-chat"></div>
+  <div class="page" id="p-dresc"></div>
 
   <div class="page" id="p-agrep"></div>
   <div class="page" id="p-trends"></div>
@@ -510,13 +531,13 @@ const ROLES = {
   store:       { label:'Store Keeper',       desc:'Purchase, kitchen issue & stock', tabs:['home','req','issue','stock','purchase','prod','plan','attend','chat'] },
   kitchen:     { label:'Kitchen',            desc:'Production, cooking & dishes',         tabs:['home','prod','issue','meals','stock','plan','dishes','attend','chat'] },
   cook:        { label:'Cook / Chef',        desc:'Requirement & cooking',          tabs:['home','req','prod','issue','meals','dishes','attend','chat'] },
-  driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','meals','attend','chat'] },
+  driver:      { label:'Driver',             desc:'Trips',                         tabs:['home','attend','dresc','chat'] },
   supervisor:  { label:'Site Supervisor',    desc:'Trips & receiving, own counter, client escalations',tabs:['home','meals','dishes','client','attend','chat'], site:true },
   aggregator:  { label:'Aggregator / Client', desc:'Live view, ratings, feedback, escalation', tabs:['agg','aglive','agrate','agesc','agrep','agcontact'], siteOpt:true },
   counter:     { label:'Counter Staff',      desc:'Loading & weighing, own counter',tabs:['home','meals','dishes','attend','chat'], site:true }
 };
 const isPMrole = r => r==='prodmanager' || r==='opsmanager';
-const NAV = { req:['📝','Requirement'], prod:['👨‍🍳','Production'], dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'], attend:['🕒','Attendance'], chat:['🗨️','Chat'] };
+const NAV = { req:['📝','Requirement'], prod:['👨‍🍳','Production'], dishes:['🍛','Dishes'], agrep:['📑','Reports'], agg:['🏠','Today'], aglive:['📍','Live'], agrate:['⭐','Rate'], agesc:['🚨','Escalate'], agcontact:['📞','Contact'], client:['💬','Client'], home:['🏠','Home'], stock:['📦','Stock'], purchase:['🛒','Purchase'], issue:['📤','Issue'], plan:['🗓️','Plan'], meals:['🍳','Meals'], reports:['📄','Reports'], trends:['📈','Trends'], masters:['⚙️','Masters'], users:['👥','Users'], attend:['🕒','Attendance'], chat:['🗨️','Chat'], dresc:['🆘','Problem'] };
 const MEALS = ['breakfast','lunch','snacks','dinner'];
 const MEAL_ICON = {breakfast:'🌅', lunch:'🍛', snacks:'☕', dinner:'🌙'};
 const UNITS = ['kg','g','L','ml','nos','pack','box','bunch','pkt'];
@@ -634,7 +655,7 @@ function listenNow(){
   bind('ratings', v=>ratings=v);
   bind('feedback', v=>feedbacks=v);
   bind('escalations', v=>escs=v);
-  db.ref(P+'attendance').limitToLast(70).on('value', x=>{ attendance = x.val()||{}; renderAll(); });
+  db.ref(P+'attendance').limitToLast(70).on('value', x=>{ attendance = x.val()||{}; __attLoaded = true; renderAll(); });
   db.ref(P+'sessions').limitToLast(600).on('value', s=>{ sessions = s.val()||{}; _ld.s=1; renderAll(); });
   db.ref(P+'ledger').limitToLast(30000).on('value', s=>{ ledger = s.val()||{}; _ld.l=1; renderAll(); });
 }
@@ -667,6 +688,8 @@ function renderAll(){
   if (can('prod'))     renderProd();
   if (can('req'))      renderReq();
   if (can('attend'))   renderAttend();
+  if (can('dresc'))    renderDresc();
+  try{ drvGate(); }catch(e){}
   if (can('chat'))     { renderChatList(); chatListen(); } else { try{ chatBadge(); }catch(e){} }
   try{ attendTick(); }catch(e){}
   try{ updateBell(); uwAttach(); botShow(); pushInit(); dlSchedule(); }catch(e){}
@@ -708,6 +731,7 @@ function postNotice(){
 }
 function renderHome(){
   const el = $('p-home');
+  if (me && me.role==='driver'){ renderDriverHome(el); return; }
   if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { skippedRender = true; return; }
   const list = Object.entries(items).filter(([,i])=>i.active!==false);
   const raw = list.filter(([,i])=>i.type==='raw');
@@ -2574,7 +2598,7 @@ let botOpen = false, botLog = [], botFlow = null;
 const botEl = document.createElement('div'); botEl.id = 'bot'; document.body.appendChild(botEl);
 const botFab = document.createElement('button'); botFab.id = 'botFab'; botFab.setAttribute('aria-label','Chat assistant'); botFab.innerHTML = '💬'; document.body.appendChild(botFab);
 botFab.onclick = ()=>botToggle(true);
-function botShow(){ botFab.style.display = (me && $('app').style.display!=='none') ? 'flex' : 'none'; if (!me && botOpen) botToggle(false); }
+function botShow(){ botFab.style.display = (me && me.role!=='driver' && $('app').style.display!=='none') ? 'flex' : 'none'; if (!me && botOpen) botToggle(false); }
 const botChips = () => isAgg()
   ? ['Where is my food?','Today\'s wastage','Quality check','Today\'s ratings','Raise an issue','Send feedback','Contact numbers','Emergency']
   : ['Vehicles on road','Today\'s status','Low stock','Late trips','Open escalations','Contact numbers','Emergency'];
@@ -3299,7 +3323,7 @@ function dlList(dateKey, roleOnly){
         const due = dlAt(dateKey,hh), start = due - dlLead(st)*60000, over = Math.floor((now-due)/60000);
         const owner = st.owners.includes(me.role), esc2 = !roleOnly && over>=10 && ['prodmanager','opsmanager','admin'].includes(me.role);
         if (!owner && !esc2) return;
-        out.push({ key:dateKey+'|'+siteId+'|'+meal+'|'+st.k, sid, st, site:site.name||siteId, meal, hh, due, start, over, done:st.done(w), owner, esc:!owner });
+        out.push({ key:dateKey+'|'+siteId+'|'+meal+'|'+st.k, sid, st, site:site.name||siteId, meal, hh, due, start, over, done:st.done(w) || (owner && st.k==='depart' && !!(w.s&&w.s.delay)), owner, esc:!owner });
       });
     });
   });
@@ -3328,7 +3352,7 @@ function dlPaint(list, lv){
     ${list.length>4?`<div class="sub">+${list.length-4} more</div>`:''}
     <div class="two" style="margin-top:12px"><button class="btn" id="dlOpen">Do it now</button><button class="btn sec" id="dlSnz">Snooze 2 min</button></div></div>`;
   b.classList.add('show');
-  $('dlOpen').onclick = ()=>{ const a = list[0]; if (a.st.go==='meals'){ openSid = a.sid; } if (a.st.go==='issue' || a.st.go==='prod' || a.st.go==='meals'){ if (can(a.st.go)) go(a.st.go); } b.classList.remove('show'); b._sig=''; list.forEach(x=>dlSnooze[x.key] = Date.now()+90*1000); };
+  $('dlOpen').onclick = ()=>{ const a = list[0]; if (me.role==='driver'){ go('home'); b.classList.remove('show'); b._sig=''; list.forEach(x=>dlSnooze[x.key] = Date.now()+90*1000); return; } if (a.st.go==='meals'){ openSid = a.sid; } if (a.st.go==='issue' || a.st.go==='prod' || a.st.go==='meals'){ if (can(a.st.go)) go(a.st.go); } b.classList.remove('show'); b._sig=''; list.forEach(x=>dlSnooze[x.key] = Date.now()+90*1000); };
   $('dlSnz').onclick = ()=>{ list.forEach(x=>dlSnooze[x.key] = Date.now()+120000); b.classList.remove('show'); b._sig=''; try{ if (navigator.vibrate) navigator.vibrate(0); }catch(e){} };
 }
 function dlTick(){
@@ -3746,7 +3770,7 @@ function attendTick(){
     Object.keys(attendance).filter(k=>k<d).forEach(k=>{ const rec = attRec(k,me.id), s = attOpen(rec); if (!s) return;
       const o = (rec.last && rec.last.ts>s.i) ? rec.last.ts : s.i+8*3600000; db.ref(P+'attendance/'+k+'/'+me.id+'/segs/'+s.id).update({ o, auto:true }); });
   }
-  const h = $('p-home'); if (h && can('home')){
+  const h = $('p-home'); if (h && can('home') && me.role!=='driver'){
     const html = attendCard(); const ex = h.querySelector('#attCard');
     if (ex) ex.outerHTML = html; else h.insertAdjacentHTML('afterbegin', html);
   }
@@ -3763,7 +3787,7 @@ document.addEventListener('click', e=>{
   else if (b.dataset.att==='later') closeSheet();
 });
 function attPrompt(){
-  if (attPrompted || !me || me.id==='setup' || me.role==='aggregator' || !can('attend')) return;
+  if (attPrompted || !me || me.id==='setup' || me.role==='aggregator' || me.role==='driver' || !can('attend')) return;
   if (!_ld.s) { setTimeout(attPrompt, 1200); return; } attPrompted = true;
   if (attOpen(attRec(todayKey(),me.id)) || attOff(todayKey())) return;
   const g = new Date().getHours(); const hi = g<12?'Good morning':g<17?'Good afternoon':'Good evening';
@@ -4143,6 +4167,150 @@ try{ const nb = document.createElement('div'); nb.id = 'netBar'; nb.textContent 
   /* Firebase link flickers on phones; only trust it if the phone itself also reports no network */
   authReady.then(()=>{ try{ db.ref('.info/connected').on('value', s=>{ if (s.val()===true) setNet(true); else if (navigator.onLine === false) setNet(false); }); }catch(e){} });
 }catch(e){}
+/* ============ DRIVER: very simple duty dashboard ============ */
+let drvChk = {}, __attLoaded = false;
+const DRV_REASONS = ['Production delay','Vehicle issue','Traffic','Driver late','Other'];
+const drvMin = m => { m = Math.max(0, Math.round(m)); return m>=60 ? Math.floor(m/60)+' hr '+(m%60)+' min' : m+' min'; };
+function drvTrips(){
+  const d = todayKey(), out = [];
+  Object.entries(sites).forEach(([siteId,site])=>{ (site.meals||[]).forEach(meal=>{
+    const sid = sidOf(d,siteId,meal), s = sessions[sid]||{}, sc = ((site.sched||{})[meal])||{};
+    if (!sc.depart && !Object.keys(s.times||{}).length) return;
+    out.push({ sid, siteId, site, meal, s, sc, due: sc.depart ? dlAt(d, sc.depart) : null });
+  }); });
+  const dn = t => !!T(t.s,'retEnd');
+  return out.sort((a,b)=> (dn(a)-dn(b)) || ((a.due||9e15)-(b.due||9e15)));
+}
+function drvDelayMin(x, site){ if (x.delayMin!=null) return x.delayMin; const sc = ((site||{}).sched||{})[x.meal]||{}; const dp = T(x,'departed'); return dp && sc.depart ? Math.max(0, lateMin(x.date, sc.depart, dp.ts)||0) : 0; }
+function drvStats(prefix){
+  let n = 0, late = 0, km = 0;
+  Object.values(sessions).forEach(x=>{ if (!x || !x.date || !String(x.date).startsWith(prefix) || x.driver!==me.name || !T(x,'departed')) return;
+    n++; if (drvDelayMin(x, sites[x.siteId]) > 5) late++;
+    if (x.odo&&x.odo.start!=null&&x.odo.end!=null) km += x.odo.end-x.odo.start; });
+  return { n, late, ok:n-late, km:Math.round(km) };
+}
+function drvTile(v, l, c){ return `<div class="dtile"><b style="color:${c}">${v}</b><span>${l}</span></div>`; }
+function drvCard(t){
+  const s = t.s, now = Date.now(), dp = T(s,'departed'), ar = T(s,'arrived'), rs = T(s,'retStart'), re = T(s,'retEnd');
+  const loaded = T(s,'loaded'), packed = T(s,'packed'), pd = T(s,'prodDone');
+  const mins = t.due ? (t.due-now)/60000 : null, ck = s.vcheck, c = drvChk[t.sid] || {};
+  const packBy = dlTime(t.site, t.meal, {f:'packBy'});
+  let st, head = '', body = '';
+  const chain = `<div class="dchain"><span class="${pd?'on':''}">🍳 Cooking ${pd?'✓':''}</span><span class="${packed?'on':''}">📦 Packed ${packed?'✓':''}</span><span class="${loaded?'on':''}">🚛 Loaded ${loaded?'✓':''}</span></div>`;
+  if (re){ st = '✅ Trip complete'; body = `<div class="dsub">Left kitchen ${hm(dp&&dp.ts)} · Reached site ${hm(ar&&ar.ts)} · Back at kitchen ${hm(re.ts)}</div>${s.delayMin>5?`<div class="dsub" style="color:#b3261e">Started ${s.delayMin} min late${s.delay?' — '+esc(s.delay.reason):''}</div>`:'<div class="dsub" style="color:#0b7a4b">Started on time</div>'}`; }
+  else if (rs){ st = '↩ Returning to kitchen'; body = `<div class="dsub">Left site ${hm(rs.ts)} · ${drvMin((now-rs.ts)/60000)} on the road. Location is shared.</div><button class="dbtn go" data-drv="rend" data-sid="${t.sid}">🏭 I REACHED KITCHEN<small>சமையலறை வந்துவிட்டேன்</small></button>`; }
+  else if (ar){ st = '✅ Food delivered'; body = `<div class="dsub">Reached ${hm(ar.ts)}. Now return to the kitchen.</div><button class="dbtn go" data-drv="rstart" data-sid="${t.sid}">↩ START RETURN TO KITCHEN<small>சமையலறைக்கு திரும்பு</small></button>`; }
+  else if (dp){ st = '🚚 On the way'; body = `<div class="dsub">Left ${hm(dp.ts)} · ${drvMin((now-dp.ts)/60000)} on the road. Location is shared.</div><button class="dbtn go" data-drv="arrive" data-sid="${t.sid}">📍 I HAVE ARRIVED<small>வந்து சேர்ந்தேன்</small></button>`; }
+  else {
+    const late = mins!=null && mins<=0;
+    st = loaded ? (late?'⏰ GO NOW':'✅ Ready to go') : (pd||packed ? '📦 Being packed' : '🍳 Food is being cooked');
+    head = t.due ? `<div class="dcount ${late?'late':mins<=30?'soon':''}">${late ? 'Late by '+drvMin(-mins) : 'Leaves in '+drvMin(mins)}<small>${esc(t.sc.depart)} start time</small></div>` : '';
+    if (s.delay) head += `<div class="ddelay">⏱ Delay: ${esc(s.delay.reason)}${t.due&&late?' — running '+drvMin(-mins):''}</div>`;
+    body = chain + (packBy?`<div class="dsub">Food packed by ${esc(packBy)}</div>`:'');
+    if (!loaded) {
+      body += ck ? `<div class="dok">✅ Vehicle ready ${hm(ck.ts)}</div>` : `<div class="dcheck"><b>🔧 Get the vehicle ready<small>வாகனத்தை தயார் செய்</small></b>
+        ${[['diesel','⛽ Diesel / fuel is enough'],['tyres','🛞 Tyres & brakes OK'],['clean','🧼 Vehicle is clean'],['docs','📄 Papers & phone charged']].map(([k,l])=>`<label><input type="checkbox" data-dchk="${k}" data-sid="${t.sid}" ${c[k]?'checked':''}> ${l}</label>`).join('')}
+        <button class="dbtn" data-drv="check" data-sid="${t.sid}" ${['diesel','tyres','clean','docs'].every(k=>c[k])?'':'disabled'}>✔ VEHICLE IS READY<small>வாகனம் தயார்</small></button></div>`;
+      body += (pd||packed) ? `<button class="dbtn go" data-drv="load" data-sid="${t.sid}">📦 FOOD LOADED IN VEHICLE<small>உணவு ஏற்றினேன்</small></button>` : `<div class="dsub">Wait for the food. You will get an alarm when it is ready.</div>`;
+    } else {
+      body += (ck?`<div class="dok">✅ Vehicle ready ${hm(ck.ts)}</div>`:'')+`<div class="drow2"><button class="dbtn go" data-drv="start" data-sid="${t.sid}">🚚 START TRIP<small>பயணம் தொடங்கு</small></button><button class="dbtn warn" data-drv="delay" data-sid="${t.sid}">⏱ DELAY<small>தாமதம்</small></button></div>`;
+    }
+  }
+  return `<div class="dcard ${dp&&!ar?'moving':''}"><div class="dtop">${logoImg(t.site,28)}<div class="grow"><b>${esc(t.site.name||t.siteId)}</b><div class="dsub" style="margin:0">${MEAL_ICON[t.meal]||''} ${esc(t.meal)}${t.sc.depart?' · leave '+esc(t.sc.depart):''}</div></div><span class="dst">${st}</span></div>${head}${body}</div>`;
+}
+function renderDriverHome(el){
+  el = el || $('p-home'); if (!el || !me) return;
+  if ($('sheet').classList.contains('show')) return;
+  if (el.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const d = todayKey(), rec = attRec(d, me.id), seg = attSegs(rec)[0], g = new Date().getHours(), hi = g<12?'Good morning':g<17?'Good afternoon':'Good evening';
+  const td = drvStats(d), mo = drvStats(d.slice(0,7)), trips = drvTrips();
+  const upcoming = trips.filter(t=>!T(t.s,'retEnd')).length;
+  el.innerHTML = `<div class="dhello"><div><b>${hi}, ${esc((me.name||'').split(' ')[0])} 👋</b><div class="dsub" style="margin:2px 0 0">${new Date().toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'})}</div></div></div>
+    <div class="dduty ${seg?'in':''}">${seg ? `✅ Duty started at <b>${attT(seg.i)}</b>${attSegs(rec).some(x=>x.i&&!x.o)?'':' · signed out'}` : '⚠ You have not signed in'}</div>
+    <div class="dtiles">${drvTile(td.n,'Trips today','#075e54')}${drvTile(td.ok,'On time','#0b7a4b')}${drvTile(td.late,'Delayed','#b3261e')}</div>
+    <div class="dsub" style="text-align:center">This month: <b>${mo.n}</b> trips · <b style="color:#0b7a4b">${mo.ok}</b> on time · <b style="color:#b3261e">${mo.late}</b> delayed${mo.km?' · '+mo.km+' km':''}</div>
+    <h2 style="margin-top:14px">🚚 Today's trips ${upcoming?`<span class="badge amber">${upcoming} to do</span>`:''}</h2>
+    ${trips.length ? trips.map(drvCard).join('') : '<div class="empty">No trips yet today.<br>You will be alerted when food is ready.</div>'}`;
+}
+/* sign in is mandatory for drivers: full-screen gate until they have signed in today */
+function drvGate(){
+  let g = document.getElementById('drvGate');
+  const need = me && me.role==='driver' && me.id!=='setup' && __attLoaded && !attSegs(attRec(todayKey(), me.id)).length;
+  if (!need){ if (g) g.classList.remove('show'); return; }
+  if (!g){ g = document.createElement('div'); g.id = 'drvGate'; document.body.appendChild(g); }
+  g.innerHTML = `<div class="dg-card"><div style="font-size:64px">🕒</div><h2>Sign in to start duty</h2><div class="dsub" style="text-align:center;font-size:15px">வேலையை தொடங்க வருகை பதிவு செய்யவும்</div>
+    <button class="dbtn go" id="dgIn" style="margin-top:18px">✅ SIGN IN<small>வருகை பதிவு</small></button>
+    <div class="dsub" style="text-align:center;margin-top:10px">Keep your phone Location (GPS) ON.</div>
+    <button class="btn sec" id="dgOut" style="margin-top:14px">Logout</button></div>`;
+  g.classList.add('show');
+  $('dgIn').onclick = attSignIn; $('dgOut').onclick = ()=>{ logout(); };
+}
+/* ---- driver actions ---- */
+const drvSet = (sid, up) => { const [date, siteId, meal] = sid.split('_'); return db.ref(P+'sessions/'+sid).update(Object.assign({ date, siteId, meal }, up)); };
+function drvDelaySheet(sid){
+  openSheet(`<h3>⏱ Why is the trip delayed?<br><small style="font-weight:500">தாமத காரணம்</small></h3><div class="dsub" style="margin-bottom:8px">Pick the reason. The delay timer keeps running until you start the trip.</div>
+    ${DRV_REASONS.map(r=>`<button class="dbtn" data-dreason="${esc(r)}" style="margin-bottom:8px">${esc(r)}</button>`).join('')}<button class="btn sec save" onclick="closeSheet()">Cancel</button>`);
+  document.querySelectorAll('#sheet [data-dreason]').forEach(b=>b.onclick=()=>{ drvSet(sid, { delay:{ reason:b.dataset.dreason, ts:Date.now(), by:me.name } }).then(()=>{ closeSheet(); toast('Delay noted: '+b.dataset.dreason); renderDriverHome(); }); });
+}
+function drvStartSheet(sid){
+  const s = sessions[sid]||{}, [date,siteId,meal] = sid.split('_'), site = sites[siteId]||{}, sc = (site.sched||{})[meal]||{}, due = sc.depart ? dlAt(date, sc.depart) : null, late = due ? Math.round((Date.now()-due)/60000) : 0;
+  let lastV = ''; try{ lastV = localStorage.getItem('drv_veh')||''; }catch(e){}
+  openSheet(`<h3>🚚 Start trip<br><small style="font-weight:500">${esc(site.name||'')} · ${esc(meal)}</small></h3>
+    <label>Vehicle number</label><input id="ds_veh" value="${esc(s.vehicle||lastV)}" placeholder="TN 09 AB 1234" autocapitalize="characters">
+    <label>🛣️ Meter reading (km) now</label><input id="ds_odo" type="number" inputmode="decimal" step="any" value="${s.odo&&s.odo.start!=null?s.odo.start:''}" placeholder="e.g. 45210">
+    ${photoBox(sid+'_odoS','📷 Photo of the meter')}
+    ${late>5&&!(s.delay&&s.delay.reason)?`<label>⏱ Why late? (${late} min)</label><select id="ds_why"><option value="">— choose —</option>${DRV_REASONS.map(r=>`<option>${esc(r)}</option>`).join('')}</select>`:''}
+    <button class="btn save dgo" id="ds_go">🚚 START TRIP NOW</button><button class="btn sec save" onclick="closeSheet()">Cancel</button>`);
+  $('ds_go').onclick = ()=>{
+    const veh = $('ds_veh').value.trim(), o = $('ds_odo').value.trim(), why = $('ds_why') ? $('ds_why').value : '';
+    if (!veh){ alert('Enter the vehicle number.'); return; } if (o===''||!(num(o)>=0)){ alert('Enter the meter reading.'); return; } if ($('ds_why') && !why){ alert('Choose why the trip is late.'); return; }
+    $('ds_go').disabled = true; try{ localStorage.setItem('drv_veh', veh); }catch(e){}
+    attGetPos(loc=>{ const now = Date.now(), delayMin = due ? Math.max(0, Math.round((now-due)/60000)) : 0;
+      const up = { ['odo/start']:num(o), ['odo/startBy']:me.name, vehicle:veh, driver:me.name, delayMin, ['times/departed']:{ ts:now, by:me.name, loc:loc||null } };
+      if (why) up.delay = { reason:why, ts:now, by:me.name };
+      drvSet(sid, up).then(()=>{ closeSheet(); toast('🚚 Trip started'); startTracking(sid); renderDriverHome(); }).catch(()=>{ $('ds_go').disabled = false; alert('Could not start. Check the internet.'); }); });
+  };
+}
+function drvArriveSheet(sid){
+  const s = sessions[sid]||{}, site = sites[sid.split('_')[1]]||{};
+  openSheet(`<h3>📍 I have arrived<br><small style="font-weight:500">${esc(site.name||'')}</small></h3>
+    <label>🛣️ Meter reading (km) now</label><input id="da_odo" type="number" inputmode="decimal" step="any" value="${s.odo&&s.odo.end!=null?s.odo.end:''}" placeholder="${s.odo&&s.odo.start!=null?'started at '+fmt(s.odo.start):''}">
+    ${photoBox(sid+'_odoE','📷 Photo of the meter')}
+    <button class="btn save dgo" id="da_go">📍 SUBMIT — ARRIVED</button><button class="btn sec save" onclick="closeSheet()">Cancel</button>`);
+  $('da_go').onclick = ()=>{ const o = $('da_odo').value.trim(); if (o===''||!(num(o)>=0)){ alert('Enter the meter reading.'); return; } if (s.odo&&s.odo.start!=null&&num(o)<s.odo.start){ alert('Meter is less than the start reading ('+fmt(s.odo.start)+').'); return; }
+    $('da_go').disabled = true; attGetPos(loc=>{ stopTracking(); drvSet(sid, { ['odo/end']:num(o), ['odo/endBy']:me.name, ['times/arrived']:{ ts:Date.now(), by:me.name, loc:loc||null } }).then(()=>{ closeSheet(); toast('✅ Arrival recorded'); renderDriverHome(); }); }); };
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest && e.target.closest('[data-drv]'); if (!b || !me || me.role!=='driver') return;
+  const sid = b.dataset.sid, a = b.dataset.drv;
+  if (a==='check'){ const c = drvChk[sid]||{}; drvSet(sid, { vcheck:Object.assign({ ts:Date.now(), by:me.name }, c) }).then(()=>{ toast('✅ Vehicle ready'); renderDriverHome(); }); }
+  else if (a==='load'){ const s = sessions[sid]||{}, now = Date.now(), up = { ['times/loaded']:{ ts:now, by:me.name } }; if (!T(s,'packed')) up['times/packed'] = { ts:now, by:me.name }; drvSet(sid, up).then(()=>{ toast('📦 Food loaded'); renderDriverHome(); }); }
+  else if (a==='start') drvStartSheet(sid);
+  else if (a==='delay') drvDelaySheet(sid);
+  else if (a==='arrive') drvArriveSheet(sid);
+  else if (a==='rstart'){ b.disabled = true; attGetPos(loc=>{ drvSet(sid, { ['times/retStart']:{ ts:Date.now(), by:me.name, loc:loc||null } }).then(()=>{ toast('↩ Return started'); setTimeout(()=>startTracking(sid),300); renderDriverHome(); }); }); }
+  else if (a==='rend'){ b.disabled = true; attGetPos(loc=>{ stopTracking(); drvSet(sid, { ['times/retEnd']:{ ts:Date.now(), by:me.name, loc:loc||null } }).then(()=>{ toast('🏭 Reached kitchen — trip complete'); renderDriverHome(); }); }); }
+});
+document.addEventListener('change', e=>{ const c = e.target; if (c && c.dataset && c.dataset.dchk){ const sid = c.dataset.sid; drvChk[sid] = drvChk[sid]||{}; drvChk[sid][c.dataset.dchk] = c.checked; const card = c.closest('.dcheck'); const btn = card && card.querySelector('[data-drv="check"]'); if (btn) btn.disabled = !['diesel','tyres','clean','docs'].every(k=>drvChk[sid][k]); } });
+setInterval(()=>{ try{ if (me && me.role==='driver'){ drvGate(); if ($('p-home').classList.contains('active')) renderDriverHome(); } }catch(e){} }, 30000);
+/* driver problem reporting (escalation) */
+const DRV_PROBLEMS = [['🔧','Vehicle breakdown','வாகனம் பழுது','high'],['💥','Accident','விபத்து','critical'],['🚦','Traffic jam','போக்குவரத்து நெரிசல்','medium'],['🍲','Food spilled / damaged','உணவு சிந்தியது','high'],['⏳','Production delay','சமையல் தாமதம்','medium'],['❓','Other problem','வேறு பிரச்சனை','medium']];
+function renderDresc(){
+  const el = $('p-dresc'); if (!el || !me) return;
+  if ($('sheet').classList.contains('show')) return;
+  const mine = Object.entries(escs).filter(([,e])=>e.by===me.name && e.src==='driver').sort((a,b)=>b[1].ts-a[1].ts).slice(0,15);
+  el.innerHTML = `<h2>🆘 Report a problem <small class="sub" style="display:inline">பிரச்சனை சொல்லுங்கள்</small></h2><div class="dsub" style="margin-bottom:8px">Tap what happened. The kitchen and managers are alerted at once.</div>
+    <div class="dprob">${DRV_PROBLEMS.map((p,i)=>`<button data-prob="${i}"><span>${p[0]}</span>${p[1]}<small>${p[2]}</small></button>`).join('')}</div>
+    <h2 style="margin-top:16px">My reports</h2>${mine.length ? mine.map(([id,e])=>`<div class="card"><div class="row"><b class="grow">${esc(e.cat)}</b><span class="badge ${e.status==='open'?'amber':''}">${esc(e.status==='open'?'Sent':e.status==='ack'?'Seen':e.status==='progress'?'Working':'Resolved')}</span></div><div class="sub">${new Date(e.ts).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${e.text&&e.text!==e.cat?' · '+esc(e.text):''}</div></div>`).join('') : '<div class="empty">No reports.</div>'}`;
+  el.querySelectorAll('[data-prob]').forEach(b=>b.onclick=()=>{ const p = DRV_PROBLEMS[+b.dataset.prob];
+    const act = drvTrips().find(t=>T(t.s,'departed') && !T(t.s,'retEnd')) || drvTrips().find(t=>!T(t.s,'retEnd'));
+    openSheet(`<h3>${p[0]} ${esc(p[1])}</h3><label>Anything to add? (optional)</label><textarea id="dp_txt" rows="3" placeholder="Where are you? What happened?"></textarea>${photoBox(draftCtx('dprob'),'📷 Add photo',{draft:'dprob'})}
+      <button class="btn save dgo" id="dp_go" style="background:linear-gradient(135deg,#ff6b6b,#d6453a)">🆘 SEND NOW</button><button class="btn sec save" onclick="closeSheet()">Cancel</button>`);
+    $('dp_go').onclick = ()=>{ const n = Object.values(escs).reduce((a,e)=>Math.max(a,e.n||0),0)+1, now = Date.now(), txt = $('dp_txt').value.trim();
+      attGetPos(loc=>{ db.ref(P+'escalations').push({ n, siteId:act?act.siteId:'all', meal:act?act.meal:null, cat:p[1], sev:p[3], text:txt||p[1], by:me.name, byRole:'driver', src:'driver', loc:loc||null, ts:now, upd:now, status:'open', level:1, due:now+slaHrs(p[3])*3600000, photoKey:usePh('dprob') }).then(()=>{ closeSheet(); toast('🆘 Sent to the kitchen team'); }); }); };
+  });
+}
+
 /* ---- Android back button: close things in order, go back through screens, double-press to exit ---- */
 let backLast = 0;
 function appBack(){
