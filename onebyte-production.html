@@ -436,6 +436,7 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
 .dtop{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.dtop .grow{flex:1 1 150px;min-width:150px}.dtop .lgchip{margin-right:0}.dtop b{font-size:18px}.dst{font-size:12.5px;font-weight:800;background:#eef5f1;color:#075e54;border-radius:99px;padding:5px 10px;white-space:nowrap}
 .dsub{font-size:13.5px;color:#5b6b64;margin:6px 0}
 .dcount{margin:10px 0 4px;font-size:26px;font-weight:900;color:#075e54}.dcount small{display:block;font-size:12px;font-weight:600;color:#5b6b64}.dcount.soon{color:#c76a00}.dcount.late{color:#b3261e}
+.dload{background:#e8f5ee;border-radius:14px;padding:10px 12px;margin:10px 0 4px;text-align:center}.dload span{display:block;font-size:14px;color:#075e54;font-weight:700}.dload big{display:block;font-size:34px;font-weight:900;color:#075e54;font-variant-numeric:tabular-nums;line-height:1.2}.dload small{display:block;font-size:12px;color:#5b6b64;font-weight:600}.dload.soon{background:#fff3e0}.dload.soon span,.dload.soon big{color:#c76a00}.dload.late{background:#fdecea}.dload.late span,.dload.late big{color:#b3261e}.dload.wait{background:#f1f3f2}.dload.wait span{color:#5b6b64}
 .ddelay{background:#fdecea;color:#b3261e;border-radius:12px;padding:8px 12px;font-weight:800;margin:6px 0}
 .dchain{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.dchain span{background:#f1f3f2;color:#7a8a83;border-radius:99px;padding:5px 10px;font-size:12.5px;font-weight:700}.dchain span.on{background:#d9fdd3;color:#0b7a4b}
 .dok{background:#e3f4ec;color:#0b7a4b;border-radius:12px;padding:9px 12px;font-weight:700;margin:8px 0}
@@ -4171,12 +4172,17 @@ try{ const nb = document.createElement('div'); nb.id = 'netBar'; nb.textContent 
 let drvChk = {}, __attLoaded = false;
 const DRV_REASONS = ['Production delay','Vehicle issue','Traffic','Driver late','Other'];
 const drvMin = m => { m = Math.max(0, Math.round(m)); return m>=60 ? Math.floor(m/60)+' hr '+(m%60)+' min' : m+' min'; };
+/* load-in-vehicle deadline: Masters 'packed & loaded by' time, else standard meal times */
+const DRV_LOAD_DEF = { breakfast:'06:00', lunch:'10:30', dinner:'18:00' };
+function drvLoadBy(site, meal){ const a = ((site.alarms||{})[meal]||{}).packBy; return a || DRV_LOAD_DEF[String(meal).toLowerCase()] || ''; }
+const drvClock = ms => { const neg = ms<0, t = Math.floor(Math.abs(ms)/1000), h = Math.floor(t/3600), m = Math.floor(t%3600/60), sec = t%60; return (neg?'-':'')+(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(sec).padStart(2,'0'); };
 function drvTrips(){
   const d = todayKey(), out = [];
   Object.entries(sites).forEach(([siteId,site])=>{ (site.meals||[]).forEach(meal=>{
     const sid = sidOf(d,siteId,meal), s = sessions[sid]||{}, sc = ((site.sched||{})[meal])||{};
-    if (!sc.depart && !Object.keys(s.times||{}).length) return;
-    out.push({ sid, siteId, site, meal, s, sc, due: sc.depart ? dlAt(d, sc.depart) : null });
+    if (!sc.depart && !drvLoadBy(site, meal) && !Object.keys(s.times||{}).length) return;
+    const ld = drvLoadBy(site, meal);
+    out.push({ sid, siteId, site, meal, s, sc, due: sc.depart ? dlAt(d, sc.depart) : null, loadHH: ld, loadDue: ld ? dlAt(d, ld) : null });
   }); });
   const dn = t => !!T(t.s,'retEnd');
   return out.sort((a,b)=> (dn(a)-dn(b)) || ((a.due||9e15)-(b.due||9e15)));
@@ -4206,6 +4212,12 @@ function drvCard(t){
     st = loaded ? (late?'⏰ GO NOW':'✅ Ready to go') : (pd||packed ? '📦 Being packed' : '🍳 Food is being cooked');
     head = t.due ? `<div class="dcount ${late?'late':mins<=30?'soon':''}">${late ? 'Late by '+drvMin(-mins) : 'Leaves in '+drvMin(mins)}<small>${esc(t.sc.depart)} start time</small></div>` : '';
     if (s.delay) head += `<div class="ddelay">⏱ Delay: ${esc(s.delay.reason)}${t.due&&late?' — running '+drvMin(-mins):''}</div>`;
+    if (!loaded && t.loadDue){
+      const started = T(s,'cookStart') || T(s,'planned') || pd || packed, ms = t.loadDue-now, lt = ms<=0;
+      head = started
+        ? `<div class="dload ${lt?'late':ms<=30*60000?'soon':''}"><span>🚛 Load in vehicle by <b>${esc(t.loadHH)}</b></span><big data-ltimer="${t.loadDue}">${lt?'Late ':''}${drvClock(Math.abs(ms))}</big><small>${lt?'Deadline passed — load now':'Time left to load · சுமை ஏற்ற மீதமுள்ள நேரம்'}</small></div>` + head
+        : `<div class="dload wait"><span>🚛 Load in vehicle by <b>${esc(t.loadHH)}</b></span><small>Timer starts when cooking starts · சமையல் தொடங்கியதும் டைமர் ஓடும்</small></div>` + head;
+    }
     body = chain + (packBy?`<div class="dsub">Food packed by ${esc(packBy)}</div>`:'');
     if (!loaded) {
       body += ck ? `<div class="dok">✅ Vehicle ready ${hm(ck.ts)}</div>` : `<div class="dcheck"><b>🔧 Get the vehicle ready<small>வாகனத்தை தயார் செய்</small></b>
@@ -4292,6 +4304,7 @@ document.addEventListener('click', e=>{
   else if (a==='rend'){ b.disabled = true; attGetPos(loc=>{ stopTracking(); drvSet(sid, { ['times/retEnd']:{ ts:Date.now(), by:me.name, loc:loc||null } }).then(()=>{ toast('🏭 Reached kitchen — trip complete'); renderDriverHome(); }); }); }
 });
 document.addEventListener('change', e=>{ const c = e.target; if (c && c.dataset && c.dataset.dchk){ const sid = c.dataset.sid; drvChk[sid] = drvChk[sid]||{}; drvChk[sid][c.dataset.dchk] = c.checked; const card = c.closest('.dcheck'); const btn = card && card.querySelector('[data-drv="check"]'); if (btn) btn.disabled = !['diesel','tyres','clean','docs'].every(k=>drvChk[sid][k]); } });
+setInterval(()=>{ try{ document.querySelectorAll('[data-ltimer]').forEach(e=>{ const ms = (+e.dataset.ltimer)-Date.now(); e.textContent = (ms<=0?'Late ':'')+drvClock(Math.abs(ms)); }); }catch(e){} }, 1000);
 setInterval(()=>{ try{ if (me && me.role==='driver'){ drvGate(); if ($('p-home').classList.contains('active')) renderDriverHome(); } }catch(e){} }, 30000);
 /* driver problem reporting (escalation) */
 const DRV_PROBLEMS = [['🔧','Vehicle breakdown','வாகனம் பழுது','high'],['💥','Accident','விபத்து','critical'],['🚦','Traffic jam','போக்குவரத்து நெரிசல்','medium'],['🍲','Food spilled / damaged','உணவு சிந்தியது','high'],['⏳','Production delay','சமையல் தாமதம்','medium'],['❓','Other problem','வேறு பிரச்சனை','medium']];
