@@ -424,6 +424,9 @@ html.native .toast{bottom:calc(120px + max(env(safe-area-inset-bottom,0px), var(
 .stdet-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}
 .stdet-grid img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;cursor:pointer}
 .stdet-body{font-size:14px;line-height:1.5}.stdet-body .phbox,.stdet-body button,.stdet-body label.phadd,.stdet-body .stephd{display:none!important}
+
+.avt{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;object-fit:cover;color:#fff;font-weight:800;vertical-align:middle;margin-right:6px;flex:none;border:2px solid rgba(255,255,255,.7)}
+#who{cursor:pointer}
 </style>
 </head>
 <body>
@@ -590,7 +593,7 @@ function enter(){
 let navKey = '';
 function buildNav(active){
   const r = ROLES[me.role], tabs = tabsFor();
-  $('who').innerHTML = (me.role==='aggregator' && me.aggId && aggs[me.aggId] ? logoImg({logo:aggs[me.aggId].icon||logoOf(aggs[me.aggId])},20) : (me.siteId && me.siteId!=='all' && sites[me.siteId] ? logoImg(sites[me.siteId],20) : ''))+esc(me.name + ' · ' + r.label);
+  $('who').innerHTML = avatarHtml(users[me.id]||me,me.id,22)+(me.role==='aggregator' && me.aggId && aggs[me.aggId] ? logoImg({logo:aggs[me.aggId].icon||logoOf(aggs[me.aggId])},20) : (me.siteId && me.siteId!=='all' && sites[me.siteId] ? logoImg(sites[me.siteId],20) : ''))+esc(me.name + ' · ' + r.label);
   navKey = tabs.join(',');
   const cur = active || tabs[0];
   const MAX = 5, main = tabs.length>MAX ? tabs.slice(0,MAX-1) : tabs, more = tabs.length>MAX ? tabs.slice(MAX-1) : [];
@@ -640,6 +643,7 @@ function stockOf(itemId){
   return t;
 }
 function renderAll(){
+  try{ const w = $('who'); if (w && me && me.id!=='setup'){ const a = w.querySelector('.avt'), ph = (users[me.id]||{}).photo||''; if (!a || (a.tagName==='IMG') !== !!ph || (ph && a.getAttribute('src')!==ph)) buildNav(); } }catch(e){}
   if (!me) return;
   if (can('home'))     renderHome();
   if (can('stock'))    renderStock();
@@ -1084,6 +1088,15 @@ function renderSession0(el){
     ${s.odo&&s.odo.start!=null&&dep&&dep.ts?`<div class="sub">🛣️ Meter ${fmt(s.odo.start)}${s.odo.end!=null?' → '+fmt(s.odo.end)+' km · <b>'+fmt(Math.round((s.odo.end-s.odo.start)*10)/10)+' km driven</b>':' km (start)'}</div>`:''}
     ${arr&&arr.ts?`<div class="sub">Arrived ${hm(arr.ts)} · trip ${dur(dep&&dep.ts,arr.ts)} · ${esc(arr.by||'')}${arr.loc?` · <a href="https://maps.google.com/?q=${arr.loc.lat},${arr.loc.lng}" target="_blank">arrival location</a>`:''}${lock('arrived',1)}</div>`:''}
     ${dep&&dep.ts?lock('departed',1):''}
+    ${(()=>{ if (!(arr&&arr.ts)) return ''; const rs = T(s,'retStart'), re = T(s,'retEnd');
+      const ln = (t,l)=>t&&t.ts?`<a href="https://maps.google.com/?q=${t.loc?t.loc.lat+','+t.loc.lng:''}" target="_blank">${l}</a>`:'';
+      let h = `<div style="border-top:1px dashed var(--line);margin-top:10px;padding-top:10px"><b>↩ Return to kitchen</b>`;
+      if (!rs||!rs.ts) h += canStep('depart') ? `<div class="sub" style="margin:4px 0">Food delivered. Start the return so the kitchen can track you back.</div><label>🛣️ Meter at start of return — km (optional)</label><input id="odoRS" type="number" inputmode="decimal" step="any" value="${s.odo&&s.odo.retStart!=null?s.odo.retStart:(s.odo&&s.odo.end!=null?s.odo.end:'')}"><button class="btn save" id="btnRetStart">↩ Start return to kitchen</button>` : `<div class="sub">Driver has not started the return yet.</div>`;
+      else if (!re||!re.ts) h += `<div class="sub" style="margin:4px 0">Left site ${hm(rs.ts)} · ${esc(rs.by||'')} · on the way back${rs.loc?' · '+ln(rs,'start location'):''}</div>
+        ${s.trackLast&&s.trackLast.leg==='ret'?`<div class="sub">Last position ${hm(s.trackLast.ts)} · <a href="https://maps.google.com/?q=${s.trackLast.lat},${s.trackLast.lng}" target="_blank">open map</a></div>`:''}
+        ${canStep('depart')?`<button class="btn sec save" id="btnTrack">${tracker?'⏸ Stop sharing location':'📍 Share live location'}</button><label>🛣️ Meter at kitchen — km (optional)</label><input id="odoRE" type="number" inputmode="decimal" step="any"><button class="btn save" id="btnRetEnd">🏭 Reached kitchen</button>`:''}`;
+      else h += `<div class="sub">Left site ${hm(rs.ts)} → reached kitchen ${hm(re.ts)} · <b>${dur(rs.ts,re.ts)}</b> · ${esc(re.by||'')} ${ln(rs,'start location')} ${ln(re,'kitchen location')}${s.odo&&s.odo.retStart!=null&&s.odo.retEnd!=null?' · 🛣️ '+fmt(Math.round((s.odo.retEnd-s.odo.retStart)*10)/10)+' km':''}${lock('retStart',1)}</div>`;
+      return h+'</div>'; })()}
   </div>
 
   <div class="card">${qcBlock('qc2','Arrival QC (at the counter)',5,settings.minTempArrival||60,'qc2')}${s.qc2&&s.qc2.ts?lock('qc2',1):''}</div>
@@ -1165,6 +1178,8 @@ function renderSession0(el){
   const bd = $('btnDepart'); if (bd) bd.onclick = ()=>{ const o1 = $('odoS').value.trim(); if (o1===''||!(num(o1)>=0)){ alert('Enter the meter (odometer) reading at start.'); return; } withLoc(loc=>{ db.ref(P+'sessions/'+sid).update({ ['odo/start']:num(o1), ['odo/startBy']:me.name, date, siteId, meal, vehicle:$('veh').value.trim(), driver:$('drv').value.trim(), ['times/departed']: {ts:Date.now(), by:me.name, loc:loc||null} }).then(()=>{ if (loc) startTracking(sid); }); }); };
   const ba = $('btnArrive'); if (ba) ba.onclick = ()=>{ const oe = $('odoE'); let o2 = null; if (oe){ if (oe.value.trim()===''||!(num(oe.value)>=0)){ alert('Enter the meter (odometer) reading at stop.'); return; } o2 = num(oe.value); if (s.odo&&s.odo.start!=null&&o2<s.odo.start){ alert('Stop meter ('+fmt(o2)+') is less than start meter ('+fmt(s.odo.start)+').'); return; } }
     withLoc(loc=>{ stopTracking(); const up = { ['times/arrived']: {ts:Date.now(), by:me.name, loc:loc||null} }; if (o2!=null){ up['odo/end']=o2; up['odo/endBy']=me.name; } db.ref(P+'sessions/'+sid).update(up); }); };
+  const brs = $('btnRetStart'); if (brs) brs.onclick = ()=>{ const v = $('odoRS').value.trim(); withLoc(loc=>{ const up = { ['times/retStart']:{ts:Date.now(), by:me.name, loc:loc||null}, date, siteId, meal }; if (v!=='' && num(v)>=0){ up['odo/retStart']=num(v); } db.ref(P+'sessions/'+sid).update(up).then(()=>{ sessions[sid] = sessions[sid]||{}; setTimeout(()=>{ if (loc!==undefined) startTracking(sid); },300); toast('↩ Return started'); }); }); };
+  const bre = $('btnRetEnd'); if (bre) bre.onclick = ()=>{ const v = $('odoRE').value.trim(); const rsOdo = s.odo&&s.odo.retStart; if (v!=='' && rsOdo!=null && num(v)<rsOdo){ alert('Meter at kitchen is less than the meter at start of return.'); return; } withLoc(loc=>{ stopTracking(); const up = { ['times/retEnd']:{ts:Date.now(), by:me.name, loc:loc||null} }; if (v!=='' && num(v)>=0) up['odo/retEnd']=num(v); db.ref(P+'sessions/'+sid).update(up).then(()=>toast('🏭 Reached kitchen')); }); };
   const bt = $('btnTrack'); if (bt) bt.onclick = ()=>{ if (tracker) stopTracking(); else startTracking(sid); renderMeals(); };
 
   // 6 weigh
@@ -1201,9 +1216,9 @@ let nativeWatcher = null, trackSid = null;
 function startTracking(sid){
   if (tracker) return;
   const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
-  let last = 0; trackSid = sid;
+  let last = 0; trackSid = sid; const leg = (sessions[sid]&&T(sessions[sid],'retStart')&&!T(sessions[sid],'retEnd')) ? 'ret' : 'out';
   const post = (lat,lng) => { const now = Date.now(); if (now-last < 30000) return; last = now;
-    const pt = { lat:+lat.toFixed(6), lng:+lng.toFixed(6), ts:now, bg:!!BG };
+    const pt = { lat:+lat.toFixed(6), lng:+lng.toFixed(6), ts:now, bg:!!BG, leg };
     db.ref(P+'sessions/'+sid+'/trackLast').set(pt); db.ref(P+'trips/'+sid).push(pt); };
   if (BG && BG.addWatcher){
     tracker = 'native';
@@ -1225,25 +1240,25 @@ function stopTracking(){
 function resumeTracking(){
   if (!me || me.role!=='driver' || tracker) return;
   const t = todayKey();
-  const e = Object.entries(sessions).find(([,x])=>x.date===t && T(x,'departed') && !T(x,'arrived') && (!x.driver || x.driver===me.name));
+  const e = Object.entries(sessions).find(([,x])=>x.date===t && ((T(x,'departed') && !T(x,'arrived')) || (T(x,'retStart') && !T(x,'retEnd'))) && (!x.driver || x.driver===me.name));
   if (e) startTracking(e[0]);
 }
 const lateMin = (date, hhmm, ts) => { if (!hhmm || !ts) return null; return Math.round((ts - new Date(date+'T'+hhmm+':00').getTime())/60000); };
 /* vehicles currently on the road, with alerts */
 function onRoad(){
   const t = todayKey(), now = Date.now(), stale = settings.staleMin||10, maxM = settings.tripMaxMin||90;
-  return Object.entries(sessions).filter(([,x])=>x.date===t && T(x,'departed') && !T(x,'arrived')).map(([sid,x])=>{
-    const dep = T(x,'departed').ts, en = Math.round((now-dep)/60000), ping = x.trackLast ? Math.round((now-x.trackLast.ts)/60000) : null;
+  return Object.entries(sessions).filter(([,x])=>x.date===t && ((T(x,'departed') && !T(x,'arrived')) || (T(x,'retStart') && !T(x,'retEnd')))).map(([sid,x])=>{
+    const ret = !!(T(x,'retStart') && !T(x,'retEnd')); const dep = (ret?T(x,'retStart'):T(x,'departed')).ts, en = Math.round((now-dep)/60000), ping = x.trackLast ? Math.round((now-x.trackLast.ts)/60000) : null;
     const alerts = [];
     if ((ping==null && en>stale) || (ping!=null && ping>stale)) alerts.push(ping==null ? 'No GPS signal received' : 'No GPS for '+ping+' min');
     if (en>maxM) alerts.push('Trip longer than '+maxM+' min');
-    return { sid, x, en, ping, alerts, site:(sites[x.siteId]||{}).name||x.siteId };
+    return { sid, x, en, ping, alerts, ret, site:(sites[x.siteId]||{}).name||x.siteId };
   });
 }
 function roadHtml(){
   const r = onRoad(); if (!r.length) return '';
   return `<h2>🚚 Vehicles on the road</h2>` + r.map(v=>`<div class="card" data-trip="${v.sid}" style="cursor:pointer;${v.alerts.length?'border-color:#EBB9B2;background:#FDF3F1':''}">
-    <div class="row"><div class="grow"><b>${esc(v.site)} — ${esc(v.x.meal)}</b><div class="sub">${esc(v.x.vehicle||'vehicle ?')} · ${esc(v.x.driver||'driver ?')} · left ${hm(T(v.x,'departed').ts)} · ${v.en} min on the road</div></div>
+    <div class="row"><div class="grow"><b>${esc(v.site)} — ${esc(v.x.meal)}</b><div class="sub">${esc(v.x.vehicle||'vehicle ?')} · ${esc(v.x.driver||'driver ?')} · ${v.ret?'↩ returning to kitchen since '+hm(T(v.x,'retStart').ts):'left '+hm(T(v.x,'departed').ts)} · ${v.en} min on the road</div></div>
     <div style="text-align:right;font-size:12px">${v.x.trackLast?`<a href="https://maps.google.com/?q=${v.x.trackLast.lat},${v.x.trackLast.lng}" target="_blank" onclick="event.stopPropagation()">📍 map</a><div class="sub" style="margin:0">${v.ping} min ago</div>`:'<span class="sub">no GPS yet</span>'}</div></div>
     ${jStrip(v.x)}${v.alerts.map(a=>`<div style="color:var(--red);font-size:12.5px;font-weight:700;margin-top:5px">⚠ ${esc(a)}</div>`).join('')}</div>`).join('');
 }
@@ -1868,7 +1883,7 @@ function renderUsers(){
     <button class="btn save" id="addUser" style="margin:0 0 8px">+ Add user</button>
     <button class="btn" id="starterUsers" style="margin:0 0 8px;background:var(--ok-soft);color:var(--brand)">⚡ Create starter team logins</button>
     <button class="btn" id="credSheet" style="margin:0 0 12px;background:#eef2ee;color:#222">📋 Login list — share / print</button><div id="uf"></div>` +
-    (rows.length ? rows.map(([id,u])=>`<div class="card"><b>${esc(u.name)}</b><span class="tag">${esc((ROLES[u.role]||{}).label||u.role)}</span>
+    (rows.length ? rows.map(([id,u])=>`<div class="card">${avatarHtml(u,id,34)}<b>${esc(u.name)}</b><span class="tag">${esc((ROLES[u.role]||{}).label||u.role)}</span>
       <div class="sub">👤 <b>${esc(u.username||'(no username)')}</b> · 🔑 <b>${esc(u.password||u.pin||'')}</b></div>
       <div class="sub">${u.role==='admin'||(u.perms&&u.perms.reports)?'📄 Reports · ':''}${ROLES[u.role]&&ROLES[u.role].site ? esc((sites[u.siteId]||{}).name||'— no counter —') : 'All counters'}</div>
       <div class="actions"><button data-e="${id}">Edit</button><button class="danger" data-d="${id}">Delete</button></div></div>`).join('') : '<div class="empty">No users yet. Tap “Create starter team logins”, or sign in as admin / 1234 and add your own.</div>');
@@ -1899,9 +1914,11 @@ function renderUsers(){
     if (confirm('Delete login for '+u.name+'?')) db.ref(P+'users/'+b.dataset.d).remove();
   });
 }
+let uPhoto;
 function userForm(id){
-  const u = id ? users[id] : { name:'', username:'', password:'', role:'counter', siteId:'' };
+  const u = id ? users[id] : { name:'', username:'', password:'', role:'counter', siteId:'' }; uPhoto = undefined;
   $('uf').innerHTML = formShell(id?'Edit user':'New user', `
+    <div class="row" style="gap:10px;margin-bottom:6px"><span id="u_pv">${avatarHtml(u,id||'new',52)}</span><label class="btn sec" style="margin:0;padding:8px 12px">📷 Profile photo<input type="file" id="u_photo" accept="image/*" hidden></label><button type="button" id="u_photoRm" class="btn sec" style="margin:0;padding:8px 12px">Remove</button></div>
     <label>Name</label><input id="u_name" value="${esc(u.name)}" placeholder="e.g. Ravi">
     <label>Username (no spaces, unique)</label><input id="u_user" autocapitalize="none" value="${esc(u.username||'')}" placeholder="e.g. ravi.store">
     <label>Password (min 4 characters)</label><div style="display:flex;gap:6px"><input id="u_pass" value="${esc(u.password||u.pin||'')}"><button type="button" id="u_gen" style="white-space:nowrap">Generate</button></div>
@@ -1912,6 +1929,8 @@ function userForm(id){
   const sync = ()=>{ $('u_aggWrap').style.display = $('u_role').value==='aggregator' ? 'block' : 'none'; $('u_repWrap').style.display = $('u_role').value==='admin' ? 'none' : 'block'; $('u_siteWrap').style.display = (ROLES[$('u_role').value].site||ROLES[$('u_role').value].siteOpt) ? 'block' : 'none'; };
   $('u_role').onchange = sync; sync();
   $('u_gen').onclick = ()=>{ $('u_pass').value = genPw(); };
+  $('u_photo').onchange = e=>{ const fl = e.target.files[0]; if (fl) avatarCompress(fl).then(d=>{ uPhoto = d; $('u_pv').innerHTML = avatarHtml({name:u.name,photo:d},id||'new',52); }); };
+  $('u_photoRm').onclick = ()=>{ uPhoto = null; $('u_pv').innerHTML = avatarHtml({name:u.name},id||'new',52); };
   $('u_save').onclick = ()=>{
     const name = $('u_name').value.trim(), username = $('u_user').value.trim().toLowerCase(), password = $('u_pass').value.trim(), role = $('u_role').value;
     const siteId = ROLES[role].site ? $('u_site').value : (ROLES[role].siteOpt ? ($('u_site').value||'all') : 'all');
@@ -1921,7 +1940,7 @@ function userForm(id){
     if (ROLES[role].site && !siteId){ alert('Pick a counter for this role.'); return; }
     if (Object.entries(users).some(([k,x])=>(x.username||'').toLowerCase()===username && k!==id)){ alert('That username is already used.'); return; }
     const ref = id ? db.ref(P+'users/'+id) : db.ref(P+'users').push();
-    ref.set({ name, username, password, role, siteId, aggId: role==='aggregator' ? ($('u_agg').value||null) : null, perms:{ reports: role==='admin' || $('u_rep').checked } }).then(()=>{
+    ref.set({ photo: (uPhoto!==undefined ? uPhoto : (id&&users[id]&&users[id].photo)) || null, name, username, password, role, siteId, aggId: role==='aggregator' ? ($('u_agg').value||null) : null, perms:{ reports: role==='admin' || $('u_rep').checked } }).then(()=>{
       toast('Saved'); $('uf').innerHTML='';
       if (me.id==='setup' && role==='admin') toast('Admin created — setup login is now disabled');
     });
@@ -3907,7 +3926,7 @@ const chatOther = cid => Object.keys(chatMembers(cid)).find(x=>x!==me.id);
 const chatIsGroup = cid => cid.startsWith('g_');
 const chatCanSee = cid => !!chatMembers(cid)[me.id] || (me.role==='admin' && cid.startsWith('g_'));
 const chatColor = uid => { let h=0; String(uid).split('').forEach(c=>h=(h*31+c.charCodeAt(0))%360); return `hsl(${h},55%,36%)`; };
-const chatAvatar = (name,cid) => `<div class="chav" style="background:${chatColor(cid||name)}">${esc((name||'?').replace(/^[^\p{L}\p{N}]+/u,'').slice(0,1).toUpperCase()||'#')}</div>`;
+const chatAvatar = (name,cid) => (users[cid]&&users[cid].photo) ? `<img class="chav" style="object-fit:cover" src="${users[cid].photo}" alt="">` : `<div class="chav" style="background:${chatColor(cid||name)}">${esc((name||'?').replace(/^[^\p{L}\p{N}]+/u,'').slice(0,1).toUpperCase()||'#')}</div>`;
 const chatOnline = uid => chatPres[uid] && Date.now()-chatPres[uid] < 100000;
 const chatPreview = l => l ? (l.k==='img'?'📷 Photo':l.k==='loc'?'📍 Location':l.k==='au'?'🎤 Voice message':l.t||'') : '';
 function chatTotalUnread(){ return Object.values(chatUnread||{}).reduce((a,n)=>a+(+n||0),0); }
@@ -4095,6 +4114,27 @@ document.addEventListener('click', e=>{
     <button class="btn sec save" onclick="closeSheet()">Close</button>`);
   document.querySelectorAll('#sheet .stdet-grid img').forEach(i=>i.onclick=()=>{ closeSheet(); phView(ctx, i.dataset.pid); });
 });
+/* ---- staff profile photos (stored small on the user record) ---- */
+function avatarHtml(u, uid, px){ px = px||28; u = u||{}; const lt = (u.name||'?').trim().slice(0,1).toUpperCase();
+  return u.photo ? `<img class="avt" data-avt="${esc(uid||'')}" style="width:${px}px;height:${px}px" src="${u.photo}" alt="">` : `<span class="avt" data-avt="${esc(uid||'')}" style="width:${px}px;height:${px}px;font-size:${Math.round(px*.5)}px;background:${chatColor(uid||u.name||'x')}">${esc(lt)}</span>`; }
+function avatarCompress(file){
+  return new Promise((res,rej)=>{ const url = URL.createObjectURL(file), im = new Image();
+    im.onload = ()=>{ URL.revokeObjectURL(url); const S = 240, m = Math.min(im.width, im.height), c = document.createElement('canvas'); c.width = c.height = S;
+      c.getContext('2d').drawImage(im, (im.width-m)/2, (im.height-m)/2, m, m, 0, 0, S, S); res(c.toDataURL('image/jpeg',.8)); };
+    im.onerror = ()=>rej(new Error('Not an image')); im.src = url; });
+}
+function profileSheet(){
+  if (!me || me.id==='setup'){ toast('Create real users first (Users tab)'); return; }
+  const u = users[me.id]||me, r = ROLES[me.role]||{};
+  openSheet(`<h3>My profile</h3><div style="text-align:center;margin:8px 0 12px">${avatarHtml(u,me.id,96)}<div style="font-weight:800;font-size:17px;margin-top:8px">${esc(u.name||me.name)}</div><div class="sub">${esc(r.label||me.role)}</div></div>
+    <div class="two"><label class="btn save" style="text-align:center;margin:0">📷 Take photo<input type="file" id="pf_cam" accept="image/*" capture="user" hidden></label><label class="btn sec" style="text-align:center;margin:0">🖼️ Gallery<input type="file" id="pf_gal" accept="image/*" hidden></label></div>
+    ${u.photo?'<button class="btn danger save" id="pf_rm">Remove photo</button>':''}<button class="btn sec save" onclick="closeSheet()">Close</button>`);
+  const up = e=>{ const fl = e.target.files[0]; if (!fl) return; toast('Saving photo…'); avatarCompress(fl).then(d=>db.ref(P+'users/'+me.id+'/photo').set(d)).then(()=>{ toast('✅ Profile photo saved'); closeSheet(); }).catch(()=>alert('Could not save the photo. Try again.')); };
+  $('pf_cam').onchange = up; $('pf_gal').onchange = up;
+  const rm = $('pf_rm'); if (rm) rm.onclick = ()=>db.ref(P+'users/'+me.id+'/photo').remove().then(()=>{ toast('Photo removed'); closeSheet(); });
+}
+document.addEventListener('click', e=>{ if (e.target.closest && e.target.closest('#who')) profileSheet(); });
+
 /* ---- connection indicator: writes queue while offline and send automatically when back ---- */
 try{ const nb = document.createElement('div'); nb.id = 'netBar'; nb.textContent = '📡 Offline — your entries will send when you are back online'; document.body.appendChild(nb);
   const setNet = on => nb.classList.toggle('show', !on);
