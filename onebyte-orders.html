@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#015B36">
+<title>OneByte Orders — Counter ⇄ Kitchen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;800&family=Noto+Sans+Tamil:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<style>
+:root{--g1:#04704a;--g2:#02764a;--dk:#014d2e;--ink:#10261c;--mut:#667a70;--card:#fff;--bg:#eef5f0;--amb:#e08a00;--red:#c4271d;--ok:#0b7a4b;--gold:#ffb703}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
+html[lang=hi] *{font-family:'Noto Sans Devanagari',system-ui,sans-serif}
+html[lang=ta] *{font-family:'Noto Sans Tamil',system-ui,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:none}
+.hide{display:none!important}
+/* login */
+#login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;background:radial-gradient(circle at 50% 0,var(--g2),var(--dk) 70%);color:#fff}
+#login h1{margin:0;font-size:22px;text-align:center}
+#login .sub{opacity:.85;font-size:14px;text-align:center;margin:0 0 6px}
+#login input{width:min(340px,100%);padding:15px;border-radius:14px;border:none;font-size:17px;user-select:text}
+#login .go{width:min(340px,100%);padding:16px;border-radius:14px;background:var(--gold);color:#1b1200;font-weight:800;font-size:18px}
+#lerr{min-height:20px;color:#ffd0cb;font-size:14px;text-align:center}
+.lang{display:inline-flex;align-items:center;gap:6px;background:#fff;border-radius:99px;padding:2px 4px 2px 10px;color:#0b3d2a}
+.lang select{border:none;background:transparent;font-weight:700;font-size:14px;padding:7px 4px;min-height:34px}
+/* app shell */
+header{position:sticky;top:0;z-index:20;background:var(--g1);color:#fff;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;display:flex;align-items:center;gap:8px}
+header .ttl{flex:1;min-width:0;line-height:1.15}
+header .ttl b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header .ttl small{opacity:.85;font-size:12px}
+header button.sm{background:rgba(255,255,255,.18);color:#fff;border-radius:99px;padding:8px 12px;font-size:13px;font-weight:700}
+.tabs{display:flex;gap:6px;padding:8px 10px;background:#fff;border-bottom:1px solid #dbe7df;position:sticky;top:var(--hh,56px);z-index:19}
+.tabs button{flex:1;padding:13px 6px;border-radius:14px;background:#e6f4ec;color:var(--g1);font-weight:800;font-size:15px;position:relative}
+.tabs button.on{background:var(--g1);color:#fff}
+.tabs .bd{position:absolute;top:2px;right:6px;min-width:22px;height:22px;border-radius:11px;background:var(--red);color:#fff;font-size:12px;display:none;align-items:center;justify-content:center;padding:0 5px}
+.tabs .bd.show{display:flex}
+.tabs .bd.rd{background:var(--ok)}
+main{padding:10px 10px calc(150px + env(safe-area-inset-bottom))}
+#net{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:60;background:var(--red);color:#fff;font-size:13px;font-weight:700;padding:7px 14px;border-radius:99px;display:none}
+#net.show{display:block}
+#snd{margin:0 0 10px;padding:16px;border-radius:16px;background:#fff3d6;border:2px solid var(--gold);text-align:center;font-weight:800;font-size:16px;width:100%;color:#6b4400}
+#perm{margin:0 0 10px;padding:12px;border-radius:14px;background:#fde4e1;color:#8a1b12;font-size:13px;line-height:1.4}
+/* counter: item grid */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:820px){.grid{grid-template-columns:repeat(4,1fr)}}
+.it{position:relative;background:var(--card);border-radius:18px;padding:12px 10px;min-height:92px;text-align:left;box-shadow:0 2px 8px rgba(4,60,40,.12);display:flex;flex-direction:column;justify-content:space-between;gap:4px}
+.it b{font-size:17px;line-height:1.2}
+.it small{color:var(--mut);font-size:12px}
+.it:active{transform:scale(.97)}
+.it.has{outline:3px solid var(--g1);background:#eaf8f0}
+.it .q{position:absolute;top:8px;right:8px;min-width:34px;height:34px;border-radius:17px;background:var(--g1);color:#fff;font-weight:800;font-size:18px;display:none;align-items:center;justify-content:center;padding:0 8px}
+.it.has .q{display:flex}
+.it .mi{position:absolute;bottom:8px;right:8px;width:38px;height:38px;border-radius:19px;background:#fde4e1;color:var(--red);font-size:24px;font-weight:800;display:none;align-items:center;justify-content:center}
+.it.has .mi{display:flex}
+.other{display:flex;gap:8px;margin:10px 0}
+.other input{flex:1;min-width:0;padding:14px;border-radius:14px;border:2px solid #cfe0d5;font-size:16px;user-select:text}
+.other button{padding:0 18px;border-radius:14px;background:#e6f4ec;color:var(--g1);font-weight:800;font-size:15px}
+/* sticky cart bar */
+#cart{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid #cfe0d5;box-shadow:0 -6px 20px rgba(0,0,0,.12);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+#cart .sum{font-size:14px;color:var(--ink);margin:0 0 8px;max-height:48px;overflow:auto;line-height:1.35}
+#cart .row{display:flex;gap:8px}
+#cart input{width:30%;min-width:96px;padding:14px;border-radius:14px;border:2px solid #cfe0d5;font-size:16px;user-select:text}
+#send{flex:1;padding:16px;border-radius:16px;background:var(--g1);color:#fff;font-weight:800;font-size:19px}
+#send:disabled{background:#9bb8a8}
+#clr{padding:0 16px;border-radius:16px;background:#fde4e1;color:var(--red);font-weight:800;font-size:15px}
+/* tickets */
+.tk{background:var(--card);border-radius:20px;padding:14px;margin:0 0 10px;box-shadow:0 2px 10px rgba(4,60,40,.14);border-left:10px solid var(--g1)}
+.tk.w1{border-left-color:var(--amb)}.tk.w2{border-left-color:var(--red)}
+.tk.rdy{border-left-color:var(--ok);background:#effaf3}
+.tk.fresh{animation:fl 1s ease 6}
+@keyframes fl{50%{background:#fff3d6}}
+.tk .h{display:flex;align-items:center;gap:10px}
+.tk .no{font-size:34px;font-weight:900;line-height:1;color:var(--g1)}
+.tk .meta{flex:1;min-width:0;font-size:12.5px;color:var(--mut);line-height:1.3}
+.tk .age{font-size:15px;font-weight:800;color:var(--mut)}
+.tk.w1 .age{color:var(--amb)}.tk.w2 .age{color:var(--red)}
+.tk ul{list-style:none;margin:10px 0 0;padding:0}
+.tk li{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:800;padding:5px 0;border-top:1px dashed #d7e6dc}
+.tk li:first-child{border-top:none}
+.tk li .n{min-width:52px;text-align:center;background:var(--g1);color:#fff;border-radius:12px;padding:2px 8px}
+.tk .note{margin-top:6px;font-size:14px;color:#8a5a00;font-weight:700}
+.tk .act{display:flex;gap:8px;margin-top:12px}
+.tk .done{flex:1;padding:18px;border-radius:16px;background:var(--ok);color:#fff;font-weight:900;font-size:21px}
+.tk .pick{flex:1;padding:18px;border-radius:16px;background:var(--g1);color:#fff;font-weight:900;font-size:21px}
+.tk .cx{padding:0 16px;border-radius:16px;background:#fde4e1;color:var(--red);font-weight:800;font-size:14px}
+.tk .st{padding:0 14px;border-radius:16px;background:#fff3d6;color:#6b4400;font-weight:800;font-size:14px}
+.tk.mini{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 0 8px;border-left-width:8px}
+.tk.mini .no{font-size:26px;min-width:52px}
+.tk.mini .ln{flex:1;min-width:0;font-size:16px;font-weight:800;line-height:1.3}
+.tk.mini .ln small{font-weight:600;color:var(--mut);font-size:12px}
+.tk.mini .pick{flex:0 0 auto;padding:14px 16px;font-size:17px;border-radius:14px}
+.tk.mini .cx{flex:0 0 auto;padding:12px 14px;font-size:16px}
+.empty{text-align:center;color:var(--mut);padding:40px 10px;font-size:16px}
+/* kitchen totals */
+#tot{background:#fff;border-radius:18px;padding:12px 14px;margin:0 0 10px;box-shadow:0 2px 8px rgba(4,60,40,.12)}
+#tot h3{margin:0 0 6px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+#tot .chips{display:flex;flex-wrap:wrap;gap:6px}
+#tot .chip{background:#fff3d6;border-radius:12px;padding:6px 12px;font-size:20px;font-weight:900}
+#tot .chip small{font-size:13px;font-weight:700;color:#6b4400;margin-right:4px}
+.stats{display:flex;gap:8px;margin:0 0 10px}
+.stats div{flex:1;background:#fff;border-radius:14px;padding:8px;text-align:center;font-size:12px;color:var(--mut)}
+.stats b{display:block;font-size:22px;color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);background:var(--g1);color:#fff;padding:11px 18px;border-radius:99px;font-weight:700;z-index:70;opacity:0;pointer-events:none;transition:.2s}
+.toast.show{opacity:1}
+.sel{background:#fff;border:none;border-radius:99px;padding:8px 10px;font-weight:700;font-size:13px;max-width:44vw;color:#0b3d2a}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="lang">🌐<select class="langsel" aria-label="Language"></select></div>
+  <h1 data-t="title">OneByte Orders</h1>
+  <p class="sub" data-t="sub">Counter ⇄ Kitchen · Kalyana Sapadu</p>
+  <input id="u" placeholder="Username" autocapitalize="none" autocomplete="username" data-tp="user">
+  <input id="p" type="password" placeholder="Password" autocomplete="current-password" data-tp="pass">
+  <button class="go" id="go" data-t="login">Login</button>
+  <div id="lerr"></div>
+</div>
+
+<div id="app" class="hide">
+  <header>
+    <div class="ttl"><b id="who"></b><small id="siteLbl"></small></div>
+    <select class="sel hide" id="siteSel" aria-label="Counter"></select>
+    <div class="lang" style="padding:0 2px 0 8px">🌐<select class="langsel" aria-label="Language"></select></div>
+    <button class="sm" id="out" data-t="logout">Logout</button>
+  </header>
+  <div class="tabs" id="tabs">
+    <button id="tCounter" data-v="counter"><span data-t="counter">Counter</span><span class="bd rd" id="bdR"></span></button>
+    <button id="tKitchen" data-v="kitchen"><span data-t="kitchen">Kitchen</span><span class="bd" id="bdN"></span></button>
+  </div>
+  <div id="net" data-t="offline">📡 Offline — orders will send when you are back online</div>
+  <main id="main"></main>
+  <div id="cart" class="hide">
+    <div class="sum" id="sum"></div>
+    <div class="row"><button id="clr" data-t="clear">Clear</button><input id="bill" inputmode="numeric" placeholder="Bill no." data-tp="bill"><button id="send" data-t="send">Send to kitchen</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= CONFIG ================= */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC2c1V3cYDX5Njc78BGvbr43caM089IuiE", authDomain: "evp-crm.firebaseapp.com",
+  databaseURL: "https://evp-crm-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "evp-crm",
+  storageBucket: "evp-crm.firebasestorage.app", messagingSenderId: "78324247402", appId: "1:78324247402:web:f4060a2bf5b04baf411313"
+};
+const P = 'prod_';
+const WARN_MIN = 5, LATE_MIN = 10;                      // ticket turns amber / red after these minutes
+const DEFAULT_MENU = ['Dosa','Idli','Pongal','Vada','Poori','Upma','Pongal Vada','Masala Dosa','Rava Dosa','Chapati','Meals','Curd Rice','Lemon Rice','Biryani','Tea','Coffee'];
+const COUNTER_ROLES = ['counter','supervisor','admin','prodmanager','opsmanager'];
+const KITCHEN_ROLES = ['kitchen','cook','admin','prodmanager','opsmanager'];
+const OK_ROLES = ['counter','supervisor','kitchen','cook','admin','prodmanager','opsmanager'];
+
+/* ================= LANGUAGE ================= */
+const L = {
+ en:{title:'OneByte Orders',sub:'Counter ⇄ Kitchen · Kalyana Sapadu',login:'Login',logout:'Logout',user:'Username',pass:'Password',counter:'Counter',kitchen:'Kitchen',
+  offline:'📡 Offline — orders will send when you are back online',clear:'Clear',send:'Send to kitchen',bill:'Bill no.',ok:'OK',
+  other:'Other item…',add:'Add',tapitems:'Tap items to add to the order',nothingnew:'No orders waiting',nothingready:'Nothing ready right now',
+  readyh:'READY — give to customer',cookingh:'In kitchen',done:'✅ DONE',given:'✔ GIVEN',cancel:'Cancel',cancelq:'Cancel this order?',
+  start:'Start',preparing:'Preparing',tomake:'To make now',orders:'Orders today',avg:'Avg time',min:'min',waiting:'Waiting',
+  sound:'🔔 Tap here to switch ON the order bell',soundon:'Bell is ON',neworder:'NEW ORDER',orderready:'ORDER READY',sent:'Sent to kitchen',wrong:'Wrong username or password',
+  nonet:'No internet — try again',norole:'This login cannot use the order screen',sitepick:'Pick a counter',all:'All counters',bell:'Bell',
+  perm:'⚠ Orders cannot be saved. Admin: add the prod_orders rule in Firebase (see FIREBASE_RULES_prod.md).',by:'by',ago:'ago',late:'LATE',note:'Note',
+  rdyshort:'ready',queue:'in kitchen',addnote:'Note (optional)'},
+ hi:{title:'वनबाइट ऑर्डर',sub:'काउंटर ⇄ रसोई · कल्याण सपाडु',login:'लॉगिन',logout:'लॉगआउट',user:'उपयोगकर्ता नाम',pass:'पासवर्ड',counter:'काउंटर',kitchen:'रसोई',
+  offline:'📡 ऑफ़लाइन — ऑनलाइन आते ही ऑर्डर भेजे जाएँगे',clear:'साफ़',send:'रसोई को भेजें',bill:'बिल नं.',ok:'ठीक है',
+  other:'अन्य सामान…',add:'जोड़ें',tapitems:'ऑर्डर में जोड़ने के लिए सामान दबाएँ',nothingnew:'कोई ऑर्डर प्रतीक्षा में नहीं',nothingready:'अभी कुछ तैयार नहीं',
+  readyh:'तैयार — ग्राहक को दें',cookingh:'रसोई में',done:'✅ तैयार',given:'✔ दे दिया',cancel:'रद्द करें',cancelq:'यह ऑर्डर रद्द करें?',
+  start:'शुरू',preparing:'बन रहा है',tomake:'अभी बनाना है',orders:'आज के ऑर्डर',avg:'औसत समय',min:'मिनट',waiting:'प्रतीक्षा',
+  sound:'🔔 ऑर्डर की घंटी चालू करने के लिए यहाँ दबाएँ',soundon:'घंटी चालू है',neworder:'नया ऑर्डर',orderready:'ऑर्डर तैयार',sent:'रसोई को भेज दिया',wrong:'उपयोगकर्ता नाम या पासवर्ड गलत है',
+  nonet:'इंटरनेट नहीं है — दोबारा कोशिश करें',norole:'यह लॉगिन ऑर्डर स्क्रीन के लिए नहीं है',sitepick:'काउंटर चुनें',all:'सभी काउंटर',bell:'घंटी',
+  perm:'⚠ ऑर्डर सहेजे नहीं जा सकते। एडमिन: Firebase में prod_orders नियम जोड़ें (FIREBASE_RULES_prod.md देखें)।',by:'द्वारा',ago:'पहले',late:'देरी',note:'नोट',
+  rdyshort:'तैयार',queue:'रसोई में',addnote:'नोट (वैकल्पिक)'},
+ ta:{title:'ஒன்பைட் ஆர்டர்',sub:'கவுண்டர் ⇄ சமையலறை · கல்யாண சப்பாடு',login:'உள்நுழை',logout:'வெளியேறு',user:'பயனர் பெயர்',pass:'கடவுச்சொல்',counter:'கவுண்டர்',kitchen:'சமையலறை',
+  offline:'📡 ஆஃப்லைன் — இணையம் வந்ததும் ஆர்டர்கள் அனுப்பப்படும்',clear:'அழி',send:'சமையலறைக்கு அனுப்பு',bill:'பில் எண்',ok:'சரி',
+  other:'வேறு பொருள்…',add:'சேர்',tapitems:'ஆர்டரில் சேர்க்க பொருட்களைத் தட்டவும்',nothingnew:'காத்திருக்கும் ஆர்டர் இல்லை',nothingready:'இப்போது எதுவும் தயாராக இல்லை',
+  readyh:'தயார் — வாடிக்கையாளருக்குக் கொடுங்கள்',cookingh:'சமையலறையில்',done:'✅ முடிந்தது',given:'✔ கொடுத்தாச்சு',cancel:'ரத்து',cancelq:'இந்த ஆர்டரை ரத்து செய்யவா?',
+  start:'தொடங்கு',preparing:'தயாராகிறது',tomake:'இப்போது செய்ய வேண்டியது',orders:'இன்றைய ஆர்டர்கள்',avg:'சராசரி நேரம்',min:'நிமி',waiting:'காத்திருப்பு',
+  sound:'🔔 ஆர்டர் மணியை இயக்க இங்கே தட்டவும்',soundon:'மணி இயக்கத்தில் உள்ளது',neworder:'புதிய ஆர்டர்',orderready:'ஆர்டர் தயார்',sent:'சமையலறைக்கு அனுப்பப்பட்டது',wrong:'பயனர் பெயர் அல்லது கடவுச்சொல் தவறு',
+  nonet:'இணையம் இல்லை — மீண்டும் முயலவும்',norole:'இந்த உள்நுழைவு ஆர்டர் திரைக்கு இல்லை',sitepick:'கவுண்டரைத் தேர்ந்தெடு',all:'அனைத்து கவுண்டர்கள்',bell:'மணி',
+  perm:'⚠ ஆர்டர்களைச் சேமிக்க முடியவில்லை. நிர்வாகி: Firebase-இல் prod_orders விதியைச் சேர்க்கவும் (FIREBASE_RULES_prod.md பார்க்கவும்).',by:'நபர்',ago:'முன்',late:'தாமதம்',note:'குறிப்பு',
+  rdyshort:'தயார்',queue:'சமையலறையில்',addnote:'குறிப்பு (விருப்பம்)'}
+};
+let lang = 'en'; try{ lang = localStorage.getItem('ord_lang') || (/^ta/.test(navigator.language)?'ta':'en'); }catch(e){}
+const T = k => (L[lang]||L.en)[k] || L.en[k] || k;
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-t]').forEach(e=>e.textContent = T(e.dataset.t));
+  document.querySelectorAll('[data-tp]').forEach(e=>e.placeholder = T(e.dataset.tp));
+  document.querySelectorAll('.langsel').forEach(s=>{ s.innerHTML = [['en','English'],['hi','हिन्दी'],['ta','தமிழ்']].map(l=>`<option value="${l[0]}" ${l[0]===lang?'selected':''}>${l[1]}</option>`).join(''); });
+  if (me) { render(); }
+}
+document.addEventListener('change', e=>{ if (e.target.classList && e.target.classList.contains('langsel')){ lang = e.target.value; try{ localStorage.setItem('ord_lang', lang); }catch(x){} applyLang(); } });
+
+/* ================= STATE ================= */
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+const authReady = (firebase.auth ? firebase.auth().signInAnonymously() : Promise.resolve()).catch(e=>console.warn('anon auth', e && e.message));
+let me = null, view = 'counter', sites = {}, items = {}, orders = {}, curSite = 'all', cart = {}, known = null, ringQ = 0, dateKey = '', soundOn = false, permErr = false;
+const dayKey = (d=new Date()) => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const store = (function(){ try{ localStorage.setItem('_t','1'); localStorage.removeItem('_t'); return localStorage; }catch(e){ return { m:{}, getItem(k){ return this.m[k]||null; }, setItem(k,v){ this.m[k]=String(v); }, removeItem(k){ delete this.m[k]; } }; } })();
+function toast(m){ const t = $('toast'); t.textContent = m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1800); }
+
+/* ================= SOUND (bell) ================= */
+let actx = null, wl = null;
+function ac(){ try{ if (!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); if (actx.state==='suspended') actx.resume(); }catch(e){} return actx; }
+['click','touchstart','keydown'].forEach(n=>document.addEventListener(n, ()=>{ ac(); if (actx && actx.state==='running' && !soundOn){ soundOn = true; render(); } }, {capture:true, passive:true}));
+/* a bright "service bell": two decaying tones. kind 'new' = loud double bell for the kitchen, 'ready' = softer chime for the counter */
+function bell(kind, times){
+  const c = ac(); try{ if (navigator.vibrate) navigator.vibrate(kind==='new' ? [400,120,400,120,400] : [250,100,250]); }catch(e){}
+  if (!c) return;
+  const n = times || (kind==='new' ? 2 : 1);
+  for (let k=0;k<n;k++){
+    const t0 = c.currentTime + k*0.9, g = c.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(kind==='new'?1:0.7, t0+0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0+0.85);
+    const comp = c.createDynamicsCompressor(); g.connect(comp); comp.connect(c.destination);
+    (kind==='new' ? [1318, 1976, 2637] : [988, 1480]).forEach((f,i)=>{ const o = c.createOscillator(); o.type = i===0 ? 'triangle' : 'sine'; o.frequency.value = f; const gg = c.createGain(); gg.gain.value = i===0 ? 1 : 0.45; o.connect(gg); gg.connect(g); o.start(t0); o.stop(t0+0.9); });
+  }
+}
+/* heavy rush: many orders in a second must not become a wall of noise — one bell per ~1.2 s, the toast shows the numbers */
+let lastRing = 0; const ringT = {};
+function ring(kind, label){
+  if (ringT[kind]){ ringT[kind].label = label; return; }
+  ringT[kind] = { label };
+  setTimeout(()=>{ const l = ringT[kind].label; ringT[kind] = null; lastRing = Date.now(); bell(kind); flash(kind, l); }, Math.max(0, 1200-(Date.now()-lastRing)));
+}
+function flash(kind, label){ const t = $('toast'); t.textContent = (kind==='new'?'🔔 ':'✅ ') + label; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2500); }
+async function keepAwake(){ try{ if ('wakeLock' in navigator){ wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', ()=>{ wl = null; }); } }catch(e){} }
+document.addEventListener('visibilitychange', ()=>{ if (!document.hidden && me) { keepAwake(); render(); } });
+
+/* ================= LOGIN ================= */
+function login(){
+  const u = ($('u').value||'').trim().toLowerCase(), pw = ($('p').value||'').trim(); $('lerr').textContent = '';
+  authReady.then(()=>db.ref(P+'users').once('value')).then(s=>{
+    const all = s.val() || {}; let m = null;
+    Object.entries(all).forEach(([id,x])=>{ if (!OK_ROLES.includes(x.role)) return; const w = x.password || x.pin; if (w===pw && ((x.username||'').toLowerCase()===u || !x.username)) m = Object.assign({id}, x); });
+    if (!m){ const any = Object.values(all).some(x=>(x.password||x.pin)===pw && (x.username||'').toLowerCase()===u); $('lerr').textContent = any ? T('norole') : T('wrong'); return; }
+    me = m; store.setItem('ord_user', JSON.stringify(m)); start();
+  }).catch(()=>{ $('lerr').textContent = T('nonet'); });
+}
+$('go').onclick = login; $('p').addEventListener('keydown', e=>{ if (e.key==='Enter') login(); });
+$('out').onclick = ()=>{ store.removeItem('ord_user'); location.reload(); };
+
+function start(){
+  $('login').classList.add('hide'); $('app').classList.remove('hide');
+  const canC = COUNTER_ROLES.includes(me.role), canK = KITCHEN_ROLES.includes(me.role);
+  $('tCounter').classList.toggle('hide', !canC); $('tKitchen').classList.toggle('hide', !canK); $('tabs').classList.toggle('hide', !(canC && canK));
+  view = canK && !canC ? 'kitchen' : (store.getItem('ord_view') && ((store.getItem('ord_view')==='kitchen' && canK) || (store.getItem('ord_view')==='counter' && canC)) ? store.getItem('ord_view') : 'counter');
+  $('who').textContent = me.name + ' · ' + me.role;
+  $('tCounter').onclick = ()=>setView('counter'); $('tKitchen').onclick = ()=>setView('kitchen');
+  db.ref(P+'sites').on('value', s=>{ sites = s.val()||{}; siteSelect(); render(); });
+  db.ref(P+'items').on('value', s=>{ items = s.val()||{}; render(); });
+  curSite = (me.siteId && me.siteId!=='all') ? me.siteId : (store.getItem('ord_site') || 'all');
+  document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight+'px');
+  listenOrders(); keepAwake(); setInterval(()=>{ if (dayKey()!==dateKey) listenOrders(); render(true); }, 20000);
+  window.addEventListener('online', netChk); window.addEventListener('offline', netChk); netChk();
+  try{ db.ref('.info/connected').on('value', s=>{ if (s.val()===true) $('net').classList.remove('show'); else if (navigator.onLine===false) $('net').classList.add('show'); }); }catch(e){}
+  render();
+}
+function netChk(){ $('net').classList.toggle('show', navigator.onLine===false); }
+function setView(v){ view = v; store.setItem('ord_view', v); render(); }
+function siteSelect(){
+  const sel = $('siteSel'), fixed = me && me.siteId && me.siteId!=='all', ids = Object.keys(sites);
+  sel.classList.toggle('hide', !!fixed || ids.length<2);
+  sel.innerHTML = `<option value="all">${esc(T('all'))}</option>` + ids.map(id=>`<option value="${esc(id)}" ${id===curSite?'selected':''}>${esc(sites[id].name)}</option>`).join('');
+  sel.value = curSite;
+  $('siteLbl').textContent = fixed && sites[me.siteId] ? sites[me.siteId].name : (curSite!=='all' && sites[curSite] ? sites[curSite].name : T('all'));
+}
+$('siteSel').onchange = e=>{ curSite = e.target.value; store.setItem('ord_site', curSite); siteSelect(); render(); };
+
+/* ================= DATA ================= */
+let ordRef = null;
+function listenOrders(){
+  if (ordRef) ordRef.off();
+  dateKey = dayKey(); known = null; orders = {};
+  ordRef = db.ref(P+'orders/'+dateKey);
+  ordRef.on('value', s=>{
+    const v = s.val() || {}, flat = {};
+    Object.entries(v).forEach(([site,o])=>{ if (o && o.o) Object.entries(o.o).forEach(([id,x])=>{ flat[id] = Object.assign({id, siteId:site}, x); }); });
+    const prev = orders; orders = flat; permErr = false;
+    if (known===null){ known = new Set(Object.keys(flat)); render(); return; }   // first load is silent
+    const canC = COUNTER_ROLES.includes(me.role), canK = KITCHEN_ROLES.includes(me.role);
+    const hearNew = canK && (view==='kitchen' || !canC), hearReady = canC && (view==='counter' || !canK);
+    let newN = 0, rdyN = 0, newNo = [], rdyNo = [];
+    Object.values(flat).forEach(o=>{
+      if (curSite!=='all' && o.siteId!==curSite) return;
+      const p = prev[o.id];
+      if (!p){ o.fresh = true; if (o.st==='new' && hearNew){ newN++; newNo.push('#'+o.no); } }
+      if (o.st==='ready' && (!p || p.st!=='ready') && hearReady){ rdyN++; rdyNo.push('#'+o.no); }
+    });
+    if (newN) ring('new', T('neworder')+' '+newNo.slice(0,4).join(' ')+(newN>4?' +'+(newN-4):''));
+    if (rdyN) ring('ready', T('orderready')+' '+rdyNo.slice(0,4).join(' ')+(rdyN>4?' +'+(rdyN-4):''));
+    render();
+  }, err=>{ permErr = true; render(); });
+}
+const mySite = () => (me.siteId && me.siteId!=='all') ? me.siteId : curSite;
+const visible = () => Object.values(orders).filter(o=>curSite==='all' || o.siteId===curSite);
+
+/* ================= COUNTER ================= */
+function menuList(){
+  const f = Object.values(items).filter(i=>i.active!==false && i.type==='food').map(i=>({ n:i.name, ta:i.ta||'' }));
+  const base = f.length ? f : DEFAULT_MENU.map(n=>({ n, ta:'' }));
+  const seen = new Set(base.map(x=>x.n.toLowerCase()));
+  Object.keys(cart).forEach(n=>{ if (!seen.has(n.toLowerCase())) base.push({ n, ta:'' }); });
+  return base;
+}
+function cartCount(){ return Object.values(cart).reduce((a,b)=>a+b,0); }
+function renderCounter(){
+  const m = $('main'), my = visible(), rdy = my.filter(o=>o.st==='ready').sort((a,b)=>(a.readyTs||0)-(b.readyTs||0)), inK = my.filter(o=>o.st==='new'||o.st==='prep');
+  const needSite = mySite()==='all' && Object.keys(sites).length>1;
+  const menu = menuList();
+  m.innerHTML = (permErr?`<div id="perm">${esc(T('perm'))}</div>`:'') + (!soundOn?`<button id="snd">${esc(T('sound'))}</button>`:'')
+    + (rdy.length ? `<h3 style="margin:4px 4px 8px;color:var(--ok)">✅ ${esc(T('readyh'))} (${rdy.length})</h3>` + rdy.map(o=>ticket(o,'ready')).join('') : '')
+    + (needSite ? `<div class="empty">${esc(T('sitepick'))} ↑</div>` : `
+    <div class="grid">${menu.map(x=>{ const q = cart[x.n]||0; return `<div class="it ${q?'has':''}" data-add="${esc(x.n)}"><b>${esc(lang==='ta'&&x.ta?x.ta:x.n)}</b><small>${esc(lang==='ta'&&x.ta?x.n:x.ta)}</small><span class="q">${q}</span><button class="mi" data-sub="${esc(x.n)}" aria-label="-1">−</button></div>`; }).join('')}</div>
+    <div class="other"><input id="oth" placeholder="${esc(T('other'))}" maxlength="40"><button id="othb">${esc(T('add'))}</button></div>`)
+    + (inK.length ? `<h3 style="margin:14px 4px 8px;color:var(--mut)">🍳 ${esc(T('cookingh'))} (${inK.length})</h3>` + inK.sort((a,b)=>a.ts-b.ts).map(o=>ticket(o,'wait')).join('') : '');
+  bindCounter();
+  const ct = cartCount(); $('cart').classList.toggle('hide', needSite);
+  $('sum').textContent = ct ? Object.entries(cart).map(([n,q])=>q+' × '+n).join('  ·  ') : T('tapitems');
+  $('send').disabled = !ct; $('send').textContent = ct ? '🔔 '+T('send')+' ('+ct+')' : T('send');
+}
+function bindCounter(){
+  const m = $('main');
+  m.querySelectorAll('[data-add]').forEach(b=>b.onclick=e=>{ if (e.target.closest('[data-sub]')) return; const n = b.dataset.add; cart[n] = (cart[n]||0)+1; renderCounter(); });
+  m.querySelectorAll('[data-sub]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const n = b.dataset.sub; if (cart[n]>1) cart[n]--; else delete cart[n]; renderCounter(); });
+  const ob = $('othb'), oi = $('oth'); const addO = ()=>{ const n = (oi.value||'').trim(); if (!n) return; cart[n] = (cart[n]||0)+1; renderCounter(); };
+  if (ob) ob.onclick = addO; if (oi) oi.addEventListener('keydown', e=>{ if (e.key==='Enter') addO(); });
+  const sn = $('snd'); if (sn) sn.onclick = ()=>{ ac(); soundOn = true; bell('new',1); renderCounter(); };
+  bindTickets(m);
+}
+$('clr').onclick = ()=>{ cart = {}; $('bill').value = ''; render(); };
+$('send').onclick = function(){
+  if (!cartCount()) return; const site = mySite(); if (!site || site==='all'){ toast(T('sitepick')); return; }
+  const btn = this; btn.disabled = true;
+  const lines = Object.assign({}, cart), bill = ($('bill').value||'').trim() || null, now = Date.now();
+  db.ref(P+'orders/'+dayKey()+'/'+site+'/n').transaction(c=>(c||0)+1, (err, ok, snap)=>{
+    if (err){ permErr = true; render(); return; }
+    const no = snap ? snap.val() : 1;
+    const ref = db.ref(P+'orders/'+dayKey()+'/'+site+'/o').push();
+    ref.set({ no, lines, bill, ts:now, st:'new', by:me.name, byId:me.id }).catch(()=>{ permErr = true; render(); });
+    cart = {}; $('bill').value = ''; toast('✅ '+T('sent')+' #'+no); render();
+  });
+};
+
+/* ================= KITCHEN ================= */
+function ageMin(o){ return Math.floor((Date.now()-(o.ts||Date.now()))/60000); }
+function ticketMini(o, mode){
+  const a = ageMin(o), lines = Object.entries(o.lines||{}).map(([n,q])=>q+' '+esc(n)).join(', ');
+  const cls = mode==='ready' ? 'rdy' : (a>=LATE_MIN ? 'w2' : a>=WARN_MIN ? 'w1' : '');
+  const btn = mode==='ready' ? `<button class="pick" data-give="${esc(o.id)}">${esc(T('given'))}</button>` : (COUNTER_ROLES.includes(me.role) ? `<button class="cx" data-cx="${esc(o.id)}">✕</button>` : '');
+  return `<div class="tk mini ${cls}" data-id="${esc(o.id)}"><div class="no">#${esc(o.no)}</div><div class="ln">${lines}${o.bill?` <small>· ${esc(o.bill)}</small>`:''}<br><small>${mode==='ready'?'✅':'⏱ '+a+' '+esc(T('min'))}${curSite==='all'&&sites[o.siteId]?' · '+esc(sites[o.siteId].name):''}</small></div>${btn}</div>`;
+}
+function ticket(o, mode){
+  if (mode==='ready' || mode==='wait') return ticketMini(o, mode);
+  const a = ageMin(o), cls = mode==='ready' ? 'rdy' : (a>=LATE_MIN ? 'w2' : a>=WARN_MIN ? 'w1' : '');
+  const lines = Object.entries(o.lines||{});
+  const time = new Date(o.ts||0).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  const age = mode==='ready' ? '✅ '+Math.max(0, Math.floor((Date.now()-(o.readyTs||o.ts))/60000))+' '+T('min') : a+' '+T('min')+(a>=LATE_MIN?' · '+T('late'):'');
+  return `<div class="tk ${cls} ${o.fresh&&mode==='kitchen'?'fresh':''}" data-id="${esc(o.id)}">
+    <div class="h"><div class="no">#${esc(o.no)}</div><div class="meta">${time}${o.bill?' · '+esc(T('bill'))+' '+esc(o.bill):''}<br>${esc(o.by||'')}${curSite==='all'&&sites[o.siteId]?' · '+esc(sites[o.siteId].name):''}</div><div class="age">${age}</div></div>
+    <ul>${lines.map(([n,q])=>`<li><span class="n">${esc(q)}</span><span>${esc(n)}</span></li>`).join('')}</ul>
+    ${o.note?`<div class="note">📝 ${esc(o.note)}</div>`:''}
+    <div class="act">${mode==='kitchen' ? `<button class="done" data-done="${esc(o.id)}">${esc(T('done'))}</button>`
+      : mode==='ready' ? `<button class="pick" data-give="${esc(o.id)}">${esc(T('given'))}</button>`
+      : (COUNTER_ROLES.includes(me.role) ? `<button class="cx" data-cx="${esc(o.id)}">${esc(T('cancel'))}</button>` : '')}</div></div>`;
+}
+function renderKitchen(){
+  const m = $('main'), my = visible(), q = my.filter(o=>o.st==='new'||o.st==='prep').sort((a,b)=>a.ts-b.ts);
+  const tot = {}; q.forEach(o=>Object.entries(o.lines||{}).forEach(([n,c])=>{ tot[n] = (tot[n]||0)+c; }));
+  const doneToday = my.filter(o=>o.st==='ready'||o.st==='given'), tms = doneToday.filter(o=>o.readyTs&&o.ts).map(o=>(o.readyTs-o.ts)/60000);
+  const avg = tms.length ? Math.round(tms.reduce((a,b)=>a+b,0)/tms.length*10)/10 : '–';
+  m.innerHTML = (permErr?`<div id="perm">${esc(T('perm'))}</div>`:'') + (!soundOn?`<button id="snd">${esc(T('sound'))}</button>`:'')
+    + `<div class="stats"><div><b>${q.length}</b>${esc(T('waiting'))}</div><div><b>${my.length}</b>${esc(T('orders'))}</div><div><b>${avg}</b>${esc(T('avg'))} (${esc(T('min'))})</div></div>`
+    + (q.length ? `<div id="tot"><h3>${esc(T('tomake'))}</h3><div class="chips">${Object.entries(tot).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="chip"><small>${esc(n)}</small>×${c}</div>`).join('')}</div></div>` : '')
+    + (q.length ? q.map(o=>ticket(o,'kitchen')).join('') : `<div class="empty">🍳<br>${esc(T('nothingnew'))}</div>`);
+  const sn = $('snd'); if (sn) sn.onclick = ()=>{ ac(); soundOn = true; bell('new',1); renderKitchen(); };
+  bindTickets(m);
+  $('cart').classList.add('hide');
+}
+function bindTickets(root){
+  root.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{ const o = orders[b.dataset.done]; if (!o) return; b.disabled = true; db.ref(P+'orders/'+dateKey+'/'+o.siteId+'/o/'+o.id).update({ st:'ready', readyTs:Date.now(), readyBy:me.name }); });
+  root.querySelectorAll('[data-give]').forEach(b=>b.onclick=()=>{ const o = orders[b.dataset.give]; if (!o) return; b.disabled = true; db.ref(P+'orders/'+dateKey+'/'+o.siteId+'/o/'+o.id).update({ st:'given', givenTs:Date.now(), givenBy:me.name }); });
+  root.querySelectorAll('[data-cx]').forEach(b=>b.onclick=()=>{ const o = orders[b.dataset.cx]; if (!o) return; if (!confirm(T('cancelq')+' #'+o.no)) return; db.ref(P+'orders/'+dateKey+'/'+o.siteId+'/o/'+o.id).update({ st:'cancelled', cxTs:Date.now(), cxBy:me.name }); });
+}
+
+/* ================= RENDER ================= */
+function render(timerOnly){
+  if (!me) return;
+  if (timerOnly && document.activeElement && /INPUT/.test(document.activeElement.tagName)) return;
+  /* cancelled / given orders drop out of the working lists */
+  const live = Object.values(orders).filter(o=>(curSite==='all'||o.siteId===curSite));
+  $('tCounter').classList.toggle('on', view==='counter'); $('tKitchen').classList.toggle('on', view==='kitchen');
+  const nR = live.filter(o=>o.st==='ready').length, nN = live.filter(o=>o.st==='new'||o.st==='prep').length;
+  const bR = $('bdR'), bN = $('bdN'); bR.textContent = nR; bR.classList.toggle('show', nR>0); bN.textContent = nN; bN.classList.toggle('show', nN>0);
+  siteSelect();
+  if (view==='kitchen') renderKitchen(); else renderCounter();
+}
+(function init(){
+  applyLang();
+  let sv = null; try{ sv = JSON.parse(store.getItem('ord_user')||'null'); }catch(e){}
+  if (sv && sv.id && OK_ROLES.includes(sv.role)){ me = sv; authReady.then(()=>db.ref(P+'users/'+sv.id).once('value')).then(s=>{ if (s.exists()){ me = Object.assign({id:sv.id}, s.val()); start(); } else { store.removeItem('ord_user'); } }).catch(()=>start()); }
+})();
+</script>
+</body>
+</html>

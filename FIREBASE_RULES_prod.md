@@ -29,7 +29,8 @@ Step 2 - Add this block to the rules (it now includes the aggregator, photo and 
     "prod_aggs":        { ".read": "auth != null", ".write": "auth != null" },
     "prod_attendance":  { ".read": "auth != null", ".write": "auth != null" },
     "prod_attendtrack": { ".read": "auth != null", ".write": "auth != null" },
-    "prod_chat":        { ".read": "auth != null", ".write": "auth != null" }
+    "prod_chat":        { ".read": "auth != null", ".write": "auth != null" },
+    "prod_orders":      { ".read": "auth != null", ".write": "auth != null" }
 
 If you do NOT add rules for the new paths and your database default is locked, the
 rating / feedback / escalation / photo / push features will silently fail to save.
@@ -52,3 +53,8 @@ Without prod_attendance / prod_chat the Attendance and Chat features will not sa
 - nightlyBackup  - 1:30 am IST copy of all production data to Cloud Storage `backups/onebyte-YYYY-MM-DD.json` (last 30 kept).
                    Needs Firebase Storage switched on (Build -> Storage -> Get started). Scheduled functions need the Blaze plan.
 To restore a backup: Firebase console -> Realtime Database -> the prod_ nodes -> Import JSON (per node from the file).
+
+
+## Counter -> Kitchen order screen (onebyte-orders.html)
+Needs the `prod_orders` line above (it is already in the block). Orders are stored per day and counter:
+prod_orders/<YYYY-MM-DD>/<counterId>/o/<orderId>, with a daily token counter at .../<counterId>/n.
