@@ -17,6 +17,8 @@ html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-
 html[lang=hi] *{font-family:'Noto Sans Devanagari',system-ui,sans-serif}
 html[lang=ta] *{font-family:'Noto Sans Tamil',system-ui,sans-serif}
 button,input,select{font:inherit;color:inherit}
+input{color:#10261c;-webkit-text-fill-color:#10261c}
+input::placeholder{color:#6b7f75;-webkit-text-fill-color:#6b7f75;opacity:1}
 button{cursor:pointer;border:none}
 .hide{display:none!important}
 html[data-brand=gnb]{--g1:#5c3d0a;--bg:#f6f1e7}
@@ -37,7 +39,8 @@ html[data-brand=gnb]{--g1:#5c3d0a;--bg:#f6f1e7}
 #login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;background:radial-gradient(circle at 50% 0,var(--g2),var(--dk) 70%);color:#fff}
 #login h1{margin:0;font-size:22px;text-align:center}
 #login .sub{opacity:.85;font-size:14px;text-align:center;margin:0 0 6px}
-#login input{width:min(340px,100%);padding:15px;border-radius:14px;border:none;font-size:17px;user-select:text}
+#login input{width:min(340px,100%);padding:15px;border-radius:14px;border:none;font-size:17px;user-select:text;background:#fff;color:#10261c;-webkit-text-fill-color:#10261c;caret-color:#04704a}
+#login input::placeholder{color:#6b7f75;-webkit-text-fill-color:#6b7f75;opacity:1}
 #login .go{width:min(340px,100%);padding:16px;border-radius:14px;background:var(--gold);color:#1b1200;font-weight:800;font-size:18px}
 #lerr{min-height:20px;color:#ffd0cb;font-size:14px;text-align:center}
 .lang{display:inline-flex;align-items:center;gap:6px;background:#fff;border-radius:99px;padding:2px 4px 2px 10px;color:#0b3d2a}
