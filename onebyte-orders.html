@@ -19,6 +19,20 @@ html[lang=ta] *{font-family:'Noto Sans Tamil',system-ui,sans-serif}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer;border:none}
 .hide{display:none!important}
+html[data-brand=gnb]{--g1:#5c3d0a;--bg:#f6f1e7}
+#brands{display:flex;gap:6px;padding:8px 10px 0;background:#fff;position:sticky;top:var(--hh,56px);z-index:19}
+#brands button{flex:1;padding:11px 6px;border-radius:14px;background:#f0f0f0;color:#333;font-weight:800;font-size:14px;line-height:1.2;border:2px solid transparent}
+#brands button small{display:block;font-weight:600;font-size:11px;opacity:.8}
+#brands button.on[data-b=ks]{background:#04704a;color:#fff}
+#brands button.on[data-b=gnb]{background:#17110a;color:#f2c46a;border-color:#c9972b}
+#brands button.on[data-b=all]{background:#333;color:#fff}
+.secs{display:flex;gap:6px;margin:0 0 10px;overflow-x:auto;padding-bottom:2px}
+.secs button{flex:1 0 auto;padding:11px 14px;border-radius:99px;background:#fff;color:var(--g1);font-weight:800;font-size:14px;box-shadow:0 1px 5px rgba(0,0,0,.12);white-space:nowrap}
+.secs button.on{background:var(--g1);color:#fff}
+.it .pr{font-weight:800;color:var(--g1);font-size:14px}
+.pk{font-size:12px;color:var(--mut);font-weight:600}
+.brtag{display:inline-block;font-size:11px;font-weight:800;border-radius:8px;padding:1px 7px;margin-left:4px;background:#e6f4ec;color:#04704a}
+.brtag.gnb{background:#17110a;color:#f2c46a}
 /* login */
 #login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;background:radial-gradient(circle at 50% 0,var(--g2),var(--dk) 70%);color:#fff}
 #login h1{margin:0;font-size:22px;text-align:center}
@@ -34,7 +48,7 @@ header .ttl{flex:1;min-width:0;line-height:1.15}
 header .ttl b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 header .ttl small{opacity:.85;font-size:12px}
 header button.sm{background:rgba(255,255,255,.18);color:#fff;border-radius:99px;padding:8px 12px;font-size:13px;font-weight:700}
-.tabs{display:flex;gap:6px;padding:8px 10px;background:#fff;border-bottom:1px solid #dbe7df;position:sticky;top:var(--hh,56px);z-index:19}
+.tabs{display:flex;gap:6px;padding:8px 10px;background:#fff;border-bottom:1px solid #dbe7df}
 .tabs button{flex:1;padding:13px 6px;border-radius:14px;background:#e6f4ec;color:var(--g1);font-weight:800;font-size:15px;position:relative}
 .tabs button.on{background:var(--g1);color:#fff}
 .tabs .bd{position:absolute;top:2px;right:6px;min-width:22px;height:22px;border-radius:11px;background:var(--red);color:#fff;font-size:12px;display:none;align-items:center;justify-content:center;padding:0 5px}
@@ -126,10 +140,10 @@ main{padding:10px 10px calc(150px + env(safe-area-inset-bottom))}
 <div id="app" class="hide">
   <header>
     <div class="ttl"><b id="who"></b><small id="siteLbl"></small></div>
-    <select class="sel hide" id="siteSel" aria-label="Counter"></select>
     <div class="lang" style="padding:0 2px 0 8px">🌐<select class="langsel" aria-label="Language"></select></div>
     <button class="sm" id="out" data-t="logout">Logout</button>
   </header>
+  <div id="brands"></div>
   <div class="tabs" id="tabs">
     <button id="tCounter" data-v="counter"><span data-t="counter">Counter</span><span class="bd rd" id="bdR"></span></button>
     <button id="tKitchen" data-v="kitchen"><span data-t="kitchen">Kitchen</span><span class="bd" id="bdN"></span></button>
@@ -152,7 +166,23 @@ const FIREBASE_CONFIG = {
 };
 const P = 'prod_';
 const WARN_MIN = 5, LATE_MIN = 10;                      // ticket turns amber / red after these minutes
-const DEFAULT_MENU = ['Dosa','Idli','Pongal','Vada','Poori','Upma','Pongal Vada','Masala Dosa','Rava Dosa','Chapati','Meals','Curd Rice','Lemon Rice','Biryani','Tea','Coffee'];
+const OLD_DEFAULT_MENU = ['Dosa','Idli','Pongal','Vada','Poori','Upma','Pongal Vada','Masala Dosa','Rava Dosa','Chapati','Meals','Curd Rice','Lemon Rice','Biryani','Tea','Coffee'];
+/* [name, portion qty, price ₹, Tamil name] — copied from the printed menus */
+const BRANDS = {
+ ks:{ short:'Kalyana Sapadu', ic:'🌿', tag:'veg', sections:{
+  breakfast:[['Vada','1',20,'வடை'],['Idly','2',30,'இட்லி'],['Plain Dosa','1',60,'சாதா தோசை'],['Kal Dosa','2',60,'கல் தோசை'],['Pongal','1',60,'பொங்கல்'],['Chapathi (with Veg Curry)','3',65,'சப்பாத்தி'],['Masala Dosa','1',70,'மசாலா தோசை'],['Poori','3',70,'பூரி'],['Podi Dosa','1',75,'பொடி தோசை'],['Ghee Dosa','1',100,'நெய் தோசை'],['Podi Ghee Dosa','1',110,'பொடி நெய் தோசை']],
+  lunch:[['Parotta','2',60,'பரோட்டா'],['Chapathi','3',65,'சப்பாத்தி'],['Curd Rice','1',65,'தயிர் சாதம்'],['Tomato Rice','1',70,'தக்காளி சாதம்'],['Sambar Rice','1',75,'சாம்பார் சாதம்'],['Veg Meals','1',110,'வெஜ் மீல்ஸ்']],
+  snacks:[['Onion Pakkoda','100g',40,'வெங்காய பக்கோடா'],['Bajji','3',50,'பஜ்ஜி'],['Bonda','2',50,'போண்டா']],
+  dinner:[['Vada','1',20,'வடை'],['Idly','2',30,'இட்லி'],['Plain Dosa','1',60,'சாதா தோசை'],['Kal Dosa','2',60,'கல் தோசை'],['Parotta','2',60,'பரோட்டா'],['Chapathi','3',65,'சப்பாத்தி'],['Masala Dosa','1',70,'மசாலா தோசை'],['Poori','3',70,'பூரி'],['Podi Dosa','1',75,'பொடி தோசை'],['Veechu Parotta','1',80,'வீச்சு பரோட்டா'],['Ghee Dosa','1',100,'நெய் தோசை'],['Podi Ghee Dosa','1',110,'பொடி நெய் தோசை']] } },
+ gnb:{ short:'Grand Nikkah Biryani', ic:'🍗', tag:'nonveg', sections:{
+  lunch:[['Chicken Briyani','1',160,'சிக்கன் பிரியாணி'],['Chicken 65','1',100,'சிக்கன் 65'],['Chicken Dry','1',100,'சிக்கன் டிரை'],['Non Veg Meals','1',160,'அசைவ மீல்ஸ்'],['Egg Briyani','1',135,'முட்டை பிரியாணி'],['Plain Briyani','1',120,'பிளெயின் பிரியாணி'],['Parotta with Chicken Curry','2',80,'பரோட்டா சிக்கன் கறி'],['Chapathi with Chicken Curry','3',90,'சப்பாத்தி சிக்கன் கறி']],
+  dinner:[['Egg Dosa','1',80,'முட்டை தோசை'],['Veechu Parotta','1',80,'வீச்சு பரோட்டா'],['Egg Veechu Parotta','1',100,'முட்டை வீச்சு பரோட்டா'],['Parotta with Chicken Curry','2',80,'பரோட்டா சிக்கன் கறி'],['Chapathi with Chicken Curry','3',90,'சப்பாத்தி சிக்கன் கறி'],['Kal Dosa with Chicken Curry','2',80,'கல் தோசை சிக்கன் கறி'],['Egg Dosa with Chicken Curry','1',100,'முட்டை தோசை சிக்கன் கறி'],['Idly with Chicken Curry','2',60,'இட்லி சிக்கன் கறி'],['Chicken Curry','1',100,'சிக்கன் கறி']] } }
+};
+const tk = o => (o.siteId==='gnb'?'G':'K')+o.no;   /* K12 = Kalyana Sapadu order 12, G12 = Grand Nikkah order 12 */
+const SEC_IC = { breakfast:'🌅', lunch:'🍱', snacks:'☕', dinner:'🌙' };
+function defSection(b){ const d = new Date(), h = d.getHours()+d.getMinutes()/60, ids = Object.keys(BRANDS[b].sections);
+  const want = b==='gnb' ? (h<16?'lunch':'dinner') : (h<11?'breakfast':h<15.5?'lunch':h<18.5?'snacks':'dinner'); return ids.includes(want) ? want : ids[0]; }
+const findItem = (b, n) => { if (!BRANDS[b]) return null; for (const s of Object.values(BRANDS[b].sections)){ const x = s.find(i=>i[0]===n); if (x) return x; } return null; };
 const COUNTER_ROLES = ['counter','supervisor','admin','prodmanager','opsmanager'];
 const KITCHEN_ROLES = ['kitchen','cook','admin','prodmanager','opsmanager'];
 const OK_ROLES = ['counter','supervisor','kitchen','cook','admin','prodmanager','opsmanager'];
@@ -167,7 +197,7 @@ const L = {
   sound:'🔔 Tap here to switch ON the order bell',soundon:'Bell is ON',neworder:'NEW ORDER',orderready:'ORDER READY',sent:'Sent to kitchen',wrong:'Wrong username or password',
   nonet:'No internet — try again',norole:'This login cannot use the order screen',sitepick:'Pick a counter',all:'All counters',bell:'Bell',
   perm:'⚠ Orders cannot be saved. Admin: add the prod_orders rule in Firebase (see FIREBASE_RULES_prod.md).',by:'by',ago:'ago',late:'LATE',note:'Note',
-  rdyshort:'ready',queue:'in kitchen',addnote:'Note (optional)'},
+  rdyshort:'ready',queue:'in kitchen',addnote:'Note (optional)',total:'Total',pcs:'pcs',s_breakfast:'Breakfast',s_lunch:'Lunch',s_snacks:'Snacks',s_dinner:'Dinner',veg:'Pure Veg',nonveg:'Non-Veg'},
  hi:{title:'वनबाइट ऑर्डर',sub:'काउंटर ⇄ रसोई · कल्याण सपाडु',login:'लॉगिन',logout:'लॉगआउट',user:'उपयोगकर्ता नाम',pass:'पासवर्ड',counter:'काउंटर',kitchen:'रसोई',
   offline:'📡 ऑफ़लाइन — ऑनलाइन आते ही ऑर्डर भेजे जाएँगे',clear:'साफ़',send:'रसोई को भेजें',bill:'बिल नं.',ok:'ठीक है',
   other:'अन्य सामान…',add:'जोड़ें',tapitems:'ऑर्डर में जोड़ने के लिए सामान दबाएँ',nothingnew:'कोई ऑर्डर प्रतीक्षा में नहीं',nothingready:'अभी कुछ तैयार नहीं',
@@ -176,7 +206,7 @@ const L = {
   sound:'🔔 ऑर्डर की घंटी चालू करने के लिए यहाँ दबाएँ',soundon:'घंटी चालू है',neworder:'नया ऑर्डर',orderready:'ऑर्डर तैयार',sent:'रसोई को भेज दिया',wrong:'उपयोगकर्ता नाम या पासवर्ड गलत है',
   nonet:'इंटरनेट नहीं है — दोबारा कोशिश करें',norole:'यह लॉगिन ऑर्डर स्क्रीन के लिए नहीं है',sitepick:'काउंटर चुनें',all:'सभी काउंटर',bell:'घंटी',
   perm:'⚠ ऑर्डर सहेजे नहीं जा सकते। एडमिन: Firebase में prod_orders नियम जोड़ें (FIREBASE_RULES_prod.md देखें)।',by:'द्वारा',ago:'पहले',late:'देरी',note:'नोट',
-  rdyshort:'तैयार',queue:'रसोई में',addnote:'नोट (वैकल्पिक)'},
+  rdyshort:'तैयार',queue:'रसोई में',addnote:'नोट (वैकल्पिक)',total:'कुल',pcs:'नग',s_breakfast:'नाश्ता',s_lunch:'दोपहर का खाना',s_snacks:'स्नैक्स',s_dinner:'रात का खाना',veg:'शुद्ध शाकाहारी',nonveg:'मांसाहारी'},
  ta:{title:'ஒன்பைட் ஆர்டர்',sub:'கவுண்டர் ⇄ சமையலறை · கல்யாண சப்பாடு',login:'உள்நுழை',logout:'வெளியேறு',user:'பயனர் பெயர்',pass:'கடவுச்சொல்',counter:'கவுண்டர்',kitchen:'சமையலறை',
   offline:'📡 ஆஃப்லைன் — இணையம் வந்ததும் ஆர்டர்கள் அனுப்பப்படும்',clear:'அழி',send:'சமையலறைக்கு அனுப்பு',bill:'பில் எண்',ok:'சரி',
   other:'வேறு பொருள்…',add:'சேர்',tapitems:'ஆர்டரில் சேர்க்க பொருட்களைத் தட்டவும்',nothingnew:'காத்திருக்கும் ஆர்டர் இல்லை',nothingready:'இப்போது எதுவும் தயாராக இல்லை',
@@ -185,7 +215,7 @@ const L = {
   sound:'🔔 ஆர்டர் மணியை இயக்க இங்கே தட்டவும்',soundon:'மணி இயக்கத்தில் உள்ளது',neworder:'புதிய ஆர்டர்',orderready:'ஆர்டர் தயார்',sent:'சமையலறைக்கு அனுப்பப்பட்டது',wrong:'பயனர் பெயர் அல்லது கடவுச்சொல் தவறு',
   nonet:'இணையம் இல்லை — மீண்டும் முயலவும்',norole:'இந்த உள்நுழைவு ஆர்டர் திரைக்கு இல்லை',sitepick:'கவுண்டரைத் தேர்ந்தெடு',all:'அனைத்து கவுண்டர்கள்',bell:'மணி',
   perm:'⚠ ஆர்டர்களைச் சேமிக்க முடியவில்லை. நிர்வாகி: Firebase-இல் prod_orders விதியைச் சேர்க்கவும் (FIREBASE_RULES_prod.md பார்க்கவும்).',by:'நபர்',ago:'முன்',late:'தாமதம்',note:'குறிப்பு',
-  rdyshort:'தயார்',queue:'சமையலறையில்',addnote:'குறிப்பு (விருப்பம்)'}
+  rdyshort:'தயார்',queue:'சமையலறையில்',addnote:'குறிப்பு (விருப்பம்)',total:'மொத்தம்',pcs:'எண்',s_breakfast:'காலை உணவு',s_lunch:'மதிய உணவு',s_snacks:'சிற்றுண்டி',s_dinner:'இரவு உணவு',veg:'சுத்த சைவம்',nonveg:'அசைவம்'}
 };
 let lang = 'en'; try{ lang = localStorage.getItem('ord_lang') || (/^ta/.test(navigator.language)?'ta':'en'); }catch(e){}
 const T = k => (L[lang]||L.en)[k] || L.en[k] || k;
@@ -204,7 +234,7 @@ document.addEventListener('change', e=>{ if (e.target.classList && e.target.clas
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
 const authReady = (firebase.auth ? firebase.auth().signInAnonymously() : Promise.resolve()).catch(e=>console.warn('anon auth', e && e.message));
-let me = null, view = 'counter', sites = {}, items = {}, orders = {}, curSite = 'all', cart = {}, known = null, ringQ = 0, dateKey = '', soundOn = false, permErr = false;
+let me = null, view = 'counter', orders = {}, curSite = 'ks', carts = { ks:{}, gnb:{} }, secSel = {}, known = null, ringQ = 0, dateKey = '', soundOn = false, permErr = false;
 const dayKey = (d=new Date()) => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const store = (function(){ try{ localStorage.setItem('_t','1'); localStorage.removeItem('_t'); return localStorage; }catch(e){ return { m:{}, getItem(k){ return this.m[k]||null; }, setItem(k,v){ this.m[k]=String(v); }, removeItem(k){ delete this.m[k]; } }; } })();
 function toast(m){ const t = $('toast'); t.textContent = m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1800); }
@@ -255,9 +285,7 @@ function start(){
   view = canK && !canC ? 'kitchen' : (store.getItem('ord_view') && ((store.getItem('ord_view')==='kitchen' && canK) || (store.getItem('ord_view')==='counter' && canC)) ? store.getItem('ord_view') : 'counter');
   $('who').textContent = me.name + ' · ' + me.role;
   $('tCounter').onclick = ()=>setView('counter'); $('tKitchen').onclick = ()=>setView('kitchen');
-  db.ref(P+'sites').on('value', s=>{ sites = s.val()||{}; siteSelect(); render(); });
-  db.ref(P+'items').on('value', s=>{ items = s.val()||{}; render(); });
-  curSite = (me.siteId && me.siteId!=='all') ? me.siteId : (store.getItem('ord_site') || 'all');
+  const sv = store.getItem('ord_brand'); curSite = (sv && (sv==='ks'||sv==='gnb'||(sv==='all'&&canK))) ? sv : (canK && !canC ? 'all' : 'ks');
   document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight+'px');
   listenOrders(); keepAwake(); setInterval(()=>{ if (dayKey()!==dateKey) listenOrders(); render(true); }, 20000);
   window.addEventListener('online', netChk); window.addEventListener('offline', netChk); netChk();
@@ -266,15 +294,13 @@ function start(){
 }
 function netChk(){ $('net').classList.toggle('show', navigator.onLine===false); }
 function setView(v){ view = v; store.setItem('ord_view', v); render(); }
-function siteSelect(){
-  const sel = $('siteSel'), fixed = me && me.siteId && me.siteId!=='all', ids = Object.keys(sites);
-  sel.classList.toggle('hide', !!fixed || ids.length<2);
-  sel.innerHTML = `<option value="all">${esc(T('all'))}</option>` + ids.map(id=>`<option value="${esc(id)}" ${id===curSite?'selected':''}>${esc(sites[id].name)}</option>`).join('');
-  sel.value = curSite;
-  $('siteLbl').textContent = fixed && sites[me.siteId] ? sites[me.siteId].name : (curSite!=='all' && sites[curSite] ? sites[curSite].name : T('all'));
+function brandBar(){
+  const canK = KITCHEN_ROLES.includes(me.role), opts = (canK ? ['all'] : []).concat(['ks','gnb']);
+  $('brands').innerHTML = opts.map(k=>`<button data-b="${k}" class="${k===curSite?'on':''}">${k==='all'?'🍽️ '+esc(T('all')):BRANDS[k].ic+' '+esc(BRANDS[k].short)}<small>${k==='all'?'':esc(T(BRANDS[k].tag==='veg'?'veg':'nonveg'))}</small></button>`).join('');
+  $('brands').querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{ curSite = b.dataset.b; store.setItem('ord_brand', curSite); render(); });
+  document.documentElement.dataset.brand = curSite==='gnb' ? 'gnb' : '';
+  $('siteLbl').textContent = curSite==='all' ? T('all') : BRANDS[curSite].short;
 }
-$('siteSel').onchange = e=>{ curSite = e.target.value; store.setItem('ord_site', curSite); siteSelect(); render(); };
-
 /* ================= DATA ================= */
 let ordRef = null;
 function listenOrders(){
@@ -292,94 +318,93 @@ function listenOrders(){
     Object.values(flat).forEach(o=>{
       if (curSite!=='all' && o.siteId!==curSite) return;
       const p = prev[o.id];
-      if (!p){ o.fresh = true; if (o.st==='new' && hearNew){ newN++; newNo.push('#'+o.no); } }
-      if (o.st==='ready' && (!p || p.st!=='ready') && hearReady){ rdyN++; rdyNo.push('#'+o.no); }
+      if (!p){ o.fresh = true; if (o.st==='new' && hearNew){ newN++; newNo.push('#'+tk(o)); } }
+      if (o.st==='ready' && (!p || p.st!=='ready') && hearReady){ rdyN++; rdyNo.push('#'+tk(o)); }
     });
     if (newN) ring('new', T('neworder')+' '+newNo.slice(0,4).join(' ')+(newN>4?' +'+(newN-4):''));
     if (rdyN) ring('ready', T('orderready')+' '+rdyNo.slice(0,4).join(' ')+(rdyN>4?' +'+(rdyN-4):''));
     render();
   }, err=>{ permErr = true; render(); });
 }
-const mySite = () => (me.siteId && me.siteId!=='all') ? me.siteId : curSite;
-const visible = () => Object.values(orders).filter(o=>curSite==='all' || o.siteId===curSite);
+const mySite = () => curSite;
+const visible = () => Object.values(orders).filter(o=>BRANDS[o.siteId] && (curSite==='all' || o.siteId===curSite));
 
 /* ================= COUNTER ================= */
-function menuList(){
-  const f = Object.values(items).filter(i=>i.active!==false && i.type==='food').map(i=>({ n:i.name, ta:i.ta||'' }));
-  const base = f.length ? f : DEFAULT_MENU.map(n=>({ n, ta:'' }));
-  const seen = new Set(base.map(x=>x.n.toLowerCase()));
-  Object.keys(cart).forEach(n=>{ if (!seen.has(n.toLowerCase())) base.push({ n, ta:'' }); });
-  return base;
-}
-function cartCount(){ return Object.values(cart).reduce((a,b)=>a+b,0); }
+const cartOf = () => carts[curSite] || (carts[curSite] = {});
+function cartCount(){ return Object.values(cartOf()).reduce((a,b)=>a+b,0); }
+function cartTotal(){ return Object.entries(cartOf()).reduce((a,[n,q])=>{ const it = findItem(curSite, n); return a + (it ? it[2]*q : 0); }, 0); }
+function packTxt(it){ if (!it) return ''; const q = it[1]; return /^\d+$/.test(q) ? (+q>1 ? q+' '+T('pcs') : '') : q.replace(/(\d)g$/,'$1 g'); }
+function itName(n){ const it = findItem(curSite, n); return lang==='ta' && it && it[3] ? it[3] : n; }
 function renderCounter(){
+  if (curSite==='all'){ curSite = 'ks'; store.setItem('ord_brand','ks'); brandBar(); }
   const m = $('main'), my = visible(), rdy = my.filter(o=>o.st==='ready').sort((a,b)=>(a.readyTs||0)-(b.readyTs||0)), inK = my.filter(o=>o.st==='new'||o.st==='prep');
-  const needSite = mySite()==='all' && Object.keys(sites).length>1;
-  const menu = menuList();
+  const B = BRANDS[curSite], secIds = Object.keys(B.sections), sec = secSel[curSite] && B.sections[secSel[curSite]] ? secSel[curSite] : defSection(curSite), cart = cartOf();
+  const extra = Object.keys(cart).filter(n=>!findItem(curSite,n));
   m.innerHTML = (permErr?`<div id="perm">${esc(T('perm'))}</div>`:'') + (!soundOn?`<button id="snd">${esc(T('sound'))}</button>`:'')
     + (rdy.length ? `<h3 style="margin:4px 4px 8px;color:var(--ok)">✅ ${esc(T('readyh'))} (${rdy.length})</h3>` + rdy.map(o=>ticket(o,'ready')).join('') : '')
-    + (needSite ? `<div class="empty">${esc(T('sitepick'))} ↑</div>` : `
-    <div class="grid">${menu.map(x=>{ const q = cart[x.n]||0; return `<div class="it ${q?'has':''}" data-add="${esc(x.n)}"><b>${esc(lang==='ta'&&x.ta?x.ta:x.n)}</b><small>${esc(lang==='ta'&&x.ta?x.n:x.ta)}</small><span class="q">${q}</span><button class="mi" data-sub="${esc(x.n)}" aria-label="-1">−</button></div>`; }).join('')}</div>
-    <div class="other"><input id="oth" placeholder="${esc(T('other'))}" maxlength="40"><button id="othb">${esc(T('add'))}</button></div>`)
+    + `<div class="secs">${secIds.map(s=>`<button data-sec="${s}" class="${s===sec?'on':''}">${SEC_IC[s]} ${esc(T('s_'+s))}</button>`).join('')}</div>
+    <div class="grid">${B.sections[sec].concat(extra.map(n=>[n,'1',0,''])).map(x=>{ const q = cart[x[0]]||0, pk = packTxt(x); return `<div class="it ${q?'has':''}" data-add="${esc(x[0])}"><b>${esc(lang==='ta'&&x[3]?x[3]:x[0])}</b><small>${esc(lang==='ta'&&x[3]?x[0]:(x[3]||''))}</small><span class="pk">${esc(pk)}</span>${x[2]?`<span class="pr">₹${x[2]}</span>`:''}<span class="q">${q}</span><button class="mi" data-sub="${esc(x[0])}" aria-label="-1">−</button></div>`; }).join('')}</div>
+    <div class="other"><input id="oth" placeholder="${esc(T('other'))}" maxlength="40"><button id="othb">${esc(T('add'))}</button></div>`
     + (inK.length ? `<h3 style="margin:14px 4px 8px;color:var(--mut)">🍳 ${esc(T('cookingh'))} (${inK.length})</h3>` + inK.sort((a,b)=>a.ts-b.ts).map(o=>ticket(o,'wait')).join('') : '');
   bindCounter();
-  const ct = cartCount(); $('cart').classList.toggle('hide', needSite);
-  $('sum').textContent = ct ? Object.entries(cart).map(([n,q])=>q+' × '+n).join('  ·  ') : T('tapitems');
+  const ct = cartCount(), tt = cartTotal(); $('cart').classList.remove('hide');
+  $('sum').textContent = ct ? Object.entries(cart).map(([n,q])=>q+' × '+itName(n)).join('  ·  ') + (tt ? '   —   '+T('total')+' ₹'+tt : '') : T('tapitems');
   $('send').disabled = !ct; $('send').textContent = ct ? '🔔 '+T('send')+' ('+ct+')' : T('send');
 }
 function bindCounter(){
   const m = $('main');
-  m.querySelectorAll('[data-add]').forEach(b=>b.onclick=e=>{ if (e.target.closest('[data-sub]')) return; const n = b.dataset.add; cart[n] = (cart[n]||0)+1; renderCounter(); });
-  m.querySelectorAll('[data-sub]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const n = b.dataset.sub; if (cart[n]>1) cart[n]--; else delete cart[n]; renderCounter(); });
-  const ob = $('othb'), oi = $('oth'); const addO = ()=>{ const n = (oi.value||'').trim(); if (!n) return; cart[n] = (cart[n]||0)+1; renderCounter(); };
+  m.querySelectorAll('[data-sec]').forEach(b=>b.onclick=()=>{ secSel[curSite] = b.dataset.sec; renderCounter(); });
+  m.querySelectorAll('[data-add]').forEach(b=>b.onclick=e=>{ if (e.target.closest('[data-sub]')) return; const n = b.dataset.add, c = cartOf(); c[n] = (c[n]||0)+1; renderCounter(); });
+  m.querySelectorAll('[data-sub]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const n = b.dataset.sub, c = cartOf(); if (c[n]>1) c[n]--; else delete c[n]; renderCounter(); });
+  const ob = $('othb'), oi = $('oth'); const addO = ()=>{ const n = (oi.value||'').trim(); if (!n) return; const c = cartOf(); c[n] = (c[n]||0)+1; renderCounter(); };
   if (ob) ob.onclick = addO; if (oi) oi.addEventListener('keydown', e=>{ if (e.key==='Enter') addO(); });
   const sn = $('snd'); if (sn) sn.onclick = ()=>{ ac(); soundOn = true; bell('new',1); renderCounter(); };
   bindTickets(m);
 }
-$('clr').onclick = ()=>{ cart = {}; $('bill').value = ''; render(); };
+$('clr').onclick = ()=>{ carts[curSite] = {}; $('bill').value = ''; render(); };
 $('send').onclick = function(){
-  if (!cartCount()) return; const site = mySite(); if (!site || site==='all'){ toast(T('sitepick')); return; }
+  if (!cartCount()) return; const site = curSite; if (!BRANDS[site]){ toast(T('sitepick')); return; }
   const btn = this; btn.disabled = true;
-  const lines = Object.assign({}, cart), bill = ($('bill').value||'').trim() || null, now = Date.now();
-  db.ref(P+'orders/'+dayKey()+'/'+site+'/n').transaction(c=>(c||0)+1, (err, ok, snap)=>{
-    if (err){ permErr = true; render(); return; }
+  const lines = Object.assign({}, cartOf()), amt = cartTotal(), bill = ($('bill').value||'').trim() || null, now = Date.now(), day = dayKey();
+  db.ref(P+'orders/'+day+'/'+site+'/n').transaction(c=>(c||0)+1, (err, ok, snap)=>{
+    if (err){ permErr = true; btn.disabled = false; render(); return; }
     const no = snap ? snap.val() : 1;
-    const ref = db.ref(P+'orders/'+dayKey()+'/'+site+'/o').push();
-    ref.set({ no, lines, bill, ts:now, st:'new', by:me.name, byId:me.id }).catch(()=>{ permErr = true; render(); });
-    cart = {}; $('bill').value = ''; toast('✅ '+T('sent')+' #'+no); render();
+    const ref = db.ref(P+'orders/'+day+'/'+site+'/o').push();
+    ref.set({ no, lines, amt, bill, ts:now, st:'new', by:me.name, byId:me.id }).catch(()=>{ permErr = true; render(); });
+    carts[site] = {}; $('bill').value = ''; toast('✅ '+T('sent')+' #'+(site==='gnb'?'G':'K')+no); render();
   });
 };
 
 /* ================= KITCHEN ================= */
 function ageMin(o){ return Math.floor((Date.now()-(o.ts||Date.now()))/60000); }
+const brTag = o => curSite==='all' && BRANDS[o.siteId] ? `<span class="brtag ${o.siteId}">${BRANDS[o.siteId].ic} ${esc(BRANDS[o.siteId].short)}</span>` : '';
+const pcsOf = (o, n, q) => { const it = findItem(o.siteId, n); return it && /^\d+$/.test(it[1]) && +it[1]>1 ? q*it[1] : 0; };
+const nameOf = (o, n) => { const it = findItem(o.siteId, n); return lang==='ta' && it && it[3] ? it[3] : n; };
+function lineTxt(o){ return Object.entries(o.lines||{}).map(([n,q])=>{ const pc = pcsOf(o,n,q); return q+' '+esc(nameOf(o,n))+(pc?' <small>('+pc+' '+esc(T('pcs'))+')</small>':''); }).join(', '); }
 function ticketMini(o, mode){
-  const a = ageMin(o), lines = Object.entries(o.lines||{}).map(([n,q])=>q+' '+esc(n)).join(', ');
-  const cls = mode==='ready' ? 'rdy' : (a>=LATE_MIN ? 'w2' : a>=WARN_MIN ? 'w1' : '');
+  const a = ageMin(o), cls = mode==='ready' ? 'rdy' : (a>=LATE_MIN ? 'w2' : a>=WARN_MIN ? 'w1' : '');
   const btn = mode==='ready' ? `<button class="pick" data-give="${esc(o.id)}">${esc(T('given'))}</button>` : (COUNTER_ROLES.includes(me.role) ? `<button class="cx" data-cx="${esc(o.id)}">✕</button>` : '');
-  return `<div class="tk mini ${cls}" data-id="${esc(o.id)}"><div class="no">#${esc(o.no)}</div><div class="ln">${lines}${o.bill?` <small>· ${esc(o.bill)}</small>`:''}<br><small>${mode==='ready'?'✅':'⏱ '+a+' '+esc(T('min'))}${curSite==='all'&&sites[o.siteId]?' · '+esc(sites[o.siteId].name):''}</small></div>${btn}</div>`;
+  return `<div class="tk mini ${cls}" data-id="${esc(o.id)}"><div class="no">#${tk(o)}</div><div class="ln">${lineTxt(o)}${o.bill?` <small>· ${esc(o.bill)}</small>`:''}<br><small>${mode==='ready'?'✅':'⏱ '+a+' '+esc(T('min'))}</small>${brTag(o)}</div>${btn}</div>`;
 }
 function ticket(o, mode){
   if (mode==='ready' || mode==='wait') return ticketMini(o, mode);
-  const a = ageMin(o), cls = mode==='ready' ? 'rdy' : (a>=LATE_MIN ? 'w2' : a>=WARN_MIN ? 'w1' : '');
+  const a = ageMin(o), cls = a>=LATE_MIN ? 'w2' : a>=WARN_MIN ? 'w1' : '';
   const lines = Object.entries(o.lines||{});
   const time = new Date(o.ts||0).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-  const age = mode==='ready' ? '✅ '+Math.max(0, Math.floor((Date.now()-(o.readyTs||o.ts))/60000))+' '+T('min') : a+' '+T('min')+(a>=LATE_MIN?' · '+T('late'):'');
-  return `<div class="tk ${cls} ${o.fresh&&mode==='kitchen'?'fresh':''}" data-id="${esc(o.id)}">
-    <div class="h"><div class="no">#${esc(o.no)}</div><div class="meta">${time}${o.bill?' · '+esc(T('bill'))+' '+esc(o.bill):''}<br>${esc(o.by||'')}${curSite==='all'&&sites[o.siteId]?' · '+esc(sites[o.siteId].name):''}</div><div class="age">${age}</div></div>
-    <ul>${lines.map(([n,q])=>`<li><span class="n">${esc(q)}</span><span>${esc(n)}</span></li>`).join('')}</ul>
+  return `<div class="tk ${cls} ${o.fresh?'fresh':''}" data-id="${esc(o.id)}">
+    <div class="h"><div class="no">#${tk(o)}</div><div class="meta">${time}${o.bill?' · '+esc(T('bill'))+' '+esc(o.bill):''}<br>${esc(o.by||'')}${brTag(o)}</div><div class="age">${a} ${esc(T('min'))}${a>=LATE_MIN?' · '+esc(T('late')):''}</div></div>
+    <ul>${lines.map(([n,q])=>{ const pc = pcsOf(o,n,q); return `<li><span class="n">${esc(q)}</span><span>${esc(nameOf(o,n))}</span>${pc?`<small style="font-size:14px;color:var(--mut);font-weight:700">${pc} ${esc(T('pcs'))}</small>`:''}</li>`; }).join('')}</ul>
     ${o.note?`<div class="note">📝 ${esc(o.note)}</div>`:''}
-    <div class="act">${mode==='kitchen' ? `<button class="done" data-done="${esc(o.id)}">${esc(T('done'))}</button>`
-      : mode==='ready' ? `<button class="pick" data-give="${esc(o.id)}">${esc(T('given'))}</button>`
-      : (COUNTER_ROLES.includes(me.role) ? `<button class="cx" data-cx="${esc(o.id)}">${esc(T('cancel'))}</button>` : '')}</div></div>`;
+    <div class="act"><button class="done" data-done="${esc(o.id)}">${esc(T('done'))}</button></div></div>`;
 }
 function renderKitchen(){
-  const m = $('main'), my = visible(), q = my.filter(o=>o.st==='new'||o.st==='prep').sort((a,b)=>a.ts-b.ts);
-  const tot = {}; q.forEach(o=>Object.entries(o.lines||{}).forEach(([n,c])=>{ tot[n] = (tot[n]||0)+c; }));
+  const m = $('main'), my = visible().filter(o=>o.st!=='cancelled'), q = my.filter(o=>o.st==='new'||o.st==='prep').sort((a,b)=>a.ts-b.ts);
+  const tot = {}; q.forEach(o=>Object.entries(o.lines||{}).forEach(([n,c])=>{ const k = o.siteId+'|'+n; tot[k] = (tot[k]||0)+c; }));
   const doneToday = my.filter(o=>o.st==='ready'||o.st==='given'), tms = doneToday.filter(o=>o.readyTs&&o.ts).map(o=>(o.readyTs-o.ts)/60000);
   const avg = tms.length ? Math.round(tms.reduce((a,b)=>a+b,0)/tms.length*10)/10 : '–';
   m.innerHTML = (permErr?`<div id="perm">${esc(T('perm'))}</div>`:'') + (!soundOn?`<button id="snd">${esc(T('sound'))}</button>`:'')
     + `<div class="stats"><div><b>${q.length}</b>${esc(T('waiting'))}</div><div><b>${my.length}</b>${esc(T('orders'))}</div><div><b>${avg}</b>${esc(T('avg'))} (${esc(T('min'))})</div></div>`
-    + (q.length ? `<div id="tot"><h3>${esc(T('tomake'))}</h3><div class="chips">${Object.entries(tot).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="chip"><small>${esc(n)}</small>×${c}</div>`).join('')}</div></div>` : '')
+    + (q.length ? `<div id="tot"><h3>${esc(T('tomake'))}</h3><div class="chips">${Object.entries(tot).sort((a,b)=>b[1]-a[1]).map(([k,c])=>{ const [b,n] = k.split('|'), pc = pcsOf({siteId:b}, n, c); return `<div class="chip"><small>${curSite==='all'&&BRANDS[b]?BRANDS[b].ic+' ':''}${esc(nameOf({siteId:b}, n))}</small>×${c}${pc?' <small>= '+pc+' '+esc(T('pcs'))+'</small>':''}</div>`; }).join('')}</div></div>` : '')
     + (q.length ? q.map(o=>ticket(o,'kitchen')).join('') : `<div class="empty">🍳<br>${esc(T('nothingnew'))}</div>`);
   const sn = $('snd'); if (sn) sn.onclick = ()=>{ ac(); soundOn = true; bell('new',1); renderKitchen(); };
   bindTickets(m);
@@ -388,7 +413,7 @@ function renderKitchen(){
 function bindTickets(root){
   root.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{ const o = orders[b.dataset.done]; if (!o) return; b.disabled = true; db.ref(P+'orders/'+dateKey+'/'+o.siteId+'/o/'+o.id).update({ st:'ready', readyTs:Date.now(), readyBy:me.name }); });
   root.querySelectorAll('[data-give]').forEach(b=>b.onclick=()=>{ const o = orders[b.dataset.give]; if (!o) return; b.disabled = true; db.ref(P+'orders/'+dateKey+'/'+o.siteId+'/o/'+o.id).update({ st:'given', givenTs:Date.now(), givenBy:me.name }); });
-  root.querySelectorAll('[data-cx]').forEach(b=>b.onclick=()=>{ const o = orders[b.dataset.cx]; if (!o) return; if (!confirm(T('cancelq')+' #'+o.no)) return; db.ref(P+'orders/'+dateKey+'/'+o.siteId+'/o/'+o.id).update({ st:'cancelled', cxTs:Date.now(), cxBy:me.name }); });
+  root.querySelectorAll('[data-cx]').forEach(b=>b.onclick=()=>{ const o = orders[b.dataset.cx]; if (!o) return; if (!confirm(T('cancelq')+' #'+tk(o))) return; db.ref(P+'orders/'+dateKey+'/'+o.siteId+'/o/'+o.id).update({ st:'cancelled', cxTs:Date.now(), cxBy:me.name }); });
 }
 
 /* ================= RENDER ================= */
@@ -400,7 +425,7 @@ function render(timerOnly){
   $('tCounter').classList.toggle('on', view==='counter'); $('tKitchen').classList.toggle('on', view==='kitchen');
   const nR = live.filter(o=>o.st==='ready').length, nN = live.filter(o=>o.st==='new'||o.st==='prep').length;
   const bR = $('bdR'), bN = $('bdN'); bR.textContent = nR; bR.classList.toggle('show', nR>0); bN.textContent = nN; bN.classList.toggle('show', nN>0);
-  siteSelect();
+  brandBar();
   if (view==='kitchen') renderKitchen(); else renderCounter();
 }
 (function init(){
